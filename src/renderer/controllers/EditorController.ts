@@ -1,4 +1,4 @@
-import { ITextModel, EditorView } from "../../shared/types";
+import { ITextModel, EditorView, RenderMode } from "../../shared/types";
 
 type ShortcutEvent = React.KeyboardEvent<HTMLTextAreaElement>;
 
@@ -14,6 +14,7 @@ export class EditorController {
     private model: ITextModel;
     private view: EditorView;
     private shortcutHandlers: ShortcutHandler[];
+    private renderMode: RenderMode = "hybrid";
 
     constructor(model: ITextModel, view: EditorView) {
         this.model = model;
@@ -48,6 +49,10 @@ export class EditorController {
                     console.log(
                         "[EditorController] Command palette shortcut pressed."
                     ),
+            },
+            {
+                when: this.isToggleRenderModeShortcut,
+                run: () => this.toggleRenderMode(),
             },
             {
                 when: this.isEnterKey,
@@ -180,6 +185,14 @@ export class EditorController {
 
     private isCommandPaletteShortcut = (event: ShortcutEvent): boolean =>
         this.isModKey(event) && event.shiftKey && this.isKey(event, "p");
+
+    private isToggleRenderModeShortcut = (event: ShortcutEvent): boolean =>
+        this.isModKey(event) && event.shiftKey && this.isKey(event, "m");
+
+    private toggleRenderMode(): void {
+        this.renderMode = this.renderMode === "hybrid" ? "raw" : "hybrid";
+        this.view.setRenderMode(this.renderMode);
+    }
 
     private isKey(event: ShortcutEvent, key: string): boolean {
         return event.key.toLowerCase() === key.toLowerCase();

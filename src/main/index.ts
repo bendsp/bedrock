@@ -1,7 +1,11 @@
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { promises as fs } from "fs";
-
-type DiscardAction = "open" | "close" | "new";
+import {
+  DiscardAction,
+  SaveFilePayload,
+  OpenFileResult,
+  SaveFileResult,
+} from "../shared/types";
 
 const MARKDOWN_DIALOG_FILTER = {
   name: "Markdown Files",
@@ -48,7 +52,7 @@ const confirmDiscardChanges = async (
   return response === 1;
 };
 
-ipcMain.handle("file:open", async () => {
+ipcMain.handle("file:open", async (): Promise<OpenFileResult | null> => {
   try {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       filters: [MARKDOWN_DIALOG_FILTER],
@@ -74,8 +78,8 @@ ipcMain.handle(
   "file:save",
   async (
     event,
-    args: { filePath?: string; content: string }
-  ): Promise<{ filePath: string } | null> => {
+    args: SaveFilePayload
+  ): Promise<SaveFileResult | null> => {
     try {
       let targetPath = args.filePath;
 

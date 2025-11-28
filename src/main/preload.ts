@@ -1,21 +1,17 @@
 import { contextBridge, ipcRenderer } from "electron";
-
-type SaveFilePayload = {
-  filePath?: string;
-  content: string;
-};
-
-type DiscardPromptPayload = {
-  action: "open" | "close" | "new";
-  fileName?: string;
-};
+import {
+  SaveFilePayload,
+  DiscardPromptPayload,
+  OpenFileResult,
+  SaveFileResult,
+} from "../shared/types";
 
 contextBridge.exposeInMainWorld("electronAPI", {
-  openFile: (): Promise<{ filePath: string; content: string } | null> =>
+  openFile: (): Promise<OpenFileResult | null> =>
     ipcRenderer.invoke("file:open"),
   saveFile: (
     payload: SaveFilePayload
-  ): Promise<{ filePath: string } | null> =>
+  ): Promise<SaveFileResult | null> =>
     ipcRenderer.invoke("file:save", payload),
   confirmDiscardChanges: (payload: DiscardPromptPayload): Promise<boolean> =>
     ipcRenderer.invoke("dialog:confirm-discard", payload),

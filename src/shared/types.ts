@@ -43,3 +43,32 @@ export enum ModelEventType {
   CONTENT_CHANGED = "contentChanged",
   CURSOR_MOVED = "cursorMoved",
 }
+
+// File Operation Types
+export type DiscardAction = "open" | "close" | "new";
+
+export interface OpenFileResult {
+  filePath: string;
+  content: string;
+}
+
+export interface SaveFilePayload {
+  filePath?: string;
+  content: string;
+}
+
+export interface SaveFileResult {
+  filePath: string;
+}
+
+export interface DiscardPromptPayload {
+  action: DiscardAction;
+  fileName?: string;
+}
+
+export interface IElectronAPI {
+  openFile: () => Promise<OpenFileResult | null>;
+  saveFile: (payload: SaveFilePayload) => Promise<SaveFileResult | null>;
+  confirmDiscardChanges: (payload: DiscardPromptPayload) => Promise<boolean>;
+  notifyDirtyState: (isDirty: boolean) => void;
+}

@@ -22,9 +22,12 @@ const getDisplayFileName = (filePath: string | null): string => {
   return lastSegment || DEFAULT_FILE_NAME;
 };
 
+const formatFileName = (fileName: string, isDirty: boolean): string => {
+  return `${isDirty ? "*" : ""}${fileName}`;
+};
+
 const buildWindowTitle = (fileName: string, isDirty: boolean): string => {
-  const prefix = isDirty ? "*" : "";
-  return `${prefix}${fileName} — Bedrock`;
+  return `${formatFileName(fileName, isDirty)} — Bedrock`;
 };
 
 const toolbarButtonStyle: React.CSSProperties = {
@@ -142,7 +145,7 @@ const App = () => {
     setIsDirty(false);
   }, [model]);
 
-  const displayLabel = `${isDirty ? "*" : ""}${fileName}`;
+  const displayLabel = formatFileName(fileName, isDirty);
 
   return (
     <div

@@ -102,6 +102,7 @@ const Editor = forwardRef<EditorView, EditorProps>(
           backgroundColor: "#282c34",
           color: "#abb2bf",
           resize: "none",
+          boxSizing: "border-box",
         }}
         value={text}
         onKeyDown={handleKeyDown}

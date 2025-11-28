@@ -138,3 +138,4 @@ If you’re unsure where a responsibility belongs: default to the model for text
 - 2025-11-10: Added scratchpad section and rule to keep it updated.
 - 2025-11-10: Implemented Markdown open/save workflow with dirty-state confirmations.
 - 2025-11-28: Refactored type definitions to `src/shared/types.ts` and deduplicated UI logic in `app.tsx`.
+- 2025-11-28: Updated CSS for custom scrollbars and fixed box-sizing to prevent horizontal overflow.

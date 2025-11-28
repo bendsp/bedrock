@@ -6,6 +6,7 @@ export interface ITextModel extends EventEmitter {
   getChar(line: number, char: number): string | undefined;
   getLine(line: number): string | undefined;
   getAll(): string | undefined;
+  setAll(content: string): void;
   getCursor(): CursorPosition;
   setCursor(position: CursorPosition): void;
   insertChar(char: string): void;

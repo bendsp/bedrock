@@ -1,4 +1,4 @@
-export interface IElectronAPI {}
+export type IElectronAPI = Record<string, never>;
 
 declare global {
     interface Window {

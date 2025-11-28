@@ -6,40 +6,33 @@ import { EditorController } from "./controllers/EditorController";
 import { LinesModel } from "./models/LinesModel";
 
 const App = () => {
-  const [controller, setController] = useState<EditorController | null>(null);
-  const [model] = useState(() => new LinesModel(""));
+    const [controller, setController] = useState<EditorController | null>(null);
+    const [model] = useState(() => new LinesModel(""));
 
-  const editorRef = useCallback(
-    (editorView: EditorView | null) => {
-      if (editorView && !controller) {
-        const newController = new EditorController(model, editorView);
-        setController(newController);
-      }
-    },
-    [controller]
-  );
+    const editorRef = useCallback(
+        (editorView: EditorView | null) => {
+            if (editorView && !controller) {
+                const newController = new EditorController(model, editorView);
+                setController(newController);
+            }
+        },
+        [controller]
+    );
 
-  return (
-    <div
-      style={{
-        width: "100%",
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      <Editor
-        ref={editorRef}
-        onKeyDown={controller?.handleKeyDown}
-        model={model}
-        // onSelectionChange={controller?.handleCursorChange}
-      />
-    </div>
-  );
+    return (
+        <div className='app-shell'>
+            <Editor
+                ref={editorRef}
+                onKeyDown={controller?.handleKeyDown}
+                model={model}
+                // onSelectionChange={controller?.handleCursorChange}
+            />
+        </div>
+    );
 };
 
 const rootElement = document.getElementById("root");
 if (rootElement) {
-  const root = createRoot(rootElement);
-  root.render(<App />);
+    const root = createRoot(rootElement);
+    root.render(<App />);
 }

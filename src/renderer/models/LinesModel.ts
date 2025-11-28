@@ -4,7 +4,7 @@ import { EventEmitter } from "events";
 export class LinesModel extends EventEmitter implements ITextModel {
   private lines: string[] = [];
   private cursor: CursorPosition = { line: 0, char: 0 };
-  private lastChar: number = 0;
+  private lastChar = 0;
 
   constructor(initialText: string) {
     super();
@@ -69,7 +69,9 @@ export class LinesModel extends EventEmitter implements ITextModel {
           line: this.cursor.line,
           char: this.lines[this.cursor.line].length,
         });
+        return;
       }
+      this.lastChar = this.cursor.char;
       this.emit(ModelEventType.CURSOR_MOVED, this.cursor);
     }
   }
@@ -86,7 +88,10 @@ export class LinesModel extends EventEmitter implements ITextModel {
       const prevLineLength = prevLine.length;
       this.lines[this.cursor.line - 1] += this.lines[this.cursor.line];
       this.lines.splice(this.cursor.line, 1);
-      this.setCursor({ line: this.cursor.line - 1, char: prevLineLength });
+      this.setCursor({
+        line: this.cursor.line - 1,
+        char: prevLineLength,
+      });
       this.lastChar = this.cursor.char;
       this.emit(ModelEventType.CONTENT_CHANGED);
     }
@@ -94,17 +99,26 @@ export class LinesModel extends EventEmitter implements ITextModel {
 
   moveCursorLeft(): void {
     if (this.cursor.char > 0) {
-      this.setCursor({ line: this.cursor.line, char: this.cursor.char - 1 });
+      this.setCursor({
+        line: this.cursor.line,
+        char: this.cursor.char - 1,
+      });
     } else if (this.cursor.line > 0) {
       const prevLineLength = this.lines[this.cursor.line - 1].length;
-      this.setCursor({ line: this.cursor.line - 1, char: prevLineLength });
+      this.setCursor({
+        line: this.cursor.line - 1,
+        char: prevLineLength,
+      });
     }
     this.lastChar = this.cursor.char;
   }
 
   moveCursorRight(): void {
     if (this.cursor.char < this.lines[this.cursor.line].length) {
-      this.setCursor({ line: this.cursor.line, char: this.cursor.char + 1 });
+      this.setCursor({
+        line: this.cursor.line,
+        char: this.cursor.char + 1,
+      });
     } else if (this.cursor.line < this.lines.length - 1) {
       this.setCursor({ line: this.cursor.line + 1, char: 0 });
     }
@@ -115,13 +129,17 @@ export class LinesModel extends EventEmitter implements ITextModel {
     if (this.cursor.line <= 0) {
       return;
     }
-    this.setCursor({ line: this.cursor.line - 1, char: this.lastChar });
+    const intendedChar = this.lastChar;
+    this.setCursor({ line: this.cursor.line - 1, char: intendedChar });
+    this.lastChar = intendedChar;
   }
 
   moveCursorDown(): void {
     if (this.cursor.line >= this.lines.length - 1) {
       return;
     }
-    this.setCursor({ line: this.cursor.line + 1, char: this.lastChar });
+    const intendedChar = this.lastChar;
+    this.setCursor({ line: this.cursor.line + 1, char: intendedChar });
+    this.lastChar = intendedChar;
   }
 }

@@ -8,7 +8,7 @@ export class LinesModel extends EventEmitter implements ITextModel {
 
   constructor(initialText: string) {
     super();
-    this.lines = initialText.split("\n");
+    this.lines = initialText.length === 0 ? [""] : initialText.split("\n");
   }
 
   insert(line: number, index: number, text: string): void {
@@ -141,5 +141,13 @@ export class LinesModel extends EventEmitter implements ITextModel {
     const intendedChar = this.lastChar;
     this.setCursor({ line: this.cursor.line + 1, char: intendedChar });
     this.lastChar = intendedChar;
+  }
+
+  setAll(content: string): void {
+    this.lines = content.length === 0 ? [""] : content.split("\n");
+    this.cursor = { line: 0, char: 0 };
+    this.lastChar = 0;
+    this.emit(ModelEventType.CURSOR_MOVED, this.cursor);
+    this.emit(ModelEventType.CONTENT_CHANGED);
   }
 }

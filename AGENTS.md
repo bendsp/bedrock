@@ -137,5 +137,7 @@ If you’re unsure where a responsibility belongs: default to the model for text
 - 2025-11-10: Created `AGENTS.md` with architecture overview and contribution rules.
 - 2025-11-10: Added scratchpad section and rule to keep it updated.
 - 2025-11-10: Implemented Markdown open/save workflow with dirty-state confirmations.
+- 2025-11-12: Added live Markdown preview using markdown-it + DOMPurify, preview UI, and shortcut regression tests.
+- 2025-11-12: Swapped split preview for inline hybrid editing, added Ctrl+Shift+M raw-mode toggle, controller tests, and refreshed styling/QA notes.
 - 2025-11-28: Refactored type definitions to `src/shared/types.ts` and deduplicated UI logic in `app.tsx`.
 - 2025-11-28: Updated CSS for custom scrollbars and fixed box-sizing to prevent horizontal overflow.

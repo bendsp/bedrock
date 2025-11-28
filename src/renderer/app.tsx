@@ -187,11 +187,13 @@ const App = () => {
         </span>
       </header>
       <div style={{ flex: 1 }}>
-        <Editor
-          ref={editorRef}
-          onKeyDown={controller?.handleKeyDown}
-          model={model}
-        />
+        <div className="app-shell">
+          <Editor
+            ref={editorRef}
+            onKeyDown={controller?.handleKeyDown}
+            model={model}
+          />
+        </div>
       </div>
     </div>
   );

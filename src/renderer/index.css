@@ -44,3 +44,139 @@ body {
 #root {
   height: 100%;
 }
+
+.app-shell {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  background-color: #1f2329;
+  padding: 24px 48px;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.inline-editor {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #e0e6f0;
+}
+
+.inline-editor--raw {
+  max-width: none;
+}
+
+.inline-editor__line {
+  padding: 0;
+  position: relative;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.inline-editor__line--rendered {
+  cursor: text;
+  white-space: normal;
+}
+
+.inline-editor__line--rendered p {
+  margin: 0;
+}
+
+.inline-editor__line--rendered h2 {
+  margin-bottom: 8px;
+}
+
+.inline-editor__line--rendered h3,
+.inline-editor__line--rendered h4,
+.inline-editor__line--rendered h5,
+.inline-editor__line--rendered h6,
+.inline-editor__line--rendered h7,
+.inline-editor__line--rendered h8 {
+  margin-bottom: 4px;
+}
+
+.inline-editor__line--rendered ul,
+.inline-editor__line--rendered ol {
+  margin: 0;
+  padding-left: 1.25em;
+  line-height: 1.6;
+}
+
+.inline-editor__line--rendered li {
+  margin: 0;
+}
+
+.inline-editor__line--rendered li p {
+  margin: 0;
+  display: inline;
+}
+
+.inline-editor__line--rendered code {
+  background-color: #2c313a;
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  font-family: "Fira Code", "Source Code Pro", Monaco, Consolas, monospace;
+  font-size: 0.95em;
+}
+
+.inline-editor__line--rendered pre {
+  background-color: #2c313a;
+  padding: 0.75em;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 0;
+  font-size: 0.95em;
+}
+
+.inline-editor__line--rendered blockquote {
+  margin: 0;
+  padding-left: 1em;
+  border-left: 4px solid #3f4755;
+  color: #b6beca;
+  font-style: italic;
+}
+
+.inline-editor__line--rendered a {
+  color: #61afef;
+  text-decoration: none;
+}
+
+.inline-editor__line--rendered a:hover {
+  text-decoration: underline;
+}
+
+.inline-editor__line--active {
+  padding: 0;
+  min-height: 1.6em;
+  height: auto;
+  resize: none;
+  outline: none;
+  border: none;
+  background: transparent;
+}
+
+.inline-editor__raw-input {
+  width: 100%;
+  min-height: 70vh;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+  padding: 4px 0;
+}
+
+.inline-editor__raw-input:focus {
+  outline: none;
+}

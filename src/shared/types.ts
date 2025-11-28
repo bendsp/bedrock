@@ -29,6 +29,8 @@ export interface CursorPosition {
   char: number;
 }
 
+export type RenderMode = "hybrid" | "raw";
+
 export interface SelectionRange {
   start: CursorPosition;
   end: CursorPosition;
@@ -37,6 +39,7 @@ export interface SelectionRange {
 export interface EditorView {
   render(text: string): void;
   setCursorPosition(position: CursorPosition): void;
+  setRenderMode(mode: RenderMode): void;
 }
 
 export enum ModelEventType {

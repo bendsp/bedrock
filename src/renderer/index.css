@@ -55,6 +55,7 @@ body {
 
 .inline-editor__line--rendered {
   cursor: text;
+  white-space: normal;
 }
 
 .inline-editor__line--rendered p {
@@ -78,6 +79,16 @@ body {
 .inline-editor__line--rendered ol {
   margin: 0;
   padding-left: 1.25em;
+  line-height: 1.6;
+}
+
+.inline-editor__line--rendered li {
+  margin: 0;
+}
+
+.inline-editor__line--rendered li p {
+  margin: 0;
+  display: inline;
 }
 
 .inline-editor__line--rendered code {
@@ -103,6 +114,15 @@ body {
   border-left: 4px solid #3f4755;
   color: #b6beca;
   font-style: italic;
+}
+
+.inline-editor__line--rendered a {
+  color: #61afef;
+  text-decoration: none;
+}
+
+.inline-editor__line--rendered a:hover {
+  text-decoration: underline;
 }
 
 .inline-editor__line--active {

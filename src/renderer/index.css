@@ -85,6 +85,7 @@ body {
 .inline-editor__line--rendered {
   cursor: text;
   white-space: normal;
+  min-height: 1.6em;
 }
 
 .inline-editor__line--rendered p {
@@ -135,6 +136,31 @@ body {
   overflow-x: auto;
   margin: 0;
   font-size: 0.95em;
+}
+
+.inline-editor__code-fence {
+  background-color: #2c313a;
+  color: #98a2b3;
+  padding: 0.35em 0.6em;
+  margin: 0;
+  border-radius: 4px;
+  font-family: "Fira Code", "Source Code Pro", Monaco, Consolas, monospace;
+  font-size: 0.95em;
+}
+
+.inline-editor__codeblock {
+  background-color: #2c313a;
+  color: #e6edf3;
+  padding: 0.35em 0.6em;
+  margin: 0;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.inline-editor__codeblock code {
+  font-family: "Fira Code", "Source Code Pro", Monaco, Consolas, monospace;
+  white-space: pre-wrap;
+  display: block;
 }
 
 .inline-editor__line--rendered blockquote {

@@ -7,8 +7,10 @@ import React, {
 } from "react";
 import { createRoot } from "react-dom/client";
 import Editor from "./components/editor";
-import { EditorView, ModelEventType } from "../shared/types";
+import { EditorView, ModelEventType, ITextModel } from "../shared/types";
 import { EditorController } from "./controllers/EditorController";
+import { DocumentModel } from "./models/DocumentModel";
+import { RopeModel } from "./models/RopeModel";
 import { LinesModel } from "./models/LinesModel";
 
 const DEFAULT_FILE_NAME = "Untitled.md";
@@ -40,9 +42,24 @@ const toolbarButtonStyle: React.CSSProperties = {
   padding: "4px 12px",
 };
 
+const selectModel = (): ITextModel => {
+  const choice =
+    (typeof localStorage !== "undefined" &&
+      localStorage.getItem("bedrock:model")) ||
+    "rope";
+
+  if (choice === "rope") {
+    return new RopeModel("");
+  }
+  if (choice === "lines") {
+    return new LinesModel("");
+  }
+  return new DocumentModel("");
+};
+
 const App = () => {
   const [controller, setController] = useState<EditorController | null>(null);
-  const [model] = useState(() => new LinesModel(""));
+  const [model] = useState<ITextModel>(() => selectModel());
   const [filePath, setFilePath] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const suppressDirtyRef = useRef(false);

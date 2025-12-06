@@ -85,6 +85,7 @@ body {
 .inline-editor__line--rendered {
   cursor: text;
   white-space: normal;
+  min-height: 1.6em;
 }
 
 .inline-editor__line--rendered p {

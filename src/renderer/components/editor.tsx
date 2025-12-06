@@ -167,7 +167,8 @@ const Editor = forwardRef<EditorView, EditorProps>(
           }
 
           const html = renderedLines[index] ?? "&nbsp;";
-          const hasContent = html.trim().length > 0;
+          const safeHtml = html.trim().length > 0 ? html : "&nbsp;";
+          const hasContent = safeHtml.trim().length > 0;
 
           return (
             <div
@@ -178,7 +179,7 @@ const Editor = forwardRef<EditorView, EditorProps>(
                 handleLineClick(index);
               }}
               dangerouslySetInnerHTML={{
-                __html: hasContent ? html : "<span>&nbsp;</span>",
+                __html: hasContent ? safeHtml : "<span>&nbsp;</span>",
               }}
             />
           );

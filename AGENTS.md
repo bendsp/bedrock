@@ -122,8 +122,9 @@ Arrow keys, Backspace, and Enter follow the same pattern via specific model APIs
 
 ## Small Implementation Notes
 
-- `LinesModel` keeps a per-line array and cursor state; `DocumentModel` is an alternative buffer-backed implementation using a single string plus cursor offset helpers while still emitting the same model events.
-- Multi-line inserts and deletes in `DocumentModel` operate on string slices; vertical movement still tracks `lastChar` for consistent column memory.
+- `LinesModel` keeps a per-line array and cursor state; `DocumentModel` is a buffer-backed implementation using a single string plus cursor offset helpers; `RopeModel` uses a balanced rope with leaf chunks (~2 KB) that stores length and line metadata.
+- `RopeModel` emits the same model events as other implementations and supports undo/redo via compact change records (insert/delete). It also exposes helpers `getTextInRange` and `forEachChunk` for non-copying iteration.
+- Multi-line inserts and deletes in `DocumentModel`/`RopeModel` operate on string slices; vertical movement still tracks `lastChar` for consistent column memory.
 - `getAll()` returns the full text string; `EditorController` bootstraps the view with `model.getAll() || ""` to account for the broader interface contract.
 - Cursor clamping prevents caret from exceeding current line length, which is important after edits and vertical moves.
 
@@ -143,3 +144,4 @@ If you’re unsure where a responsibility belongs: default to the model for text
 - 2025-11-28: Refactored type definitions to `src/shared/types.ts` and deduplicated UI logic in `app.tsx`.
 - 2025-11-28: Updated CSS for custom scrollbars and fixed box-sizing to prevent horizontal overflow.
 - 2025-12-06: Added `DocumentModel` (buffer-backed text model) alongside `LinesModel`, improved hybrid Markdown rendering for fenced code blocks, and added model/markdown regression tests.
+- 2025-12-06: Added `RopeModel` (balanced rope with chunked leaves, undo/redo, and chunk iteration) and a runtime model selector via `localStorage.getItem("bedrock:model")` (`document` | `lines` | `rope`); default model is now `rope`.

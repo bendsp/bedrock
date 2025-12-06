@@ -2,6 +2,7 @@ import { strict as assert } from "assert";
 import type React from "react";
 import { EditorController } from "../src/renderer/controllers/EditorController";
 import { DocumentModel } from "../src/renderer/models/DocumentModel";
+import { RopeModel } from "../src/renderer/models/RopeModel";
 import { CursorPosition, EditorView, RenderMode } from "../src/shared/types";
 
 interface KeyboardEventInit {
@@ -115,6 +116,26 @@ runTest("toggle render mode cycles between hybrid and raw", () => {
     createKeyboardEvent({ key: "m", ctrlKey: true, shiftKey: true })
   );
   assert.equal(view.renderMode, "hybrid");
+});
+
+runTest("arrow keys preserve cursor memory with RopeModel", () => {
+  const model = new RopeModel("abcdefghijk\nx\nmnopqrstuvwx");
+  const view = new TestView();
+  const controller = new EditorController(model, view);
+
+  model.setCursor({ line: 0, char: 10 });
+
+  controller.handleKeyDown(createKeyboardEvent({ key: "ArrowDown" }));
+  assert.deepEqual(model.getCursor(), { line: 1, char: 1 });
+
+  controller.handleKeyDown(createKeyboardEvent({ key: "ArrowDown" }));
+  assert.deepEqual(model.getCursor(), { line: 2, char: 10 });
+
+  controller.handleKeyDown(createKeyboardEvent({ key: "ArrowUp" }));
+  assert.deepEqual(model.getCursor(), { line: 1, char: 1 });
+
+  controller.handleKeyDown(createKeyboardEvent({ key: "ArrowUp" }));
+  assert.deepEqual(model.getCursor(), { line: 0, char: 10 });
 });
 
 if (process.exitCode && process.exitCode !== 0) {

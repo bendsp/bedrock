@@ -164,9 +164,10 @@ export class RopeModel extends EventEmitter implements ITextModel {
       return;
     }
     const targetLine = cursor.line - 1;
-    const targetChar = Math.min(this.lastChar, this.getLineLength(targetLine));
+    const intendedChar = this.lastChar;
+    const targetChar = Math.min(intendedChar, this.getLineLength(targetLine));
     this.setCursor({ line: targetLine, char: targetChar });
-    this.lastChar = targetChar;
+    this.lastChar = intendedChar;
   }
 
   moveCursorDown(): void {
@@ -176,9 +177,10 @@ export class RopeModel extends EventEmitter implements ITextModel {
       return;
     }
     const targetLine = cursor.line + 1;
-    const targetChar = Math.min(this.lastChar, this.getLineLength(targetLine));
+    const intendedChar = this.lastChar;
+    const targetChar = Math.min(intendedChar, this.getLineLength(targetLine));
     this.setCursor({ line: targetLine, char: targetChar });
-    this.lastChar = targetChar;
+    this.lastChar = intendedChar;
   }
 
   // Extras (not part of ITextModel) -----------------------------------------

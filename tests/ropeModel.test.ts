@@ -37,6 +37,23 @@ runTest("cursor conversions remain stable", () => {
   assert.deepEqual(model.getCursor(), { line: 2, char: 2 });
 });
 
+runTest("cursor memory persists across short lines", () => {
+  const model = new RopeModel("abcdefghijk\nx\nmnopqrstuvwx");
+
+  model.setCursor({ line: 0, char: 10 }); // near end of long line
+  model.moveCursorDown(); // into short line -> clamped
+  assert.deepEqual(model.getCursor(), { line: 1, char: 1 });
+
+  model.moveCursorDown(); // into long line -> restore intended column
+  assert.deepEqual(model.getCursor(), { line: 2, char: 10 });
+
+  model.moveCursorUp(); // back to short line -> clamp
+  assert.deepEqual(model.getCursor(), { line: 1, char: 1 });
+
+  model.moveCursorUp(); // back to long line -> restore intended column
+  assert.deepEqual(model.getCursor(), { line: 0, char: 10 });
+});
+
 runTest("getLine and getChar work across rope splits", () => {
   const longLine = "x".repeat(5000);
   const model = new RopeModel(`${longLine}\nyy\nz`);

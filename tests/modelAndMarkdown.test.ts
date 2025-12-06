@@ -58,3 +58,4 @@ runTest("renderMarkdownLines preserves fenced code blocks", () => {
 if (process.exitCode && process.exitCode !== 0) {
   throw new Error("One or more tests failed.");
 }
+

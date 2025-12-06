@@ -10,7 +10,7 @@
     "build": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
-    "test": "ts-node --project tsconfig.json tests/controllerShortcuts.test.ts"
+    "test": "ts-node --project tsconfig.json tests/index.ts"
   },
   "keywords": [],
   "author": {

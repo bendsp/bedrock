@@ -9,7 +9,7 @@ import { createRoot } from "react-dom/client";
 import Editor from "./components/editor";
 import { EditorView, ModelEventType } from "../shared/types";
 import { EditorController } from "./controllers/EditorController";
-import { LinesModel } from "./models/LinesModel";
+import { DocumentModel } from "./models/DocumentModel";
 
 const DEFAULT_FILE_NAME = "Untitled.md";
 
@@ -42,7 +42,7 @@ const toolbarButtonStyle: React.CSSProperties = {
 
 const App = () => {
   const [controller, setController] = useState<EditorController | null>(null);
-  const [model] = useState(() => new LinesModel(""));
+  const [model] = useState(() => new DocumentModel(""));
   const [filePath, setFilePath] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const suppressDirtyRef = useRef(false);

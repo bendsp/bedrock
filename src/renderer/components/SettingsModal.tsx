@@ -163,7 +163,15 @@ const SettingsModal = ({
             type="button"
             size="sm"
             variant="secondary"
-            onClick={() => setListeningFor(isActive ? null : action)}
+            onClick={() => {
+              if (isActive) {
+                setPendingBinding(null);
+                setListeningFor(null);
+              } else {
+                setPendingBinding(null);
+                setListeningFor(action);
+              }
+            }}
           >
             {isActive ? "Cancel" : "Change"}
           </Button>
@@ -181,8 +189,16 @@ const SettingsModal = ({
       <div className="w-[90%] h-[90%] bg-[color:var(--panel-bg)] border border-[color:var(--panel-border)] rounded-xl shadow-2xl text-[color:var(--panel-text)] flex flex-col p-6 gap-4 text-base">
         <div className="flex items-center justify-between border-b border-[color:var(--panel-border)] pb-3">
           <h2 className="m-0 text-lg tracking-[0.2px]">Settings</h2>
-          <Button variant="secondary" size="sm" onClick={onClose}>
-            Close
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onClose}
+            className="inline-flex items-center gap-2"
+          >
+            Close{" "}
+            <Kbd className="h-5 min-w-5 px-1 text-[11px] font-semibold leading-[1.15]">
+              Esc
+            </Kbd>
           </Button>
         </div>
         <div className="flex-1 overflow-auto pt-1 space-y-4">

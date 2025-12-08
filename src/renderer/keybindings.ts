@@ -18,6 +18,19 @@ const normalizePart = (part: string): string => {
   return lower;
 };
 
+export const isModifierKey = (key: string): boolean => {
+  const lower = key.toLowerCase();
+  return (
+    lower === "meta" ||
+    lower === "cmd" ||
+    lower === "control" ||
+    lower === "ctrl" ||
+    lower === "shift" ||
+    lower === "alt" ||
+    lower === "option"
+  );
+};
+
 export const normalizeBinding = (binding: string): string => {
   const rawParts = binding.split("+").map(normalizePart).filter(Boolean);
   const keyPart = rawParts.find(
@@ -40,6 +53,11 @@ export const eventToBinding = (
 
   // Require a modifier to avoid capturing plain typing.
   if (!event.metaKey && !event.ctrlKey) {
+    return null;
+  }
+
+  // Avoid committing when only modifier keys are pressed.
+  if (isModifierKey(key)) {
     return null;
   }
 

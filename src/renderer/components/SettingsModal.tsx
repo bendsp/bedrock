@@ -4,6 +4,7 @@ import {
   eventToBinding,
   formatBinding,
   keyBindingLabels,
+  isModifierKey,
 } from "../keybindings";
 
 type SettingsModalProps = {
@@ -65,34 +66,48 @@ const SettingsModal = ({
   const [listeningFor, setListeningFor] = useState<KeyBindingAction | null>(
     null
   );
+  const [pendingBinding, setPendingBinding] = useState<string | null>(null);
 
   useEffect(() => {
     if (!listeningFor) {
       return;
     }
 
-    const handleCapture = (event: KeyboardEvent) => {
-      event.preventDefault();
+    const handleKeyDown = (event: KeyboardEvent) => {
       const binding = eventToBinding(event);
       if (!binding) {
-        setListeningFor(null);
         return;
       }
+      setPendingBinding(binding);
+      event.preventDefault();
+    };
 
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (isModifierKey(event.key)) {
+        return;
+      }
+      if (!pendingBinding) {
+        return;
+      }
       onChange({
         ...settings,
         keyBindings: {
           ...settings.keyBindings,
-          [listeningFor]: binding,
+          [listeningFor]: pendingBinding,
         },
       });
+      setPendingBinding(null);
       setListeningFor(null);
+      event.preventDefault();
     };
 
-    window.addEventListener("keydown", handleCapture, { capture: true });
-    return () =>
-      window.removeEventListener("keydown", handleCapture, { capture: true });
-  }, [listeningFor, onChange, settings]);
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    window.addEventListener("keyup", handleKeyUp, { capture: true });
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown, { capture: true });
+      window.removeEventListener("keyup", handleKeyUp, { capture: true });
+    };
+  }, [listeningFor, onChange, pendingBinding, settings]);
 
   const updateTextSize = (delta: number) => {
     const next = Math.min(28, Math.max(12, settings.textSize + delta));
@@ -133,7 +148,9 @@ const SettingsModal = ({
             }}
           >
             {isActive
-              ? "Press keys…"
+              ? pendingBinding
+                ? formatBinding(pendingBinding)
+                : "Press keys…"
               : formatBinding(settings.keyBindings[action])}
           </span>
           <button

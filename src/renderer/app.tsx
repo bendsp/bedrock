@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { createRoot } from "react-dom/client";
 import Editor from "./components/editor";
+import SettingsModal from "./components/SettingsModal";
 import { EditorView, ModelEventType, ITextModel } from "../shared/types";
 import { EditorController } from "./controllers/EditorController";
 import { DocumentModel } from "./models/DocumentModel";
@@ -62,6 +63,7 @@ const App = () => {
   const [model] = useState<ITextModel>(() => selectModel());
   const [filePath, setFilePath] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const suppressDirtyRef = useRef(false);
 
   const editorRef = useCallback(
@@ -162,6 +164,14 @@ const App = () => {
     setIsDirty(false);
   }, [model]);
 
+  const handleOpenSettings = useCallback(() => {
+    setIsSettingsOpen(true);
+  }, []);
+
+  const handleCloseSettings = useCallback(() => {
+    setIsSettingsOpen(false);
+  }, []);
+
   const displayLabel = formatFileName(fileName, isDirty);
 
   return (
@@ -198,6 +208,13 @@ const App = () => {
           >
             Save As…
           </button>
+          <button
+            type="button"
+            style={toolbarButtonStyle}
+            onClick={handleOpenSettings}
+          >
+            Settings
+          </button>
         </div>
         <span style={{ marginLeft: "auto", fontSize: "13px" }}>
           {displayLabel}
@@ -212,6 +229,7 @@ const App = () => {
           />
         </div>
       </div>
+      {isSettingsOpen ? <SettingsModal onClose={handleCloseSettings} /> : null}
     </div>
   );
 };

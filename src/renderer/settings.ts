@@ -107,3 +107,14 @@ export const saveSettings = (settings: UserSettings) => {
     /* ignore storage failures */
   }
 };
+
+export const clearSettingsStorage = () => {
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore failures */
+  }
+};

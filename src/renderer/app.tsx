@@ -19,6 +19,7 @@ import {
   loadSettings,
   saveSettings,
   UserSettings,
+  clearSettingsStorage,
 } from "./settings";
 import {
   clampKeyBindings,
@@ -233,6 +234,11 @@ const App = () => {
     }));
   }, []);
 
+  const handleClearLocalStorage = useCallback(() => {
+    clearSettingsStorage();
+    setSettings(defaultSettings);
+  }, []);
+
   useEffect(() => {
     if (isSettingsOpen) {
       return;
@@ -330,6 +336,7 @@ const App = () => {
           onClose={handleCloseSettings}
           onChange={handleUpdateSettings}
           onResetBindings={handleResetBindings}
+          onClearLocalStorage={handleClearLocalStorage}
         />
       ) : null}
     </div>

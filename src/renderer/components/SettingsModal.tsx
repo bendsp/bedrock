@@ -13,6 +13,7 @@ type SettingsModalProps = {
   onClose: () => void;
   onChange: (settings: UserSettings) => void;
   onResetBindings: () => void;
+  onClearLocalStorage: () => void;
 };
 
 const overlayStyle: React.CSSProperties = {
@@ -63,6 +64,7 @@ const SettingsModal = ({
   onClose,
   onChange,
   onResetBindings,
+  onClearLocalStorage,
 }: SettingsModalProps) => {
   const [listeningFor, setListeningFor] = useState<KeyBindingAction | null>(
     null
@@ -369,6 +371,21 @@ const SettingsModal = ({
                 onClick={onResetBindings}
               >
                 Reset bindings
+              </button>
+            </div>
+          </section>
+          <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <h3 style={{ margin: "12px 0 0 0", fontSize: "1em" }}>Developer</h3>
+            <p style={{ color: "var(--muted-text)", margin: 0, fontSize: 12 }}>
+              Clear saved preferences to test defaults.
+            </p>
+            <div>
+              <button
+                type="button"
+                style={{ ...closeButtonStyle, padding: "6px 12px" }}
+                onClick={onClearLocalStorage}
+              >
+                Clear local storage
               </button>
             </div>
           </section>

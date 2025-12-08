@@ -74,4 +74,5 @@ export interface IElectronAPI {
   saveFile: (payload: SaveFilePayload) => Promise<SaveFileResult | null>;
   confirmDiscardChanges: (payload: DiscardPromptPayload) => Promise<boolean>;
   notifyDirtyState: (isDirty: boolean) => void;
+  openDevTools: () => void;
 }

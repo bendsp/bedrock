@@ -74,6 +74,17 @@ const App = () => {
   const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(
     () => window.matchMedia("(prefers-color-scheme: dark)").matches
   );
+  useEffect(() => {
+    const handleDevToolsShortcut = (event: KeyboardEvent) => {
+      if (event.key === "F12") {
+        event.preventDefault();
+        window.electronAPI.openDevTools();
+      }
+    };
+
+    window.addEventListener("keydown", handleDevToolsShortcut);
+    return () => window.removeEventListener("keydown", handleDevToolsShortcut);
+  }, []);
 
   const editorRef = useCallback(
     (editorView: EditorView | null) => {

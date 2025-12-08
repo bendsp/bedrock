@@ -353,6 +353,15 @@ const SettingsModal = ({
                 Clear local storage
               </Button>
             </div>
+            <div>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => window.electronAPI.openDevTools()}
+              >
+                Open DevTools
+              </Button>
+            </div>
           </section>
         </div>
       </div>

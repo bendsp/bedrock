@@ -8,7 +8,7 @@ const Kbd = React.forwardRef<
   <span
     ref={ref}
     className={cn(
-      "inline-flex items-center justify-center rounded-md border border-[color:var(--button-border)] bg-[color:var(--panel-bg)]/30 px-2 py-1 text-[11px] font-medium leading-none text-[color:var(--button-text)] shadow-sm",
+      "inline-flex h-9 min-w-9 items-center justify-center rounded-lg border border-[color:var(--panel-border)] bg-[color:var(--panel-bg)]/70 px-3 text-[11px] font-mono font-medium leading-none text-[color:var(--button-text)] shadow-sm",
       className
     )}
     {...props}

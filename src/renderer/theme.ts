@@ -174,3 +174,4 @@ export const themeDisplayName: Record<ThemeName, string> = themeOptions.reduce(
   },
   {} as Record<ThemeName, string>
 );
+

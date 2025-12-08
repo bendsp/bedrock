@@ -147,16 +147,19 @@ const SettingsModal = ({
           </Button>
         </div>
         <div className="flex-1 overflow-auto pt-1 space-y-4">
-          <section className="flex flex-col gap-2">
-            <div className="flex items-center gap-3">
-              <Label className="w-28 text-[0.9em] text-[color:var(--muted-text)]">
-                Text size
-              </Label>
+          <section className="flex flex-col gap-3 rounded-xl border border-[color:var(--panel-border)] bg-[color:var(--panel-bg)]/60 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Label className="text-sm font-semibold text-[color:var(--panel-text)]">
+                  Text size
+                </Label>
+              </div>
               <div className="flex items-center gap-2">
                 <Button
                   type="button"
                   aria-label="Decrease text size"
                   size="icon"
+                  variant="secondary"
                   onClick={() => updateTextSize(-1)}
                 >
                   –
@@ -168,22 +171,26 @@ const SettingsModal = ({
                   type="button"
                   aria-label="Increase text size"
                   size="icon"
+                  variant="secondary"
                   onClick={() => updateTextSize(1)}
                 >
                   +
                 </Button>
               </div>
             </div>
-            <p className="text-[color:var(--muted-text)] mt-1 text-xs">
+            <p className="text-[color:var(--muted-text)] m-0 text-xs">
               Adjust the editor font size. Changes apply immediately.
             </p>
           </section>
-          <section className="flex flex-col gap-2">
-            <h3 className="mt-3 text-base">Theme</h3>
-            <p className="text-[color:var(--muted-text)] m-0 text-xs">
-              Pick a theme. Colors apply across the app.
-            </p>
-            <div className="flex items-center gap-3 flex-wrap">
+
+          <section className="flex flex-col gap-3 rounded-xl border border-[color:var(--panel-border)] bg-[color:var(--panel-bg)]/60 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="m-0 text-base font-semibold">Theme</h3>
+                <p className="text-[color:var(--muted-text)] m-0 text-xs">
+                  Pick a theme. Colors apply across the app.
+                </p>
+              </div>
               <div className="flex items-center gap-2">
                 <Switch
                   checked={settings.followSystem}
@@ -195,34 +202,36 @@ const SettingsModal = ({
                   }
                 />
                 <span className="text-[color:var(--panel-text)] text-[0.95em]">
-                  Follow system theme
+                  Follow system
                 </span>
               </div>
-              {!settings.followSystem && (
-                <Select
-                  value={settings.theme}
-                  onValueChange={(value) =>
-                    onChange({
-                      ...settings,
-                      theme: value as ThemeName,
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {themeOptions.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {themeDisplayName[option]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
             </div>
+
+            {!settings.followSystem && (
+              <Select
+                value={settings.theme}
+                onValueChange={(value) =>
+                  onChange({
+                    ...settings,
+                    theme: value as ThemeName,
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {themeOptions.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {themeDisplayName[option]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
             {settings.followSystem && (
-              <div className="flex gap-4 flex-wrap">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="flex items-center gap-2">
                   <span className="text-[color:var(--muted-text)] text-xs">
                     Light mode
@@ -276,12 +285,15 @@ const SettingsModal = ({
               </div>
             )}
           </section>
-          <section className="flex flex-col gap-2">
-            <h3 className="mt-3 text-base">Keybindings</h3>
-            <p className="text-[color:var(--muted-text)] m-0 text-xs">
-              Click change, then press a new shortcut. Use Cmd/Ctrl combos.
-            </p>
-            {keyBindingRows}
+
+          <section className="flex flex-col gap-3 rounded-xl border border-[color:var(--panel-border)] bg-[color:var(--panel-bg)]/60 p-4">
+            <div>
+              <h3 className="m-0 text-base font-semibold">Keybindings</h3>
+              <p className="text-[color:var(--muted-text)] m-0 text-xs">
+                Click change, then press a new shortcut. Use Cmd/Ctrl combos.
+              </p>
+            </div>
+            <div className="space-y-2">{keyBindingRows}</div>
             <div className="flex justify-start">
               <Button
                 type="button"
@@ -292,8 +304,9 @@ const SettingsModal = ({
               </Button>
             </div>
           </section>
-          <section className="flex flex-col gap-2">
-            <h3 className="mt-3 text-base">Developer</h3>
+
+          <section className="flex flex-col gap-3 rounded-xl border border-[color:var(--panel-border)] bg-[color:var(--panel-bg)]/60 p-4">
+            <h3 className="m-0 text-base font-semibold">Developer</h3>
             <p className="text-[color:var(--muted-text)] m-0 text-xs">
               Clear saved preferences to test defaults.
             </p>

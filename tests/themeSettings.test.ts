@@ -114,3 +114,4 @@ runTest("clearSettingsStorage removes persisted data", () => {
 if (process.exitCode && process.exitCode !== 0) {
   throw new Error("One or more tests failed.");
 }
+

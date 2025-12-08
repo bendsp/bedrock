@@ -126,10 +126,8 @@ const SettingsModal = ({
           const showPlus = index < parts.length - 1;
           return (
             <React.Fragment key={`${binding}-${index}`}>
-              <Kbd>{label}</Kbd>
-              {showPlus ? (
-                <span className="text-[color:var(--muted-text)]">+</span>
-              ) : null}
+              <Kbd className="">{label}</Kbd>
+              {showPlus ? <span> + </span> : null}
             </React.Fragment>
           );
         })}

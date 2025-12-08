@@ -6,7 +6,7 @@ import {
   keyBindingLabels,
   isModifierKey,
 } from "../keybindings";
-import { themeOptions, ThemeName } from "../theme";
+import { themeOptions, ThemeName, themeDisplayName } from "../theme";
 
 type SettingsModalProps = {
   settings: UserSettings;
@@ -291,7 +291,7 @@ const SettingsModal = ({
                 >
                   {themeOptions.map((option) => (
                     <option key={option} value={option}>
-                      {option}
+                      {themeDisplayName[option]}
                     </option>
                   ))}
                 </select>
@@ -321,7 +321,7 @@ const SettingsModal = ({
                   >
                     {themeOptions.map((option) => (
                       <option key={option} value={option}>
-                        {option}
+                        {themeDisplayName[option]}
                       </option>
                     ))}
                   </select>
@@ -348,7 +348,7 @@ const SettingsModal = ({
                   >
                     {themeOptions.map((option) => (
                       <option key={option} value={option}>
-                        {option}
+                        {themeDisplayName[option]}
                       </option>
                     ))}
                   </select>

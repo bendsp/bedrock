@@ -1,13 +1,20 @@
-export type ThemeName = "dark" | "light" | "moonlight";
+export type ThemeName =
+  | "dark"
+  | "light"
+  | "moonlight"
+  | "aquamarine"
+  | "solarized";
 
 type Theme = {
   name: ThemeName;
+  displayName: string;
   variables: Record<string, string>;
 };
 
 const themes: Record<ThemeName, Theme> = {
   dark: {
     name: "dark",
+    displayName: "Dark",
     variables: {
       "--bg-body": "#282c34",
       "--text-body": "#abb2bf",
@@ -33,6 +40,7 @@ const themes: Record<ThemeName, Theme> = {
   },
   light: {
     name: "light",
+    displayName: "Light",
     variables: {
       "--bg-body": "#f5f7fb",
       "--text-body": "#1f2430",
@@ -58,6 +66,7 @@ const themes: Record<ThemeName, Theme> = {
   },
   moonlight: {
     name: "moonlight",
+    displayName: "Moonlight",
     variables: {
       "--bg-body": "#1b1424",
       "--text-body": "#f5e9ff",
@@ -81,6 +90,58 @@ const themes: Record<ThemeName, Theme> = {
       "--blockquote-text": "#e5d4f7",
     },
   },
+  aquamarine: {
+    name: "aquamarine",
+    displayName: "Aquamarine",
+    variables: {
+      "--bg-body": "#031a2b",
+      "--text-body": "#d9f4ff",
+      "--shell-bg": "#05233a",
+      "--header-bg": "#06304d",
+      "--header-border": "#042235",
+      "--header-text": "#e6fbff",
+      "--button-bg": "#0a4f83",
+      "--button-border": "#0f71b4",
+      "--button-text": "#e8fbff",
+      "--panel-bg": "#042b45",
+      "--panel-border": "#0a4f83",
+      "--panel-text": "#def6ff",
+      "--muted-text": "#9ed6f5",
+      "--overlay": "rgba(3, 20, 35, 0.7)",
+      "--code-bg": "#06304d",
+      "--code-inline-bg": "#0a4f83",
+      "--code-text": "#e8fbff",
+      "--link-color": "#4ecbff",
+      "--blockquote-border": "#0f71b4",
+      "--blockquote-text": "#c7eefe",
+    },
+  },
+  solarized: {
+    name: "solarized",
+    displayName: "Solarized",
+    variables: {
+      "--bg-body": "#002b36",
+      "--text-body": "#93a1a1",
+      "--shell-bg": "#073642",
+      "--header-bg": "#002b36",
+      "--header-border": "#073642",
+      "--header-text": "#eee8d5",
+      "--button-bg": "#073642",
+      "--button-border": "#0c3a48",
+      "--button-text": "#eee8d5",
+      "--panel-bg": "#002b36",
+      "--panel-border": "#0c3a48",
+      "--panel-text": "#eee8d5",
+      "--muted-text": "#93a1a1",
+      "--overlay": "rgba(0, 43, 54, 0.7)",
+      "--code-bg": "#073642",
+      "--code-inline-bg": "#0c3a48",
+      "--code-text": "#fdf6e3",
+      "--link-color": "#268bd2",
+      "--blockquote-border": "#586e75",
+      "--blockquote-text": "#93a1a1",
+    },
+  },
 };
 
 export const applyTheme = (themeName: ThemeName) => {
@@ -95,7 +156,21 @@ export const getTheme = (themeName: ThemeName): Theme => {
   return themes[themeName] ?? themes.dark;
 };
 
-export const themeOptions: ThemeName[] = ["dark", "light", "moonlight"];
+export const themeOptions: ThemeName[] = [
+  "dark",
+  "light",
+  "moonlight",
+  "aquamarine",
+  "solarized",
+];
 
 export const isThemeName = (value: string): value is ThemeName =>
   themeOptions.includes(value as ThemeName);
+
+export const themeDisplayName: Record<ThemeName, string> = themeOptions.reduce(
+  (acc, name) => {
+    acc[name] = themes[name].displayName;
+    return acc;
+  },
+  {} as Record<ThemeName, string>
+);

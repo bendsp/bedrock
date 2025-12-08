@@ -142,6 +142,10 @@ const App = () => {
       "--editor-font-size",
       `${settings.textSize}px`
     );
+    document.documentElement.style.setProperty(
+      "--ui-font-size",
+      `${(settings.uiScale / 100) * 15}px`
+    );
     saveSettings(settings);
   }, [settings]);
 

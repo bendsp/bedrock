@@ -50,6 +50,7 @@ body {
 }
 
 :root {
+  --ui-font-size: 15px;
   --bg-body: #282c34;
   --text-body: #abb2bf;
   --shell-bg: #1f2329;
@@ -79,6 +80,7 @@ body {
   --link-color: #61afef;
   --blockquote-border: #3f4755;
   --blockquote-text: #b6beca;
+  font-size: var(--ui-font-size);
 }
 
 .app-shell {

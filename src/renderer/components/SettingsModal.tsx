@@ -104,6 +104,13 @@ const SettingsModal = ({
     }
   };
 
+  const updateUiScale = (value: number) => {
+    const clamped = Math.min(200, Math.max(50, value));
+    if (clamped !== settings.uiScale) {
+      onChange({ ...settings, uiScale: clamped });
+    }
+  };
+
   const renderBinding = (binding: string) => {
     const parts = binding.split("+").filter(Boolean);
     return (
@@ -180,39 +187,72 @@ const SettingsModal = ({
         </div>
         <div className="flex-1 overflow-auto pt-1 space-y-4">
           <section className="flex flex-col gap-3 rounded-xl border border-[color:var(--panel-border)] bg-[color:var(--panel-bg)]/60 p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Label className="text-sm font-semibold text-[color:var(--panel-text)]">
-                  Text size
-                </Label>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm font-semibold text-[color:var(--panel-text)]">
+                    Editor text size
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    aria-label="Decrease text size"
+                    size="icon"
+                    variant="secondary"
+                    onClick={() => updateTextSize(-1)}
+                  >
+                    –
+                  </Button>
+                  <span className="text-[color:var(--panel-text)] tabular-nums min-w-[48px] text-center">
+                    {settings.textSize}px
+                  </span>
+                  <Button
+                    type="button"
+                    aria-label="Increase text size"
+                    size="icon"
+                    variant="secondary"
+                    onClick={() => updateTextSize(1)}
+                  >
+                    +
+                  </Button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  aria-label="Decrease text size"
-                  size="icon"
-                  variant="secondary"
-                  onClick={() => updateTextSize(-1)}
-                >
-                  –
-                </Button>
-                <span className="text-[color:var(--panel-text)] tabular-nums min-w-[48px] text-center">
-                  {settings.textSize}px
-                </span>
-                <Button
-                  type="button"
-                  aria-label="Increase text size"
-                  size="icon"
-                  variant="secondary"
-                  onClick={() => updateTextSize(1)}
-                >
-                  +
-                </Button>
-              </div>
+              <p className="text-[color:var(--muted-text)] m-0 text-xs">
+                Adjust the editor font size. Changes apply immediately.
+              </p>
             </div>
-            <p className="text-[color:var(--muted-text)] m-0 text-xs">
-              Adjust the editor font size. Changes apply immediately.
-            </p>
+
+            <div className="h-px bg-[color:var(--panel-border)]/80" />
+
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm font-semibold text-[color:var(--panel-text)]">
+                    UI scaling
+                  </Label>
+                </div>
+                <Select
+                  value={String(settings.uiScale)}
+                  onValueChange={(value) => updateUiScale(Number(value))}
+                >
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[50, 75, 100, 125, 150].map((value) => (
+                      <SelectItem key={value} value={String(value)}>
+                        {value === 100 ? "Default (100%)" : `${value}%`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-[color:var(--muted-text)] m-0 text-xs">
+                Scale the interface (menus, labels, buttons). 50%–150% applied
+                instantly.
+              </p>
+            </div>
           </section>
 
           <section className="flex flex-col gap-3 rounded-xl border border-[color:var(--panel-border)] bg-[color:var(--panel-bg)]/60 p-4">

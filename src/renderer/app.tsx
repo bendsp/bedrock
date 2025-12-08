@@ -7,11 +7,24 @@ import React, {
 } from "react";
 import { createRoot } from "react-dom/client";
 import Editor from "./components/editor";
+import SettingsModal from "./components/SettingsModal";
 import { EditorView, ModelEventType, ITextModel } from "../shared/types";
 import { EditorController } from "./controllers/EditorController";
 import { DocumentModel } from "./models/DocumentModel";
 import { RopeModel } from "./models/RopeModel";
 import { LinesModel } from "./models/LinesModel";
+import {
+  defaultSettings,
+  defaultKeyBindings,
+  loadSettings,
+  saveSettings,
+  UserSettings,
+} from "./settings";
+import {
+  clampKeyBindings,
+  eventToBinding,
+  matchesBinding,
+} from "./keybindings";
 
 const DEFAULT_FILE_NAME = "Untitled.md";
 
@@ -62,6 +75,8 @@ const App = () => {
   const [model] = useState<ITextModel>(() => selectModel());
   const [filePath, setFilePath] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState<UserSettings>(defaultSettings);
   const suppressDirtyRef = useRef(false);
 
   const editorRef = useCallback(
@@ -93,6 +108,19 @@ const App = () => {
   useEffect(() => {
     window.electronAPI.notifyDirtyState(isDirty);
   }, [isDirty]);
+
+  useEffect(() => {
+    const loaded = loadSettings();
+    setSettings(loaded);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--editor-font-size",
+      `${settings.textSize}px`
+    );
+    saveSettings(settings);
+  }, [settings]);
 
   const fileName = useMemo(() => getDisplayFileName(filePath), [filePath]);
 
@@ -162,6 +190,62 @@ const App = () => {
     setIsDirty(false);
   }, [model]);
 
+  const handleOpenSettings = useCallback(() => {
+    setIsSettingsOpen(true);
+  }, []);
+
+  const handleCloseSettings = useCallback(() => {
+    setIsSettingsOpen(false);
+  }, []);
+
+  const handleUpdateSettings = useCallback((updated: UserSettings) => {
+    setSettings({
+      ...updated,
+      keyBindings: clampKeyBindings(updated.keyBindings),
+    });
+  }, []);
+
+  const handleResetBindings = useCallback(() => {
+    setSettings((prev) => ({
+      ...prev,
+      keyBindings: defaultKeyBindings,
+    }));
+  }, []);
+
+  useEffect(() => {
+    if (isSettingsOpen) {
+      return;
+    }
+
+    const handleGlobalShortcut = (event: KeyboardEvent) => {
+      const binding = eventToBinding(event);
+      if (!binding) {
+        return;
+      }
+
+      if (matchesBinding(binding, settings.keyBindings.open)) {
+        event.preventDefault();
+        handleOpen();
+        return;
+      }
+
+      if (matchesBinding(binding, settings.keyBindings.save)) {
+        event.preventDefault();
+        handleSave();
+        return;
+      }
+
+      if (matchesBinding(binding, settings.keyBindings.openSettings)) {
+        event.preventDefault();
+        setIsSettingsOpen(true);
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalShortcut);
+    return () => window.removeEventListener("keydown", handleGlobalShortcut);
+  }, [handleOpen, handleSave, isSettingsOpen, settings.keyBindings]);
+
   const displayLabel = formatFileName(fileName, isDirty);
 
   return (
@@ -198,6 +282,13 @@ const App = () => {
           >
             Save As…
           </button>
+          <button
+            type="button"
+            style={toolbarButtonStyle}
+            onClick={handleOpenSettings}
+          >
+            Settings
+          </button>
         </div>
         <span style={{ marginLeft: "auto", fontSize: "13px" }}>
           {displayLabel}
@@ -212,6 +303,14 @@ const App = () => {
           />
         </div>
       </div>
+      {isSettingsOpen ? (
+        <SettingsModal
+          settings={settings}
+          onClose={handleCloseSettings}
+          onChange={handleUpdateSettings}
+          onResetBindings={handleResetBindings}
+        />
+      ) : null}
     </div>
   );
 };

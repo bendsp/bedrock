@@ -288,16 +288,16 @@ const App = () => {
     <div className="h-full w-full flex flex-col">
       <header className="flex items-center gap-3 px-4 py-2 border-b border-[color:var(--header-border)] bg-[color:var(--header-bg)] text-[color:var(--header-text)]">
         <div className="flex gap-2">
-          <Button size="sm" onClick={handleOpen}>
+          <Button size="sm" variant="secondary" onClick={handleOpen}>
             Open…
           </Button>
-          <Button size="sm" onClick={handleSave}>
+          <Button size="sm" variant="secondary" onClick={handleSave}>
             Save
           </Button>
-          <Button size="sm" onClick={handleSaveAs}>
+          <Button size="sm" variant="secondary" onClick={handleSaveAs}>
             Save As…
           </Button>
-          <Button size="sm" onClick={handleOpenSettings}>
+          <Button size="sm" variant="secondary" onClick={handleOpenSettings}>
             Settings
           </Button>
         </div>

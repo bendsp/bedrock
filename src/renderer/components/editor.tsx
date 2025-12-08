@@ -133,9 +133,7 @@ const Editor = forwardRef<EditorView, EditorProps>(
 
       const element = document.createElement("div");
       element.style.position = "absolute";
-      element.style.top = "-9999px";
-      element.style.left = "-9999px";
-      element.style.visibility = "visible";
+      element.style.visibility = "hidden";
       element.style.opacity = "0";
       element.style.pointerEvents = "none";
       element.style.whiteSpace = "pre-wrap";
@@ -201,12 +199,14 @@ const Editor = forwardRef<EditorView, EditorProps>(
       measurement.style.padding = computed.padding;
       measurement.style.margin = computed.margin;
       measurement.style.width = `${rect.width}px`;
+      measurement.style.height = `${rect.height}px`;
+      measurement.style.left = `${rect.left + window.scrollX}px`;
+      measurement.style.top = `${rect.top + window.scrollY}px`;
       measurement.textContent = lineText.length > 0 ? lineText : "\u00a0";
 
-      const measureRect = measurement.getBoundingClientRect();
       const range = resolveRangeFromPoint(
-        measureRect.left + relativeX,
-        measureRect.top + relativeY,
+        event.clientX,
+        event.clientY,
         measurement
       );
 

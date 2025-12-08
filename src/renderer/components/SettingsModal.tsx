@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "./ui/select";
 import { Switch } from "./ui/switch";
+import { Kbd, KbdGroup } from "./ui/kbd";
 
 type SettingsModalProps = {
   settings: UserSettings;
@@ -103,6 +104,39 @@ const SettingsModal = ({
     }
   };
 
+  const renderBinding = (binding: string) => {
+    const parts = binding.split("+").filter(Boolean);
+    return (
+      <KbdGroup>
+        {parts.map((part, index) => {
+          const label =
+            part.toLowerCase() === "mod"
+              ? "⌘"
+              : part.toLowerCase() === "cmd"
+              ? "⌘"
+              : part.toLowerCase() === "ctrl"
+              ? "Ctrl"
+              : part.toLowerCase() === "shift"
+              ? "⇧"
+              : part.toLowerCase() === "alt"
+              ? "⌥"
+              : part.length === 1
+              ? part.toUpperCase()
+              : part;
+          const showPlus = index < parts.length - 1;
+          return (
+            <React.Fragment key={`${binding}-${index}`}>
+              <Kbd>{label}</Kbd>
+              {showPlus ? (
+                <span className="text-[color:var(--muted-text)]">+</span>
+              ) : null}
+            </React.Fragment>
+          );
+        })}
+      </KbdGroup>
+    );
+  };
+
   const keyBindingRows = (
     ["open", "save", "openSettings"] as KeyBindingAction[]
   ).map((action) => {
@@ -113,12 +147,12 @@ const SettingsModal = ({
           {keyBindingLabels[action]}
         </span>
         <div className="flex items-center gap-2 min-h-8">
-          <span className="text-[color:var(--panel-text)] tabular-nums min-w-[80px]">
+          <span className="text-[color:var(--panel-text)] tabular-nums min-w-[120px]">
             {isActive
               ? pendingBinding
-                ? formatBinding(pendingBinding)
+                ? renderBinding(formatBinding(pendingBinding))
                 : "Press keys…"
-              : formatBinding(settings.keyBindings[action])}
+              : renderBinding(formatBinding(settings.keyBindings[action]))}
           </span>
           <Button
             type="button"

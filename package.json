@@ -3,6 +3,10 @@
   "productName": "Bedrock",
   "version": "1.2.0",
   "description": "A modern text editor - built with Electron and React",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bendsp/bedrock"
+  },
   "main": ".webpack/main",
   "scripts": {
     "start": "electron-forge start",

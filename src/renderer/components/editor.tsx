@@ -132,10 +132,11 @@ const Editor = forwardRef<EditorView, EditorProps>(
       }
 
       const element = document.createElement("div");
-      element.style.position = "fixed";
-      element.style.top = "0";
-      element.style.left = "0";
-      element.style.visibility = "hidden";
+      element.style.position = "absolute";
+      element.style.top = "-9999px";
+      element.style.left = "-9999px";
+      element.style.visibility = "visible";
+      element.style.opacity = "0";
       element.style.pointerEvents = "none";
       element.style.whiteSpace = "pre-wrap";
       element.style.wordBreak = "break-word";

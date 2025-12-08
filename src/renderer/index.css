@@ -62,7 +62,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0;
-  font-size: 1rem;
+  font-size: var(--editor-font-size, 16px);
   line-height: 1.6;
   color: #e0e6f0;
 }

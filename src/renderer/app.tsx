@@ -13,6 +13,12 @@ import { EditorController } from "./controllers/EditorController";
 import { DocumentModel } from "./models/DocumentModel";
 import { RopeModel } from "./models/RopeModel";
 import { LinesModel } from "./models/LinesModel";
+import {
+  defaultSettings,
+  loadSettings,
+  saveSettings,
+  UserSettings,
+} from "./settings";
 
 const DEFAULT_FILE_NAME = "Untitled.md";
 
@@ -64,6 +70,7 @@ const App = () => {
   const [filePath, setFilePath] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState<UserSettings>(defaultSettings);
   const suppressDirtyRef = useRef(false);
 
   const editorRef = useCallback(
@@ -95,6 +102,19 @@ const App = () => {
   useEffect(() => {
     window.electronAPI.notifyDirtyState(isDirty);
   }, [isDirty]);
+
+  useEffect(() => {
+    const loaded = loadSettings();
+    setSettings(loaded);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--editor-font-size",
+      `${settings.textSize}px`
+    );
+    saveSettings(settings);
+  }, [settings]);
 
   const fileName = useMemo(() => getDisplayFileName(filePath), [filePath]);
 
@@ -172,6 +192,10 @@ const App = () => {
     setIsSettingsOpen(false);
   }, []);
 
+  const handleUpdateSettings = useCallback((updated: UserSettings) => {
+    setSettings(updated);
+  }, []);
+
   const displayLabel = formatFileName(fileName, isDirty);
 
   return (
@@ -229,7 +253,13 @@ const App = () => {
           />
         </div>
       </div>
-      {isSettingsOpen ? <SettingsModal onClose={handleCloseSettings} /> : null}
+      {isSettingsOpen ? (
+        <SettingsModal
+          settings={settings}
+          onClose={handleCloseSettings}
+          onChange={handleUpdateSettings}
+        />
+      ) : null}
     </div>
   );
 };

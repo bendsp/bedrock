@@ -1,7 +1,10 @@
 import React from "react";
+import { UserSettings } from "../settings";
 
 type SettingsModalProps = {
+  settings: UserSettings;
   onClose: () => void;
+  onChange: (settings: UserSettings) => void;
 };
 
 const overlayStyle: React.CSSProperties = {
@@ -26,6 +29,7 @@ const modalStyle: React.CSSProperties = {
   flexDirection: "column",
   padding: "24px",
   gap: "16px",
+  fontSize: "var(--editor-font-size, 16px)",
 };
 
 const headerStyle: React.CSSProperties = {
@@ -46,7 +50,14 @@ const closeButtonStyle: React.CSSProperties = {
   padding: "4px 10px",
 };
 
-const SettingsModal = ({ onClose }: SettingsModalProps) => {
+const SettingsModal = ({ settings, onClose, onChange }: SettingsModalProps) => {
+  const updateTextSize = (delta: number) => {
+    const next = Math.min(28, Math.max(12, settings.textSize + delta));
+    if (next !== settings.textSize) {
+      onChange({ ...settings, textSize: next });
+    }
+  };
+
   return (
     <div style={overlayStyle} role="dialog" aria-modal="true">
       <div style={modalStyle}>
@@ -59,9 +70,47 @@ const SettingsModal = ({ onClose }: SettingsModalProps) => {
           </button>
         </div>
         <div style={{ flex: 1, overflow: "auto", paddingTop: "4px" }}>
-          <p style={{ color: "#b9bec9", marginTop: 0 }}>
-            Configure your Bedrock experience. Add controls and sections here.
-          </p>
+          <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <label
+                htmlFor="text-size"
+                style={{ width: 120, color: "#c1c7d0", fontSize: "0.9em" }}
+              >
+                Text size
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button
+                  type="button"
+                  aria-label="Decrease text size"
+                  style={closeButtonStyle}
+                  onClick={() => updateTextSize(-1)}
+                >
+                  –
+                </button>
+                <span
+                  style={{
+                    color: "#dfe3ea",
+                    fontVariantNumeric: "tabular-nums",
+                    minWidth: 48,
+                    textAlign: "center",
+                  }}
+                >
+                  {settings.textSize}px
+                </span>
+                <button
+                  type="button"
+                  aria-label="Increase text size"
+                  style={closeButtonStyle}
+                  onClick={() => updateTextSize(1)}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+            <p style={{ color: "#8f97a5", margin: "4px 0 0 0", fontSize: 12 }}>
+              Adjust the editor font size. Changes apply immediately.
+            </p>
+          </section>
         </div>
       </div>
     </div>

@@ -69,6 +69,23 @@ const SettingsModal = ({
   const [pendingBinding, setPendingBinding] = useState<string | null>(null);
 
   useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (listeningFor) {
+          setListeningFor(null);
+          setPendingBinding(null);
+          return;
+        }
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [listeningFor, onClose]);
+
+  useEffect(() => {
     if (!listeningFor) {
       return;
     }

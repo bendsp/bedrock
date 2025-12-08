@@ -6,6 +6,7 @@ import {
   keyBindingLabels,
   isModifierKey,
 } from "../keybindings";
+import { themeOptions, ThemeName } from "../theme";
 
 type SettingsModalProps = {
   settings: UserSettings;
@@ -17,7 +18,7 @@ type SettingsModalProps = {
 const overlayStyle: React.CSSProperties = {
   position: "fixed",
   inset: 0,
-  backgroundColor: "rgba(0, 0, 0, 0.65)",
+  backgroundColor: "var(--overlay)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -27,11 +28,11 @@ const overlayStyle: React.CSSProperties = {
 const modalStyle: React.CSSProperties = {
   width: "90%",
   height: "90%",
-  backgroundColor: "#1b1e24",
-  border: "1px solid #2a2f38",
+  backgroundColor: "var(--panel-bg)",
+  border: "1px solid var(--panel-border)",
   borderRadius: "12px",
   boxShadow: "0 20px 60px rgba(0, 0, 0, 0.45)",
-  color: "#e6e9ef",
+  color: "var(--panel-text)",
   display: "flex",
   flexDirection: "column",
   padding: "24px",
@@ -43,15 +44,15 @@ const headerStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  borderBottom: "1px solid #2e3440",
+  borderBottom: "1px solid var(--panel-border)",
   paddingBottom: "12px",
 };
 
 const closeButtonStyle: React.CSSProperties = {
-  backgroundColor: "#3a3f4b",
-  border: "1px solid #4b5263",
+  backgroundColor: "var(--button-bg)",
+  border: "1px solid var(--button-border)",
   borderRadius: "4px",
-  color: "#eef1f6",
+  color: "var(--button-text)",
   cursor: "pointer",
   fontSize: "12px",
   padding: "4px 10px",
@@ -236,10 +237,128 @@ const SettingsModal = ({
             </p>
           </section>
           <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <h3 style={{ margin: "12px 0 0 0", fontSize: "1em" }}>Theme</h3>
+            <p style={{ color: "var(--muted-text)", margin: 0, fontSize: 12 }}>
+              Pick a theme. Colors apply across the app.
+            </p>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  color: "var(--panel-text)",
+                  fontSize: "0.95em",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={settings.followSystem}
+                  onChange={(e) =>
+                    onChange({
+                      ...settings,
+                      followSystem: e.target.checked,
+                    })
+                  }
+                />
+                Follow system theme
+              </label>
+              {!settings.followSystem && (
+                <select
+                  value={settings.theme}
+                  onChange={(e) =>
+                    onChange({
+                      ...settings,
+                      theme: e.target.value as ThemeName,
+                    })
+                  }
+                  style={{
+                    backgroundColor: "var(--panel-bg)",
+                    color: "var(--panel-text)",
+                    border: "1px solid var(--panel-border)",
+                    borderRadius: 6,
+                    padding: "6px 10px",
+                  }}
+                >
+                  {themeOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            {settings.followSystem && (
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ color: "var(--muted-text)", fontSize: 12 }}>
+                    Light mode
+                  </span>
+                  <select
+                    value={settings.systemLightTheme}
+                    onChange={(e) =>
+                      onChange({
+                        ...settings,
+                        systemLightTheme: e.target.value as ThemeName,
+                      })
+                    }
+                    style={{
+                      backgroundColor: "var(--panel-bg)",
+                      color: "var(--panel-text)",
+                      border: "1px solid var(--panel-border)",
+                      borderRadius: 6,
+                      padding: "6px 10px",
+                    }}
+                  >
+                    {themeOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ color: "var(--muted-text)", fontSize: 12 }}>
+                    Dark mode
+                  </span>
+                  <select
+                    value={settings.systemDarkTheme}
+                    onChange={(e) =>
+                      onChange({
+                        ...settings,
+                        systemDarkTheme: e.target.value as ThemeName,
+                      })
+                    }
+                    style={{
+                      backgroundColor: "var(--panel-bg)",
+                      color: "var(--panel-text)",
+                      border: "1px solid var(--panel-border)",
+                      borderRadius: 6,
+                      padding: "6px 10px",
+                    }}
+                  >
+                    {themeOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+          </section>
+          <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <h3 style={{ margin: "12px 0 0 0", fontSize: "1em" }}>
               Keybindings
             </h3>
-            <p style={{ color: "#8f97a5", margin: 0, fontSize: 12 }}>
+            <p style={{ color: "var(--muted-text)", margin: 0, fontSize: 12 }}>
               Click change, then press a new shortcut. Use Cmd/Ctrl combos.
             </p>
             {keyBindingRows}

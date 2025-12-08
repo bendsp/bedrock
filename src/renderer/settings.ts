@@ -1,3 +1,5 @@
+import { ThemeName, isThemeName } from "./theme";
+
 export type KeyBindingAction = "open" | "save" | "openSettings";
 
 export type KeyBindings = Record<KeyBindingAction, string>;
@@ -5,6 +7,10 @@ export type KeyBindings = Record<KeyBindingAction, string>;
 export type UserSettings = {
   textSize: number;
   keyBindings: KeyBindings;
+  theme: ThemeName;
+  followSystem: boolean;
+  systemLightTheme: ThemeName;
+  systemDarkTheme: ThemeName;
 };
 
 const STORAGE_KEY = "bedrock:settings";
@@ -18,6 +24,10 @@ export const defaultKeyBindings: KeyBindings = {
 export const defaultSettings: UserSettings = {
   textSize: 16,
   keyBindings: defaultKeyBindings,
+  theme: "dark",
+  followSystem: false,
+  systemLightTheme: "light",
+  systemDarkTheme: "dark",
 };
 
 const normalizeKeyBindings = (
@@ -55,7 +65,33 @@ export const loadSettings = (): UserSettings => {
         ? parsed.textSize
         : defaultSettings.textSize;
     const keyBindings = normalizeKeyBindings(parsed.keyBindings);
-    return { textSize, keyBindings };
+    const theme =
+      parsed.theme &&
+      typeof parsed.theme === "string" &&
+      isThemeName(parsed.theme)
+        ? parsed.theme
+        : defaultSettings.theme;
+    const followSystem = Boolean(parsed.followSystem);
+    const systemLightTheme =
+      parsed.systemLightTheme &&
+      typeof parsed.systemLightTheme === "string" &&
+      isThemeName(parsed.systemLightTheme)
+        ? parsed.systemLightTheme
+        : defaultSettings.systemLightTheme;
+    const systemDarkTheme =
+      parsed.systemDarkTheme &&
+      typeof parsed.systemDarkTheme === "string" &&
+      isThemeName(parsed.systemDarkTheme)
+        ? parsed.systemDarkTheme
+        : defaultSettings.systemDarkTheme;
+    return {
+      textSize,
+      keyBindings,
+      theme,
+      followSystem,
+      systemLightTheme,
+      systemDarkTheme,
+    };
   } catch {
     return defaultSettings;
   }

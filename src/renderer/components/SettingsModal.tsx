@@ -209,9 +209,7 @@ const SettingsModal = ({
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue
-                      placeholder={themeDisplayName[settings.theme]}
-                    />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {themeOptions.map((option) => (
@@ -239,11 +237,7 @@ const SettingsModal = ({
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue
-                        placeholder={
-                          themeDisplayName[settings.systemLightTheme]
-                        }
-                      />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {themeOptions.map((option) => (
@@ -268,9 +262,7 @@ const SettingsModal = ({
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue
-                        placeholder={themeDisplayName[settings.systemDarkTheme]}
-                      />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {themeOptions.map((option) => (

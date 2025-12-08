@@ -244,9 +244,6 @@ const SettingsModal = ({
                   </Button>
                 </div>
               </div>
-              <p className="text-[color:var(--muted-text)] m-0 text-xs">
-                Adjust the editor font size. Changes apply immediately.
-              </p>
             </div>
 
             <div className="h-px bg-[color:var(--panel-border)]/80" />
@@ -274,10 +271,6 @@ const SettingsModal = ({
                   </SelectContent>
                 </Select>
               </div>
-              <p className="text-[color:var(--muted-text)] m-0 text-xs">
-                Scale the interface (menus, labels, buttons). 50%–150% applied
-                instantly.
-              </p>
             </div>
           </section>
 
@@ -285,9 +278,6 @@ const SettingsModal = ({
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="m-0 text-base font-semibold">Theme</h3>
-                <p className="text-[color:var(--muted-text)] m-0 text-xs">
-                  Pick a theme. Colors apply across the app.
-                </p>
               </div>
               <div className="flex items-center gap-2">
                 <Switch

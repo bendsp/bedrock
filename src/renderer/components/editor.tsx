@@ -14,6 +14,7 @@ import {
   RenderMode,
 } from "../../shared/types";
 import { renderMarkdownLines } from "../services/markdownRenderer";
+import { cursorFromAbsoluteOffset } from "../utils/cursor";
 
 interface EditorProps {
   onKeyDown?: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -32,6 +33,16 @@ const Editor = forwardRef<EditorView, EditorProps>(
     const activeLineRef = useRef<HTMLTextAreaElement>(null);
     const rawTextareaRef = useRef<HTMLTextAreaElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const measurementRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+      return () => {
+        if (measurementRef.current) {
+          measurementRef.current.remove();
+          measurementRef.current = null;
+        }
+      };
+    }, []);
 
     useEffect(() => {
       if (renderMode === "hybrid") {
@@ -113,16 +124,134 @@ const Editor = forwardRef<EditorView, EditorProps>(
       onKeyDown?.(event);
     };
 
-    const handleLineClick = (lineIndex: number) => {
-      if (renderMode !== "hybrid") {
-        return;
-      }
-      if (lineIndex === cursorPosition.line) {
-        activeLineRef.current?.focus();
-        return;
+    const ensureMeasurementElement = (
+      sourceElement: HTMLElement
+    ): HTMLDivElement => {
+      if (measurementRef.current) {
+        return measurementRef.current;
       }
 
-      model.setCursor({ line: lineIndex, char: 0 });
+      const element = document.createElement("div");
+      element.style.position = "fixed";
+      element.style.top = "0";
+      element.style.left = "0";
+      element.style.visibility = "hidden";
+      element.style.pointerEvents = "none";
+      element.style.whiteSpace = "pre-wrap";
+      element.style.wordBreak = "break-word";
+      element.style.padding = "0";
+      element.style.margin = "0";
+
+      const computed = window.getComputedStyle(sourceElement);
+      element.style.font = computed.font;
+      element.style.lineHeight = computed.lineHeight;
+      element.style.letterSpacing = computed.letterSpacing;
+
+      document.body.appendChild(element);
+      measurementRef.current = element;
+      return element;
+    };
+
+    const resolveRangeFromPoint = (
+      x: number,
+      y: number,
+      container: HTMLElement
+    ): Range | null => {
+      const doc = document as Document & {
+        caretRangeFromPoint?: (x: number, y: number) => Range | null;
+        caretPositionFromPoint?: (
+          x: number,
+          y: number
+        ) => { offsetNode: Node; offset: number } | null;
+      };
+
+      const range = doc.caretRangeFromPoint?.(x, y);
+      if (range && container.contains(range.startContainer)) {
+        return range;
+      }
+
+      const caretPosition = doc.caretPositionFromPoint?.(x, y);
+      if (caretPosition && container.contains(caretPosition.offsetNode)) {
+        const fallback = document.createRange();
+        fallback.setStart(caretPosition.offsetNode, caretPosition.offset);
+        fallback.collapse(true);
+        return fallback;
+      }
+
+      return null;
+    };
+
+    const getLineCharFromClick = (
+      event: React.MouseEvent<HTMLElement>,
+      lineText: string
+    ): number => {
+      const target = event.currentTarget as HTMLElement;
+      const rect = target.getBoundingClientRect();
+      const relativeX = event.clientX - rect.left;
+      const relativeY = event.clientY - rect.top;
+      const measurement = ensureMeasurementElement(target);
+      const computed = window.getComputedStyle(target);
+
+      measurement.style.font = computed.font;
+      measurement.style.lineHeight = computed.lineHeight;
+      measurement.style.letterSpacing = computed.letterSpacing;
+      measurement.style.whiteSpace = computed.whiteSpace;
+      measurement.style.wordBreak = computed.wordBreak;
+      measurement.style.padding = computed.padding;
+      measurement.style.margin = computed.margin;
+      measurement.style.width = `${rect.width}px`;
+      measurement.textContent = lineText.length > 0 ? lineText : "\u00a0";
+
+      const measureRect = measurement.getBoundingClientRect();
+      const range = resolveRangeFromPoint(
+        measureRect.left + relativeX,
+        measureRect.top + relativeY,
+        measurement
+      );
+
+      const textLength = measurement.textContent?.length ?? 0;
+      const clampToLine = (value: number) =>
+        Math.max(0, Math.min(value, lineText.length));
+      if (!range || !measurement.contains(range.startContainer)) {
+        if (rect.width <= 0) {
+          return 0;
+        }
+        const proportional = Math.round((relativeX / rect.width) * textLength);
+        return clampToLine(
+          Math.max(0, Math.min(textLength, proportional))
+        );
+      }
+
+      if (range.startContainer.nodeType === Node.TEXT_NODE) {
+        return clampToLine(
+          Math.max(0, Math.min(range.startOffset, textLength))
+        );
+      }
+
+      return clampToLine(textLength);
+    };
+
+    const handleActiveLineSelect = (
+      event: React.SyntheticEvent<HTMLTextAreaElement>
+    ) => {
+      const selectionStart = event.currentTarget.selectionStart ?? 0;
+      if (selectionStart !== cursorPosition.char) {
+        model.setCursor({
+          line: cursorPosition.line,
+          char: selectionStart,
+        });
+      }
+    };
+
+    const handleRawSelectionChange = (
+      event: React.SyntheticEvent<HTMLTextAreaElement>
+    ) => {
+      const selectionStart = event.currentTarget.selectionStart ?? 0;
+      const nextCursor = cursorFromAbsoluteOffset(
+        event.currentTarget.value,
+        selectionStart
+      );
+      model.setCursor(nextCursor);
     };
 
     const containerClass = `inline-editor inline-editor--${renderMode}`;
@@ -135,6 +264,8 @@ const Editor = forwardRef<EditorView, EditorProps>(
             className="inline-editor__raw-input"
             value={text}
             onKeyDown={handleKeyDown}
+            onSelect={handleRawSelectionChange}
+            onClick={handleRawSelectionChange}
             spellCheck={false}
             placeholder="Start typing…"
           />
@@ -155,6 +286,8 @@ const Editor = forwardRef<EditorView, EditorProps>(
                 value={line}
                 rows={1}
                 onKeyDown={handleKeyDown}
+                onSelect={handleActiveLineSelect}
+                onClick={handleActiveLineSelect}
                 spellCheck={false}
                 onFocus={(event) => {
                   event.currentTarget.setSelectionRange(
@@ -176,7 +309,11 @@ const Editor = forwardRef<EditorView, EditorProps>(
               className="inline-editor__line inline-editor__line--rendered"
               onMouseDown={(event) => {
                 event.preventDefault();
-                handleLineClick(index);
+                const nextChar = getLineCharFromClick(
+                  event,
+                  lines[index] ?? ""
+                );
+                model.setCursor({ line: index, char: nextChar });
               }}
               dangerouslySetInnerHTML={{
                 __html: hasContent ? safeHtml : "<span>&nbsp;</span>",
@@ -191,6 +328,8 @@ const Editor = forwardRef<EditorView, EditorProps>(
             value=""
             rows={1}
             onKeyDown={handleKeyDown}
+            onSelect={handleActiveLineSelect}
+            onClick={handleActiveLineSelect}
             spellCheck={false}
           />
         )}

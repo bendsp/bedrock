@@ -163,6 +163,7 @@ const SettingsModal = ({
             type="button"
             size="sm"
             variant="secondary"
+            className="inline-flex items-center gap-2 focus-visible:ring-0 focus-visible:ring-offset-0"
             onClick={() => {
               if (isActive) {
                 setPendingBinding(null);
@@ -173,7 +174,16 @@ const SettingsModal = ({
               }
             }}
           >
-            {isActive ? "Cancel" : "Change"}
+            {isActive ? (
+              <>
+                Cancel{" "}
+                <Kbd className="h-5 min-w-5 px-1 text-[11px] font-semibold leading-[1.15]">
+                  Esc
+                </Kbd>
+              </>
+            ) : (
+              "Change"
+            )}
           </Button>
         </div>
       </div>

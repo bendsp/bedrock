@@ -19,12 +19,14 @@ import {
   loadSettings,
   saveSettings,
   UserSettings,
+  clearSettingsStorage,
 } from "./settings";
 import {
   clampKeyBindings,
   eventToBinding,
   matchesBinding,
 } from "./keybindings";
+import { applyTheme, ThemeName } from "./theme";
 
 const DEFAULT_FILE_NAME = "Untitled.md";
 
@@ -46,10 +48,10 @@ const buildWindowTitle = (fileName: string, isDirty: boolean): string => {
 };
 
 const toolbarButtonStyle: React.CSSProperties = {
-  backgroundColor: "#3a3f4b",
-  border: "1px solid #4b5263",
+  backgroundColor: "var(--button-bg)",
+  border: "1px solid var(--button-border)",
   borderRadius: "4px",
-  color: "#eef1f6",
+  color: "var(--button-text)",
   cursor: "pointer",
   fontSize: "12px",
   padding: "4px 12px",
@@ -78,6 +80,9 @@ const App = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
   const suppressDirtyRef = useRef(false);
+  const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(
+    () => window.matchMedia("(prefers-color-scheme: dark)").matches
+  );
 
   const editorRef = useCallback(
     (editorView: EditorView | null) => {
@@ -115,12 +120,32 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = (event: MediaQueryListEvent) => {
+      setSystemPrefersDark(event.matches);
+    };
+    media.addEventListener("change", handler);
+    setSystemPrefersDark(media.matches);
+    return () => media.removeEventListener("change", handler);
+  }, []);
+
+  const activeTheme: ThemeName = settings.followSystem
+    ? systemPrefersDark
+      ? settings.systemDarkTheme
+      : settings.systemLightTheme
+    : settings.theme;
+
+  useEffect(() => {
     document.documentElement.style.setProperty(
       "--editor-font-size",
       `${settings.textSize}px`
     );
     saveSettings(settings);
   }, [settings]);
+
+  useEffect(() => {
+    applyTheme(activeTheme);
+  }, [activeTheme]);
 
   const fileName = useMemo(() => getDisplayFileName(filePath), [filePath]);
 
@@ -212,6 +237,11 @@ const App = () => {
     }));
   }, []);
 
+  const handleClearLocalStorage = useCallback(() => {
+    clearSettingsStorage();
+    setSettings(defaultSettings);
+  }, []);
+
   useEffect(() => {
     if (isSettingsOpen) {
       return;
@@ -262,10 +292,10 @@ const App = () => {
           display: "flex",
           alignItems: "center",
           padding: "8px 16px",
-          backgroundColor: "#21252b",
-          borderBottom: "1px solid #181a1f",
+          backgroundColor: "var(--header-bg)",
+          borderBottom: "1px solid var(--header-border)",
           gap: "12px",
-          color: "#d7dae0",
+          color: "var(--header-text)",
         }}
       >
         <div style={{ display: "flex", gap: "8px" }}>
@@ -309,6 +339,7 @@ const App = () => {
           onClose={handleCloseSettings}
           onChange={handleUpdateSettings}
           onResetBindings={handleResetBindings}
+          onClearLocalStorage={handleClearLocalStorage}
         />
       ) : null}
     </div>

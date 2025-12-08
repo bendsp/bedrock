@@ -7,8 +7,8 @@ body {
   height: 100%;
   margin: 0;
   padding: 0;
-  background-color: #282c34;
-  color: #abb2bf;
+  background-color: var(--bg-body, #282c34);
+  color: var(--text-body, #abb2bf);
   overflow: hidden; /* Prevent body scroll */
 }
 
@@ -45,11 +45,34 @@ body {
   height: 100%;
 }
 
+:root {
+  --bg-body: #282c34;
+  --text-body: #abb2bf;
+  --shell-bg: #1f2329;
+  --header-bg: #21252b;
+  --header-border: #181a1f;
+  --header-text: #d7dae0;
+  --button-bg: #3a3f4b;
+  --button-border: #4b5263;
+  --button-text: #eef1f6;
+  --panel-bg: #1b1e24;
+  --panel-border: #2a2f38;
+  --panel-text: #e6e9ef;
+  --muted-text: #8f97a5;
+  --overlay: rgba(0, 0, 0, 0.65);
+  --code-bg: #2c313a;
+  --code-inline-bg: #2c313a;
+  --code-text: #e6edf3;
+  --link-color: #61afef;
+  --blockquote-border: #3f4755;
+  --blockquote-text: #b6beca;
+}
+
 .app-shell {
   display: flex;
   height: 100%;
   width: 100%;
-  background-color: #1f2329;
+  background-color: var(--shell-bg, #1f2329);
   padding: 24px 48px;
   box-sizing: border-box;
   overflow-y: auto;
@@ -64,7 +87,7 @@ body {
   gap: 0;
   font-size: var(--editor-font-size, 16px);
   line-height: 1.6;
-  color: #e0e6f0;
+  color: var(--panel-text, #e0e6f0);
 }
 
 .inline-editor--raw {
@@ -122,7 +145,7 @@ body {
 }
 
 .inline-editor__line--rendered code {
-  background-color: #2c313a;
+  background-color: var(--code-inline-bg, #2c313a);
   padding: 0.15em 0.35em;
   border-radius: 4px;
   font-family: "Fira Code", "Source Code Pro", Monaco, Consolas, monospace;
@@ -130,7 +153,7 @@ body {
 }
 
 .inline-editor__line--rendered pre {
-  background-color: #2c313a;
+  background-color: var(--code-bg, #2c313a);
   padding: 0.75em;
   border-radius: 8px;
   overflow-x: auto;
@@ -139,8 +162,8 @@ body {
 }
 
 .inline-editor__code-fence {
-  background-color: #2c313a;
-  color: #98a2b3;
+  background-color: var(--code-bg, #2c313a);
+  color: var(--code-text, #98a2b3);
   padding: 0.35em 0.6em;
   margin: 0;
   border-radius: 4px;
@@ -149,8 +172,8 @@ body {
 }
 
 .inline-editor__codeblock {
-  background-color: #2c313a;
-  color: #e6edf3;
+  background-color: var(--code-bg, #2c313a);
+  color: var(--code-text, #e6edf3);
   padding: 0.35em 0.6em;
   margin: 0;
   border-radius: 4px;
@@ -166,13 +189,13 @@ body {
 .inline-editor__line--rendered blockquote {
   margin: 0;
   padding-left: 1em;
-  border-left: 4px solid #3f4755;
-  color: #b6beca;
+  border-left: 4px solid var(--blockquote-border, #3f4755);
+  color: var(--blockquote-text, #b6beca);
   font-style: italic;
 }
 
 .inline-editor__line--rendered a {
-  color: #61afef;
+  color: var(--link-color, #61afef);
   text-decoration: none;
 }
 

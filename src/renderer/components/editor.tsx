@@ -14,6 +14,7 @@ import {
   RenderMode,
 } from "../../shared/types";
 import { renderMarkdownLines } from "../services/markdownRenderer";
+import { cn } from "../lib/utils";
 
 interface EditorProps {
   onKeyDown?: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -125,7 +126,10 @@ const Editor = forwardRef<EditorView, EditorProps>(
       model.setCursor({ line: lineIndex, char: 0 });
     };
 
-    const containerClass = `inline-editor inline-editor--${renderMode}`;
+    const containerClass = cn(
+      `inline-editor inline-editor--${renderMode}`,
+      "w-full max-w-3xl mx-auto text-[color:var(--panel-text)]"
+    );
 
     if (renderMode === "raw") {
       return (

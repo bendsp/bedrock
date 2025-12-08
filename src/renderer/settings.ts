@@ -25,7 +25,7 @@ export const defaultSettings: UserSettings = {
   textSize: 16,
   keyBindings: defaultKeyBindings,
   theme: "dark",
-  followSystem: false,
+  followSystem: true,
   systemLightTheme: "light",
   systemDarkTheme: "dark",
 };

@@ -140,9 +140,12 @@ const App = () => {
       "--editor-font-size",
       `${settings.textSize}px`
     );
-    applyTheme(activeTheme);
     saveSettings(settings);
-  }, [activeTheme, settings]);
+  }, [settings]);
+
+  useEffect(() => {
+    applyTheme(activeTheme);
+  }, [activeTheme]);
 
   const fileName = useMemo(() => getDisplayFileName(filePath), [filePath]);
 

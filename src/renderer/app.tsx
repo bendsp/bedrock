@@ -15,10 +15,16 @@ import { RopeModel } from "./models/RopeModel";
 import { LinesModel } from "./models/LinesModel";
 import {
   defaultSettings,
+  defaultKeyBindings,
   loadSettings,
   saveSettings,
   UserSettings,
 } from "./settings";
+import {
+  clampKeyBindings,
+  eventToBinding,
+  matchesBinding,
+} from "./keybindings";
 
 const DEFAULT_FILE_NAME = "Untitled.md";
 
@@ -193,8 +199,52 @@ const App = () => {
   }, []);
 
   const handleUpdateSettings = useCallback((updated: UserSettings) => {
-    setSettings(updated);
+    setSettings({
+      ...updated,
+      keyBindings: clampKeyBindings(updated.keyBindings),
+    });
   }, []);
+
+  const handleResetBindings = useCallback(() => {
+    setSettings((prev) => ({
+      ...prev,
+      keyBindings: defaultKeyBindings,
+    }));
+  }, []);
+
+  useEffect(() => {
+    if (isSettingsOpen) {
+      return;
+    }
+
+    const handleGlobalShortcut = (event: KeyboardEvent) => {
+      const binding = eventToBinding(event);
+      if (!binding) {
+        return;
+      }
+
+      if (matchesBinding(binding, settings.keyBindings.open)) {
+        event.preventDefault();
+        handleOpen();
+        return;
+      }
+
+      if (matchesBinding(binding, settings.keyBindings.save)) {
+        event.preventDefault();
+        handleSave();
+        return;
+      }
+
+      if (matchesBinding(binding, settings.keyBindings.openSettings)) {
+        event.preventDefault();
+        setIsSettingsOpen(true);
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalShortcut);
+    return () => window.removeEventListener("keydown", handleGlobalShortcut);
+  }, [handleOpen, handleSave, isSettingsOpen, settings.keyBindings]);
 
   const displayLabel = formatFileName(fileName, isDirty);
 
@@ -258,6 +308,7 @@ const App = () => {
           settings={settings}
           onClose={handleCloseSettings}
           onChange={handleUpdateSettings}
+          onResetBindings={handleResetBindings}
         />
       ) : null}
     </div>

@@ -1,11 +1,42 @@
+export type KeyBindingAction = "open" | "save" | "openSettings";
+
+export type KeyBindings = Record<KeyBindingAction, string>;
+
 export type UserSettings = {
   textSize: number;
+  keyBindings: KeyBindings;
 };
 
 const STORAGE_KEY = "bedrock:settings";
 
+export const defaultKeyBindings: KeyBindings = {
+  open: "mod+o",
+  save: "mod+s",
+  openSettings: "mod+,",
+};
+
 export const defaultSettings: UserSettings = {
   textSize: 16,
+  keyBindings: defaultKeyBindings,
+};
+
+const normalizeKeyBindings = (
+  stored: Partial<KeyBindings> | undefined
+): KeyBindings => {
+  return {
+    open:
+      stored?.open && typeof stored.open === "string"
+        ? stored.open
+        : defaultKeyBindings.open,
+    save:
+      stored?.save && typeof stored.save === "string"
+        ? stored.save
+        : defaultKeyBindings.save,
+    openSettings:
+      stored?.openSettings && typeof stored.openSettings === "string"
+        ? stored.openSettings
+        : defaultKeyBindings.openSettings,
+  };
 };
 
 export const loadSettings = (): UserSettings => {
@@ -23,7 +54,8 @@ export const loadSettings = (): UserSettings => {
       typeof parsed.textSize === "number" && parsed.textSize > 8
         ? parsed.textSize
         : defaultSettings.textSize;
-    return { textSize };
+    const keyBindings = normalizeKeyBindings(parsed.keyBindings);
+    return { textSize, keyBindings };
   } catch {
     return defaultSettings;
   }

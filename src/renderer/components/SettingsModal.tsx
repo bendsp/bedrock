@@ -1,10 +1,16 @@
-import React from "react";
-import { UserSettings } from "../settings";
+import React, { useEffect, useState } from "react";
+import { KeyBindingAction, UserSettings } from "../settings";
+import {
+  eventToBinding,
+  formatBinding,
+  keyBindingLabels,
+} from "../keybindings";
 
 type SettingsModalProps = {
   settings: UserSettings;
   onClose: () => void;
   onChange: (settings: UserSettings) => void;
+  onResetBindings: () => void;
 };
 
 const overlayStyle: React.CSSProperties = {
@@ -50,13 +56,97 @@ const closeButtonStyle: React.CSSProperties = {
   padding: "4px 10px",
 };
 
-const SettingsModal = ({ settings, onClose, onChange }: SettingsModalProps) => {
+const SettingsModal = ({
+  settings,
+  onClose,
+  onChange,
+  onResetBindings,
+}: SettingsModalProps) => {
+  const [listeningFor, setListeningFor] = useState<KeyBindingAction | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (!listeningFor) {
+      return;
+    }
+
+    const handleCapture = (event: KeyboardEvent) => {
+      event.preventDefault();
+      const binding = eventToBinding(event);
+      if (!binding) {
+        setListeningFor(null);
+        return;
+      }
+
+      onChange({
+        ...settings,
+        keyBindings: {
+          ...settings.keyBindings,
+          [listeningFor]: binding,
+        },
+      });
+      setListeningFor(null);
+    };
+
+    window.addEventListener("keydown", handleCapture, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", handleCapture, { capture: true });
+  }, [listeningFor, onChange, settings]);
+
   const updateTextSize = (delta: number) => {
     const next = Math.min(28, Math.max(12, settings.textSize + delta));
     if (next !== settings.textSize) {
       onChange({ ...settings, textSize: next });
     }
   };
+
+  const keyBindingRows = (
+    ["open", "save", "openSettings"] as KeyBindingAction[]
+  ).map((action) => {
+    const isActive = listeningFor === action;
+    return (
+      <div
+        key={action}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
+        <span style={{ width: 120, color: "#c1c7d0", fontSize: "0.9em" }}>
+          {keyBindingLabels[action]}
+        </span>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            minHeight: 32,
+          }}
+        >
+          <span
+            style={{
+              color: "#dfe3ea",
+              fontVariantNumeric: "tabular-nums",
+              minWidth: 80,
+            }}
+          >
+            {isActive
+              ? "Press keys…"
+              : formatBinding(settings.keyBindings[action])}
+          </span>
+          <button
+            type="button"
+            style={closeButtonStyle}
+            onClick={() => setListeningFor(isActive ? null : action)}
+          >
+            {isActive ? "Cancel" : "Change"}
+          </button>
+        </div>
+      </div>
+    );
+  });
 
   return (
     <div style={overlayStyle} role="dialog" aria-modal="true">
@@ -110,6 +200,24 @@ const SettingsModal = ({ settings, onClose, onChange }: SettingsModalProps) => {
             <p style={{ color: "#8f97a5", margin: "4px 0 0 0", fontSize: 12 }}>
               Adjust the editor font size. Changes apply immediately.
             </p>
+          </section>
+          <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <h3 style={{ margin: "12px 0 0 0", fontSize: "1em" }}>
+              Keybindings
+            </h3>
+            <p style={{ color: "#8f97a5", margin: 0, fontSize: 12 }}>
+              Click change, then press a new shortcut. Use Cmd/Ctrl combos.
+            </p>
+            {keyBindingRows}
+            <div style={{ display: "flex", justifyContent: "flex-start" }}>
+              <button
+                type="button"
+                style={{ ...closeButtonStyle, padding: "6px 12px" }}
+                onClick={onResetBindings}
+              >
+                Reset bindings
+              </button>
+            </div>
           </section>
         </div>
       </div>

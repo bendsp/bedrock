@@ -7,6 +7,16 @@ import {
   isModifierKey,
 } from "../keybindings";
 import { themeOptions, ThemeName, themeDisplayName } from "../theme";
+import { Button } from "./ui/button";
+import { Label } from "./ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { Switch } from "./ui/switch";
 
 type SettingsModalProps = {
   settings: UserSettings;
@@ -47,16 +57,6 @@ const headerStyle: React.CSSProperties = {
   justifyContent: "space-between",
   borderBottom: "1px solid var(--panel-border)",
   paddingBottom: "12px",
-};
-
-const closeButtonStyle: React.CSSProperties = {
-  backgroundColor: "var(--button-bg)",
-  border: "1px solid var(--button-border)",
-  borderRadius: "4px",
-  color: "var(--button-text)",
-  cursor: "pointer",
-  fontSize: "12px",
-  padding: "4px 10px",
 };
 
 const SettingsModal = ({
@@ -173,13 +173,14 @@ const SettingsModal = ({
                 : "Press keys…"
               : formatBinding(settings.keyBindings[action])}
           </span>
-          <button
+          <Button
             type="button"
-            style={closeButtonStyle}
+            size="sm"
+            variant="secondary"
             onClick={() => setListeningFor(isActive ? null : action)}
           >
             {isActive ? "Cancel" : "Change"}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -192,28 +193,28 @@ const SettingsModal = ({
           <h2 style={{ margin: 0, fontSize: "18px", letterSpacing: "0.2px" }}>
             Settings
           </h2>
-          <button type="button" style={closeButtonStyle} onClick={onClose}>
+          <Button variant="secondary" size="sm" onClick={onClose}>
             Close
-          </button>
+          </Button>
         </div>
         <div style={{ flex: 1, overflow: "auto", paddingTop: "4px" }}>
           <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <label
+              <Label
                 htmlFor="text-size"
                 style={{ width: 120, color: "#c1c7d0", fontSize: "0.9em" }}
               >
                 Text size
-              </label>
+              </Label>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <button
+                <Button
                   type="button"
                   aria-label="Decrease text size"
-                  style={closeButtonStyle}
+                  size="icon"
                   onClick={() => updateTextSize(-1)}
                 >
                   –
-                </button>
+                </Button>
                 <span
                   style={{
                     color: "#dfe3ea",
@@ -224,14 +225,14 @@ const SettingsModal = ({
                 >
                   {settings.textSize}px
                 </span>
-                <button
+                <Button
                   type="button"
                   aria-label="Increase text size"
-                  style={closeButtonStyle}
+                  size="icon"
                   onClick={() => updateTextSize(1)}
                 >
                   +
-                </button>
+                </Button>
               </div>
             </div>
             <p style={{ color: "#8f97a5", margin: "4px 0 0 0", fontSize: 12 }}>
@@ -251,50 +252,45 @@ const SettingsModal = ({
                 flexWrap: "wrap",
               }}
             >
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  color: "var(--panel-text)",
-                  fontSize: "0.95em",
-                }}
-              >
-                <input
-                  type="checkbox"
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Switch
                   checked={settings.followSystem}
-                  onChange={(e) =>
+                  onCheckedChange={(checked) =>
                     onChange({
                       ...settings,
-                      followSystem: e.target.checked,
+                      followSystem: checked,
                     })
                   }
                 />
-                Follow system theme
-              </label>
+                <span
+                  style={{ color: "var(--panel-text)", fontSize: "0.95em" }}
+                >
+                  Follow system theme
+                </span>
+              </div>
               {!settings.followSystem && (
-                <select
+                <Select
                   value={settings.theme}
-                  onChange={(e) =>
+                  onValueChange={(value) =>
                     onChange({
                       ...settings,
-                      theme: e.target.value as ThemeName,
+                      theme: value as ThemeName,
                     })
                   }
-                  style={{
-                    backgroundColor: "var(--panel-bg)",
-                    color: "var(--panel-text)",
-                    border: "1px solid var(--panel-border)",
-                    borderRadius: 6,
-                    padding: "6px 10px",
-                  }}
                 >
-                  {themeOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {themeDisplayName[option]}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={themeDisplayName[settings.theme]}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {themeOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {themeDisplayName[option]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             </div>
             {settings.followSystem && (
@@ -303,55 +299,57 @@ const SettingsModal = ({
                   <span style={{ color: "var(--muted-text)", fontSize: 12 }}>
                     Light mode
                   </span>
-                  <select
+                  <Select
                     value={settings.systemLightTheme}
-                    onChange={(e) =>
+                    onValueChange={(value) =>
                       onChange({
                         ...settings,
-                        systemLightTheme: e.target.value as ThemeName,
+                        systemLightTheme: value as ThemeName,
                       })
                     }
-                    style={{
-                      backgroundColor: "var(--panel-bg)",
-                      color: "var(--panel-text)",
-                      border: "1px solid var(--panel-border)",
-                      borderRadius: 6,
-                      padding: "6px 10px",
-                    }}
                   >
-                    {themeOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {themeDisplayName[option]}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          themeDisplayName[settings.systemLightTheme]
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {themeOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {themeDisplayName[option]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ color: "var(--muted-text)", fontSize: 12 }}>
                     Dark mode
                   </span>
-                  <select
+                  <Select
                     value={settings.systemDarkTheme}
-                    onChange={(e) =>
+                    onValueChange={(value) =>
                       onChange({
                         ...settings,
-                        systemDarkTheme: e.target.value as ThemeName,
+                        systemDarkTheme: value as ThemeName,
                       })
                     }
-                    style={{
-                      backgroundColor: "var(--panel-bg)",
-                      color: "var(--panel-text)",
-                      border: "1px solid var(--panel-border)",
-                      borderRadius: 6,
-                      padding: "6px 10px",
-                    }}
                   >
-                    {themeOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {themeDisplayName[option]}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={themeDisplayName[settings.systemDarkTheme]}
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {themeOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {themeDisplayName[option]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             )}
@@ -365,13 +363,13 @@ const SettingsModal = ({
             </p>
             {keyBindingRows}
             <div style={{ display: "flex", justifyContent: "flex-start" }}>
-              <button
+              <Button
                 type="button"
-                style={{ ...closeButtonStyle, padding: "6px 12px" }}
+                variant="secondary"
                 onClick={onResetBindings}
               >
                 Reset bindings
-              </button>
+              </Button>
             </div>
           </section>
           <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -380,13 +378,13 @@ const SettingsModal = ({
               Clear saved preferences to test defaults.
             </p>
             <div>
-              <button
+              <Button
                 type="button"
-                style={{ ...closeButtonStyle, padding: "6px 12px" }}
+                variant="secondary"
                 onClick={onClearLocalStorage}
               >
                 Clear local storage
-              </button>
+              </Button>
             </div>
           </section>
         </div>

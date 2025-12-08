@@ -8,6 +8,7 @@ import React, {
 import { createRoot } from "react-dom/client";
 import Editor from "./components/editor";
 import SettingsModal from "./components/SettingsModal";
+import { Button } from "./components/ui/button";
 import { EditorView, ModelEventType, ITextModel } from "../shared/types";
 import { EditorController } from "./controllers/EditorController";
 import { DocumentModel } from "./models/DocumentModel";
@@ -45,16 +46,6 @@ const formatFileName = (fileName: string, isDirty: boolean): string => {
 
 const buildWindowTitle = (fileName: string, isDirty: boolean): string => {
   return `${formatFileName(fileName, isDirty)} — Bedrock`;
-};
-
-const toolbarButtonStyle: React.CSSProperties = {
-  backgroundColor: "var(--button-bg)",
-  border: "1px solid var(--button-border)",
-  borderRadius: "4px",
-  color: "var(--button-text)",
-  cursor: "pointer",
-  fontSize: "12px",
-  padding: "4px 12px",
 };
 
 const selectModel = (): ITextModel => {
@@ -279,52 +270,25 @@ const App = () => {
   const displayLabel = formatFileName(fileName, isDirty);
 
   return (
-    <div
-      style={{
-        width: "100%",
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          padding: "8px 16px",
-          backgroundColor: "var(--header-bg)",
-          borderBottom: "1px solid var(--header-border)",
-          gap: "12px",
-          color: "var(--header-text)",
-        }}
-      >
-        <div style={{ display: "flex", gap: "8px" }}>
-          <button type="button" style={toolbarButtonStyle} onClick={handleOpen}>
+    <div className="h-full w-full flex flex-col">
+      <header className="flex items-center gap-3 px-4 py-2 border-b border-[color:var(--header-border)] bg-[color:var(--header-bg)] text-[color:var(--header-text)]">
+        <div className="flex gap-2">
+          <Button size="sm" onClick={handleOpen}>
             Open…
-          </button>
-          <button type="button" style={toolbarButtonStyle} onClick={handleSave}>
+          </Button>
+          <Button size="sm" onClick={handleSave}>
             Save
-          </button>
-          <button
-            type="button"
-            style={toolbarButtonStyle}
-            onClick={handleSaveAs}
-          >
+          </Button>
+          <Button size="sm" onClick={handleSaveAs}>
             Save As…
-          </button>
-          <button
-            type="button"
-            style={toolbarButtonStyle}
-            onClick={handleOpenSettings}
-          >
+          </Button>
+          <Button size="sm" onClick={handleOpenSettings}>
             Settings
-          </button>
+          </Button>
         </div>
-        <span style={{ marginLeft: "auto", fontSize: "13px" }}>
-          {displayLabel}
-        </span>
+        <span className="ml-auto text-[13px]">{displayLabel}</span>
       </header>
-      <div style={{ flex: 1 }}>
+      <div className="flex-1">
         <div className="app-shell">
           <Editor
             ref={editorRef}

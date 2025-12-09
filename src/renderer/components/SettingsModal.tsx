@@ -112,7 +112,7 @@ const SettingsModal = ({
   };
 
   const updateUiScale = (value: number) => {
-    const clamped = Math.min(200, Math.max(50, value));
+    const clamped = Math.min(150, Math.max(50, value));
     if (clamped !== settings.uiScale) {
       onChange({ ...settings, uiScale: clamped });
     }

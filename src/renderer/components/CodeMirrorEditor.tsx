@@ -21,7 +21,6 @@ type CodeMirrorEditorProps = {
   placeholder?: string;
   onChange: (nextValue: string) => void;
   onCursorChange?: (cursor: CursorPosition) => void;
-  onToggleRenderMode?: () => void;
   className?: string;
 };
 
@@ -34,7 +33,6 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
   placeholder,
   onChange,
   onCursorChange,
-  onToggleRenderMode,
   className,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -54,7 +52,6 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
       placeholder,
       onDocChange: onChange,
       onCursorChange,
-      onToggleRenderMode,
     });
 
     const state = createState(value, bundle);
@@ -120,10 +117,10 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
     }
     view.dispatch({
       effects: bundle.compartments.keymap.reconfigure(
-        keymapExtension(keyBindings, buildBaseKeymap(onToggleRenderMode))
+        keymapExtension(keyBindings, buildBaseKeymap())
       ),
     });
-  }, [keyBindings, onToggleRenderMode]);
+  }, [keyBindings]);
 
   return <div ref={containerRef} className={className} />;
 };

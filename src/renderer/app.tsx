@@ -68,7 +68,7 @@ const toCmKey = (binding: string): string => {
 
 const App = () => {
   const [doc, setDoc] = useState<string>("");
-  const [renderMode, setRenderMode] = useState<RenderMode>("hybrid");
+  const [renderMode] = useState<RenderMode>("raw");
   const [filePath, setFilePath] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -174,7 +174,6 @@ const App = () => {
     setDoc(result.content);
     setFilePath(result.filePath);
     setIsDirty(false);
-    setRenderMode("hybrid");
   }, [confirmDiscardIfNeeded]);
 
   const handleSave = useCallback(async () => {
@@ -271,10 +270,6 @@ const App = () => {
 
   const displayLabel = formatFileName(fileName, isDirty);
 
-  const handleToggleRenderMode = useCallback(() => {
-    setRenderMode((prev) => (prev === "hybrid" ? "raw" : "hybrid"));
-  }, []);
-
   const keyBindings = useMemo<KeyBinding[]>(() => {
     const appBindings: KeyBinding[] = [
       {
@@ -360,7 +355,6 @@ const App = () => {
             keyBindings={keyBindings}
             placeholder="Start typing…"
             onChange={handleDocChange}
-            onToggleRenderMode={handleToggleRenderMode}
             className="cm-editor-shell"
           />
         </div>

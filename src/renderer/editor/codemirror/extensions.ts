@@ -13,7 +13,6 @@ import { markdown } from "@codemirror/lang-markdown";
 import { indentUnit } from "@codemirror/language";
 import { CursorPosition, RenderMode } from "../../../shared/types";
 import { ThemeName } from "../../theme";
-import { hybridMarkdown } from "./hybridMarkdown";
 import { buildThemeExtension } from "./theme";
 
 type ExtensionOptions = {
@@ -24,7 +23,6 @@ type ExtensionOptions = {
   placeholder?: string;
   onDocChange: (doc: string) => void;
   onCursorChange?: (cursor: CursorPosition) => void;
-  onToggleRenderMode?: () => void;
 };
 
 export type ExtensionBundle = {
@@ -36,27 +34,10 @@ export type ExtensionBundle = {
   };
 };
 
-export const buildBaseKeymap = (
-  onToggleRenderMode?: () => void
-): import("@codemirror/view").KeyBinding[] => [
-  {
-    key: "Mod-Shift-m",
-    preventDefault: true,
-    run: () => {
-      if (onToggleRenderMode) {
-        onToggleRenderMode();
-      }
-      return true;
-    },
-  },
-];
+export const buildBaseKeymap =
+  (): import("@codemirror/view").KeyBinding[] => [];
 
-export const renderModeExtension = (mode: RenderMode): Extension => {
-  if (mode === "hybrid") {
-    return hybridMarkdown();
-  }
-  return [];
-};
+export const renderModeExtension = (_mode: RenderMode): Extension => [];
 
 export const keymapExtension = (
   bindings: import("@codemirror/view").KeyBinding[],
@@ -83,7 +64,7 @@ export const createCmExtensions = (
     }
   });
 
-  const baseKeys = buildBaseKeymap(options.onToggleRenderMode);
+  const baseKeys = buildBaseKeymap();
 
   const extensions: Extension[] = [
     lineNumbers(),

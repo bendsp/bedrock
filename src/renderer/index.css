@@ -274,3 +274,7 @@ body {
 .cm-hybrid-line {
   cursor: text;
 }
+
+.cm-hybrid-hidden {
+  display: none;
+}

@@ -107,12 +107,16 @@ export const hybridMarkdown = (options?: HybridOptions): Extension => {
           const line = view.state.doc.line(lineNumber);
           const html = renderedLines[lineNumber - 1] ?? "&nbsp;";
 
-          const widget = Decoration.replace({
+          const widget = Decoration.widget({
             widget: new RenderedLineWidget(html, lineNumber, this.activate),
-            block: true,
-            inclusive: false,
-          }).range(line.from, line.to);
-          decorations.push(widget);
+            side: -1,
+          }).range(line.from);
+
+          const hideLine = Decoration.line({
+            class: "cm-hybrid-hidden",
+          }).range(line.from);
+
+          decorations.push(widget, hideLine);
         }
 
         return Decoration.set(decorations, true);

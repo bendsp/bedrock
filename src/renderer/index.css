@@ -283,6 +283,8 @@ body {
 .cm-line.cm-md-heading {
   font-weight: 700;
   color: var(--panel-text, #e6e9ef);
+  text-indent: 0;
+  padding-left: 0;
 }
 
 .cm-line.cm-md-atxheading1,
@@ -354,4 +356,5 @@ body {
   color: transparent;
   text-shadow: none;
   pointer-events: none;
+  font-size: 0;
 }

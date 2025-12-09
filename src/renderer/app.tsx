@@ -6,14 +6,10 @@ import React, {
   useRef,
 } from "react";
 import { createRoot } from "react-dom/client";
-import Editor from "./components/editor";
+import CodeMirrorEditor from "./components/CodeMirrorEditor";
 import SettingsModal from "./components/SettingsModal";
 import { Button } from "./components/ui/button";
-import { EditorView, ModelEventType, ITextModel } from "../shared/types";
-import { EditorController } from "./controllers/EditorController";
-import { DocumentModel } from "./models/DocumentModel";
-import { RopeModel } from "./models/RopeModel";
-import { LinesModel } from "./models/LinesModel";
+import { RenderMode } from "../shared/types";
 import {
   defaultSettings,
   defaultKeyBindings,
@@ -28,6 +24,14 @@ import {
   matchesBinding,
 } from "./keybindings";
 import { applyTheme, ThemeName } from "./theme";
+import {
+  defaultKeymap,
+  historyKeymap,
+  indentWithTab,
+} from "@codemirror/commands";
+import { EditorView, KeyBinding } from "@codemirror/view";
+import { markdownKeymap } from "@codemirror/lang-markdown";
+import { createSnippetCommand } from "./editor/codemirror/commands";
 
 const DEFAULT_FILE_NAME = "Untitled.md";
 
@@ -48,29 +52,29 @@ const buildWindowTitle = (fileName: string, isDirty: boolean): string => {
   return `${formatFileName(fileName, isDirty)} — Bedrock`;
 };
 
-const selectModel = (): ITextModel => {
-  const choice =
-    (typeof localStorage !== "undefined" &&
-      localStorage.getItem("bedrock:model")) ||
-    "rope";
-
-  if (choice === "rope") {
-    return new RopeModel("");
-  }
-  if (choice === "lines") {
-    return new LinesModel("");
-  }
-  return new DocumentModel("");
+const toCmKey = (binding: string): string => {
+  const parts = binding.split("+").filter(Boolean);
+  const mapped = parts.map((part) => {
+    const lower = part.toLowerCase();
+    if (lower === "mod") return "Mod";
+    if (lower === "cmd") return "Mod";
+    if (lower === "ctrl") return "Ctrl";
+    if (lower === "shift") return "Shift";
+    if (lower === "alt" || lower === "option") return "Alt";
+    return part.length === 1 ? part.toUpperCase() : part;
+  });
+  return mapped.join("-");
 };
 
 const App = () => {
-  const [controller, setController] = useState<EditorController | null>(null);
-  const [model] = useState<ITextModel>(() => selectModel());
+  const [doc, setDoc] = useState<string>("");
+  const [renderMode] = useState<RenderMode>("hybrid");
   const [filePath, setFilePath] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
   const suppressDirtyRef = useRef(false);
+  const editorViewRef = useRef<EditorView | null>(null);
   const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(
     () => window.matchMedia("(prefers-color-scheme: dark)").matches
   );
@@ -86,31 +90,18 @@ const App = () => {
     return () => window.removeEventListener("keydown", handleDevToolsShortcut);
   }, []);
 
-  const editorRef = useCallback(
-    (editorView: EditorView | null) => {
-      if (editorView && !controller) {
-        const newController = new EditorController(model, editorView);
-        setController(newController);
-      }
-    },
-    [controller, model]
-  );
+  const handleDocChange = useCallback((next: string) => {
+    setDoc(next);
+    if (suppressDirtyRef.current) {
+      suppressDirtyRef.current = false;
+      return;
+    }
+    setIsDirty(true);
+  }, []);
 
-  useEffect(() => {
-    const handleContentChange = () => {
-      if (suppressDirtyRef.current) {
-        suppressDirtyRef.current = false;
-        return;
-      }
-      setIsDirty(true);
-    };
-
-    model.on(ModelEventType.CONTENT_CHANGED, handleContentChange);
-
-    return () => {
-      model.off(ModelEventType.CONTENT_CHANGED, handleContentChange);
-    };
-  }, [model]);
+  const focusEditor = useCallback(() => {
+    editorViewRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     window.electronAPI.notifyDirtyState(isDirty);
@@ -176,22 +167,25 @@ const App = () => {
   const handleOpen = useCallback(async () => {
     const proceed = await confirmDiscardIfNeeded("open");
     if (!proceed) {
+      focusEditor();
       return;
     }
 
     const result = await window.electronAPI.openFile();
     if (!result) {
+      focusEditor();
       return;
     }
 
     suppressDirtyRef.current = true;
-    model.setAll(result.content);
+    setDoc(result.content);
     setFilePath(result.filePath);
     setIsDirty(false);
-  }, [confirmDiscardIfNeeded, model]);
+    focusEditor();
+  }, [confirmDiscardIfNeeded, focusEditor]);
 
   const handleSave = useCallback(async () => {
-    const content = model.getAll() ?? "";
+    const content = doc ?? "";
 
     const result = await window.electronAPI.saveFile({
       filePath: filePath ?? undefined,
@@ -199,27 +193,31 @@ const App = () => {
     });
 
     if (!result) {
+      focusEditor();
       return;
     }
 
     setFilePath(result.filePath);
     setIsDirty(false);
-  }, [filePath, model]);
+    focusEditor();
+  }, [doc, filePath, focusEditor]);
 
   const handleSaveAs = useCallback(async () => {
-    const content = model.getAll() ?? "";
+    const content = doc ?? "";
 
     const result = await window.electronAPI.saveFile({
       content,
     });
 
     if (!result) {
+      focusEditor();
       return;
     }
 
     setFilePath(result.filePath);
     setIsDirty(false);
-  }, [model]);
+    focusEditor();
+  }, [doc, focusEditor]);
 
   const handleOpenSettings = useCallback(() => {
     setIsSettingsOpen(true);
@@ -227,7 +225,8 @@ const App = () => {
 
   const handleCloseSettings = useCallback(() => {
     setIsSettingsOpen(false);
-  }, []);
+    focusEditor();
+  }, [focusEditor]);
 
   const handleUpdateSettings = useCallback((updated: UserSettings) => {
     setSettings({
@@ -284,6 +283,62 @@ const App = () => {
 
   const displayLabel = formatFileName(fileName, isDirty);
 
+  const keyBindings = useMemo<KeyBinding[]>(() => {
+    const appBindings: KeyBinding[] = [
+      {
+        key: toCmKey(settings.keyBindings.open),
+        preventDefault: true,
+        run: () => {
+          handleOpen();
+          return true;
+        },
+      },
+      {
+        key: toCmKey(settings.keyBindings.save),
+        preventDefault: true,
+        run: () => {
+          handleSave();
+          return true;
+        },
+      },
+      {
+        key: toCmKey(settings.keyBindings.openSettings),
+        preventDefault: true,
+        run: () => {
+          handleOpenSettings();
+          return true;
+        },
+      },
+    ];
+
+    const snippetBindings: KeyBinding[] = [
+      {
+        key: "Mod-b",
+        preventDefault: true,
+        run: createSnippetCommand("****", 2),
+      },
+      {
+        key: "Mod-i",
+        preventDefault: true,
+        run: createSnippetCommand("**", 1),
+      },
+      {
+        key: "Mod-k",
+        preventDefault: true,
+        run: createSnippetCommand("[](url)", 1),
+      },
+    ];
+
+    return [
+      ...snippetBindings,
+      ...appBindings,
+      indentWithTab,
+      ...defaultKeymap,
+      ...historyKeymap,
+      ...markdownKeymap,
+    ];
+  }, [handleOpen, handleOpenSettings, handleSave, settings.keyBindings]);
+
   return (
     <div className="h-full w-full flex flex-col">
       <header className="flex items-center gap-3 px-4 py-2 border-b border-[color:var(--header-border)] bg-[color:var(--header-bg)] text-[color:var(--header-text)]">
@@ -305,10 +360,19 @@ const App = () => {
       </header>
       <div className="flex-1">
         <div className="app-shell">
-          <Editor
-            ref={editorRef}
-            onKeyDown={controller?.handleKeyDown}
-            model={model}
+          <CodeMirrorEditor
+            value={doc}
+            renderMode={renderMode}
+            theme={activeTheme}
+            textSize={settings.textSize}
+            keyBindings={keyBindings}
+            placeholder="Start typing…"
+            onChange={handleDocChange}
+            onReady={(view) => {
+              editorViewRef.current = view;
+              view.focus();
+            }}
+            className="cm-editor-shell"
           />
         </div>
       </div>

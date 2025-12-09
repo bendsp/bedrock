@@ -38,6 +38,10 @@ const SettingsModal = ({
     null
   );
   const [pendingBinding, setPendingBinding] = useState<string | null>(null);
+  const originalBindingRef = React.useRef<{
+    action: KeyBindingAction | null;
+    binding: string | null;
+  }>({ action: null, binding: null });
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -62,30 +66,33 @@ const SettingsModal = ({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (!listeningFor) {
+        return;
+      }
       const binding = eventToBinding(event);
       if (!binding) {
         return;
       }
-      setPendingBinding(binding);
       event.preventDefault();
-    };
-
-    const handleKeyUp = (event: KeyboardEvent) => {
-      if (isModifierKey(event.key)) {
-        return;
-      }
-      if (!pendingBinding) {
-        return;
-      }
       onChange({
         ...settings,
         keyBindings: {
           ...settings.keyBindings,
-          [listeningFor]: pendingBinding,
+          [listeningFor]: binding,
         },
       });
-      setPendingBinding(null);
+      setPendingBinding(binding);
       setListeningFor(null);
+      originalBindingRef.current = { action: null, binding: null };
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (!listeningFor) {
+        return;
+      }
+      if (isModifierKey(event.key)) {
+        return;
+      }
       event.preventDefault();
     };
 
@@ -166,9 +173,26 @@ const SettingsModal = ({
             className="inline-flex items-center gap-2 focus-visible:ring-0 focus-visible:ring-offset-0"
             onClick={() => {
               if (isActive) {
+                if (
+                  originalBindingRef.current.action === action &&
+                  originalBindingRef.current.binding
+                ) {
+                  onChange({
+                    ...settings,
+                    keyBindings: {
+                      ...settings.keyBindings,
+                      [action]: originalBindingRef.current.binding,
+                    },
+                  });
+                }
                 setPendingBinding(null);
                 setListeningFor(null);
+                originalBindingRef.current = { action: null, binding: null };
               } else {
+                originalBindingRef.current = {
+                  action,
+                  binding: settings.keyBindings[action],
+                };
                 setPendingBinding(null);
                 setListeningFor(action);
               }

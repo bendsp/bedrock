@@ -29,7 +29,7 @@ import {
   historyKeymap,
   indentWithTab,
 } from "@codemirror/commands";
-import { KeyBinding } from "@codemirror/view";
+import { EditorView, KeyBinding } from "@codemirror/view";
 import { markdownKeymap } from "@codemirror/lang-markdown";
 import { createSnippetCommand } from "./editor/codemirror/commands";
 
@@ -74,6 +74,7 @@ const App = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
   const suppressDirtyRef = useRef(false);
+  const editorViewRef = useRef<EditorView | null>(null);
   const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(
     () => window.matchMedia("(prefers-color-scheme: dark)").matches
   );
@@ -96,6 +97,10 @@ const App = () => {
       return;
     }
     setIsDirty(true);
+  }, []);
+
+  const focusEditor = useCallback(() => {
+    editorViewRef.current?.focus();
   }, []);
 
   useEffect(() => {
@@ -162,11 +167,13 @@ const App = () => {
   const handleOpen = useCallback(async () => {
     const proceed = await confirmDiscardIfNeeded("open");
     if (!proceed) {
+      focusEditor();
       return;
     }
 
     const result = await window.electronAPI.openFile();
     if (!result) {
+      focusEditor();
       return;
     }
 
@@ -174,7 +181,8 @@ const App = () => {
     setDoc(result.content);
     setFilePath(result.filePath);
     setIsDirty(false);
-  }, [confirmDiscardIfNeeded]);
+    focusEditor();
+  }, [confirmDiscardIfNeeded, focusEditor]);
 
   const handleSave = useCallback(async () => {
     const content = doc ?? "";
@@ -185,12 +193,14 @@ const App = () => {
     });
 
     if (!result) {
+      focusEditor();
       return;
     }
 
     setFilePath(result.filePath);
     setIsDirty(false);
-  }, [doc, filePath]);
+    focusEditor();
+  }, [doc, filePath, focusEditor]);
 
   const handleSaveAs = useCallback(async () => {
     const content = doc ?? "";
@@ -200,12 +210,14 @@ const App = () => {
     });
 
     if (!result) {
+      focusEditor();
       return;
     }
 
     setFilePath(result.filePath);
     setIsDirty(false);
-  }, [doc]);
+    focusEditor();
+  }, [doc, focusEditor]);
 
   const handleOpenSettings = useCallback(() => {
     setIsSettingsOpen(true);
@@ -213,7 +225,8 @@ const App = () => {
 
   const handleCloseSettings = useCallback(() => {
     setIsSettingsOpen(false);
-  }, []);
+    focusEditor();
+  }, [focusEditor]);
 
   const handleUpdateSettings = useCallback((updated: UserSettings) => {
     setSettings({
@@ -355,6 +368,10 @@ const App = () => {
             keyBindings={keyBindings}
             placeholder="Start typing…"
             onChange={handleDocChange}
+            onReady={(view) => {
+              editorViewRef.current = view;
+              view.focus();
+            }}
             className="cm-editor-shell"
           />
         </div>

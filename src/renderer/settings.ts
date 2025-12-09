@@ -1,4 +1,5 @@
 import { ThemeName, isThemeName } from "./theme";
+import { RenderMode } from "../shared/types";
 
 export type KeyBindingAction = "open" | "save" | "openSettings";
 
@@ -12,6 +13,7 @@ export type UserSettings = {
   followSystem: boolean;
   systemLightTheme: ThemeName;
   systemDarkTheme: ThemeName;
+  renderMode: RenderMode;
 };
 
 const STORAGE_KEY = "bedrock:settings";
@@ -30,6 +32,7 @@ export const defaultSettings: UserSettings = {
   followSystem: true,
   systemLightTheme: "light",
   systemDarkTheme: "dark",
+  renderMode: "hybrid",
 };
 
 const normalizeKeyBindings = (
@@ -96,6 +99,10 @@ export const loadSettings = (): UserSettings => {
       isThemeName(parsed.systemDarkTheme)
         ? parsed.systemDarkTheme
         : defaultSettings.systemDarkTheme;
+    const renderMode =
+      parsed.renderMode === "raw" || parsed.renderMode === "hybrid"
+        ? parsed.renderMode
+        : defaultSettings.renderMode;
     return {
       textSize,
       uiScale,
@@ -104,6 +111,7 @@ export const loadSettings = (): UserSettings => {
       followSystem,
       systemLightTheme,
       systemDarkTheme,
+      renderMode,
     };
   } catch {
     return defaultSettings;

@@ -21,6 +21,7 @@ type CodeMirrorEditorProps = {
   placeholder?: string;
   onChange: (nextValue: string) => void;
   onCursorChange?: (cursor: CursorPosition) => void;
+  onReady?: (view: EditorView) => void;
   className?: string;
 };
 
@@ -33,6 +34,7 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
   placeholder,
   onChange,
   onCursorChange,
+  onReady,
   className,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -62,6 +64,11 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
 
     bundleRef.current = bundle;
     viewRef.current = view;
+    if (onReady) {
+      onReady(view);
+    }
+    // Focus the editor when it mounts so typing works immediately.
+    requestAnimationFrame(() => view.focus());
 
     return () => {
       view.destroy();

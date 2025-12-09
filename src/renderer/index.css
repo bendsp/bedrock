@@ -254,11 +254,14 @@ body {
   width: 100%;
   max-width: 960px;
   margin: 0 auto;
+  height: calc(100vh - 140px);
+  max-height: calc(100vh - 140px);
 }
 
 .cm-editor .cm-scroller {
   padding: 0 8px;
   background: var(--panel-bg);
+  overflow: auto;
 }
 
 .cm-editor .cm-content {

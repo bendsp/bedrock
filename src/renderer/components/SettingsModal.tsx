@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "./ui/select";
 import { Switch } from "./ui/switch";
+import { Kbd, KbdGroup } from "./ui/kbd";
 
 type SettingsModalProps = {
   settings: UserSettings;
@@ -37,6 +38,10 @@ const SettingsModal = ({
     null
   );
   const [pendingBinding, setPendingBinding] = useState<string | null>(null);
+  const originalBindingRef = React.useRef<{
+    action: KeyBindingAction | null;
+    binding: string | null;
+  }>({ action: null, binding: null });
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -61,30 +66,33 @@ const SettingsModal = ({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (!listeningFor) {
+        return;
+      }
       const binding = eventToBinding(event);
       if (!binding) {
         return;
       }
-      setPendingBinding(binding);
       event.preventDefault();
-    };
-
-    const handleKeyUp = (event: KeyboardEvent) => {
-      if (isModifierKey(event.key)) {
-        return;
-      }
-      if (!pendingBinding) {
-        return;
-      }
       onChange({
         ...settings,
         keyBindings: {
           ...settings.keyBindings,
-          [listeningFor]: pendingBinding,
+          [listeningFor]: binding,
         },
       });
-      setPendingBinding(null);
+      setPendingBinding(binding);
       setListeningFor(null);
+      originalBindingRef.current = { action: null, binding: null };
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (!listeningFor) {
+        return;
+      }
+      if (isModifierKey(event.key)) {
+        return;
+      }
       event.preventDefault();
     };
 
@@ -103,6 +111,44 @@ const SettingsModal = ({
     }
   };
 
+  const updateUiScale = (value: number) => {
+    const clamped = Math.min(150, Math.max(50, value));
+    if (clamped !== settings.uiScale) {
+      onChange({ ...settings, uiScale: clamped });
+    }
+  };
+
+  const renderBinding = (binding: string) => {
+    const parts = binding.split("+").filter(Boolean);
+    return (
+      <KbdGroup>
+        {parts.map((part, index) => {
+          const label =
+            part.toLowerCase() === "mod"
+              ? "⌘"
+              : part.toLowerCase() === "cmd"
+              ? "⌘"
+              : part.toLowerCase() === "ctrl"
+              ? "Ctrl"
+              : part.toLowerCase() === "shift"
+              ? "⇧"
+              : part.toLowerCase() === "alt"
+              ? "⌥"
+              : part.length === 1
+              ? part.toUpperCase()
+              : part;
+          const showPlus = index < parts.length - 1;
+          return (
+            <React.Fragment key={`${binding}-${index}`}>
+              <Kbd className="">{label}</Kbd>
+              {showPlus ? <span> + </span> : null}
+            </React.Fragment>
+          );
+        })}
+      </KbdGroup>
+    );
+  };
+
   const keyBindingRows = (
     ["open", "save", "openSettings"] as KeyBindingAction[]
   ).map((action) => {
@@ -113,20 +159,55 @@ const SettingsModal = ({
           {keyBindingLabels[action]}
         </span>
         <div className="flex items-center gap-2 min-h-8">
-          <span className="text-[color:var(--panel-text)] tabular-nums min-w-[80px]">
+          <span className="text-[color:var(--panel-text)] tabular-nums min-w-[120px]">
             {isActive
               ? pendingBinding
-                ? formatBinding(pendingBinding)
+                ? renderBinding(formatBinding(pendingBinding))
                 : "Press keys…"
-              : formatBinding(settings.keyBindings[action])}
+              : renderBinding(formatBinding(settings.keyBindings[action]))}
           </span>
           <Button
             type="button"
             size="sm"
             variant="secondary"
-            onClick={() => setListeningFor(isActive ? null : action)}
+            className="inline-flex items-center gap-2 focus-visible:ring-0 focus-visible:ring-offset-0"
+            onClick={() => {
+              if (isActive) {
+                if (
+                  originalBindingRef.current.action === action &&
+                  originalBindingRef.current.binding
+                ) {
+                  onChange({
+                    ...settings,
+                    keyBindings: {
+                      ...settings.keyBindings,
+                      [action]: originalBindingRef.current.binding,
+                    },
+                  });
+                }
+                setPendingBinding(null);
+                setListeningFor(null);
+                originalBindingRef.current = { action: null, binding: null };
+              } else {
+                originalBindingRef.current = {
+                  action,
+                  binding: settings.keyBindings[action],
+                };
+                setPendingBinding(null);
+                setListeningFor(action);
+              }
+            }}
           >
-            {isActive ? "Cancel" : "Change"}
+            {isActive ? (
+              <>
+                Cancel{" "}
+                <Kbd className="h-5 min-w-5 px-1 text-[11px] font-semibold leading-[1.15]">
+                  Esc
+                </Kbd>
+              </>
+            ) : (
+              "Change"
+            )}
           </Button>
         </div>
       </div>
@@ -142,48 +223,86 @@ const SettingsModal = ({
       <div className="w-[90%] h-[90%] bg-[color:var(--panel-bg)] border border-[color:var(--panel-border)] rounded-xl shadow-2xl text-[color:var(--panel-text)] flex flex-col p-6 gap-4 text-base">
         <div className="flex items-center justify-between border-b border-[color:var(--panel-border)] pb-3">
           <h2 className="m-0 text-lg tracking-[0.2px]">Settings</h2>
-          <Button variant="secondary" size="sm" onClick={onClose}>
-            Close
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onClose}
+            className="inline-flex items-center gap-2"
+          >
+            Close{" "}
+            <Kbd className="h-5 min-w-5 px-1 text-[11px] font-semibold leading-[1.15]">
+              Esc
+            </Kbd>
           </Button>
         </div>
         <div className="flex-1 overflow-auto pt-1 space-y-4">
-          <section className="flex flex-col gap-2">
-            <div className="flex items-center gap-3">
-              <Label className="w-28 text-[0.9em] text-[color:var(--muted-text)]">
-                Text size
-              </Label>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  aria-label="Decrease text size"
-                  size="icon"
-                  onClick={() => updateTextSize(-1)}
-                >
-                  –
-                </Button>
-                <span className="text-[color:var(--panel-text)] tabular-nums min-w-[48px] text-center">
-                  {settings.textSize}px
-                </span>
-                <Button
-                  type="button"
-                  aria-label="Increase text size"
-                  size="icon"
-                  onClick={() => updateTextSize(1)}
-                >
-                  +
-                </Button>
+          <section className="flex flex-col gap-3 rounded-xl border border-[color:var(--panel-border)] bg-[color:var(--panel-bg)]/60 p-4">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm font-semibold text-[color:var(--panel-text)]">
+                    Editor text size
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    aria-label="Decrease text size"
+                    size="icon"
+                    variant="secondary"
+                    onClick={() => updateTextSize(-1)}
+                  >
+                    –
+                  </Button>
+                  <span className="text-[color:var(--panel-text)] tabular-nums min-w-[48px] text-center">
+                    {settings.textSize}px
+                  </span>
+                  <Button
+                    type="button"
+                    aria-label="Increase text size"
+                    size="icon"
+                    variant="secondary"
+                    onClick={() => updateTextSize(1)}
+                  >
+                    +
+                  </Button>
+                </div>
               </div>
             </div>
-            <p className="text-[color:var(--muted-text)] mt-1 text-xs">
-              Adjust the editor font size. Changes apply immediately.
-            </p>
+
+            <div className="h-px bg-[color:var(--panel-border)]/80" />
+
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm font-semibold text-[color:var(--panel-text)]">
+                    UI scaling
+                  </Label>
+                </div>
+                <Select
+                  value={String(settings.uiScale)}
+                  onValueChange={(value) => updateUiScale(Number(value))}
+                >
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[50, 75, 100, 125, 150].map((value) => (
+                      <SelectItem key={value} value={String(value)}>
+                        {value === 100 ? "Default (100%)" : `${value}%`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </section>
-          <section className="flex flex-col gap-2">
-            <h3 className="mt-3 text-base">Theme</h3>
-            <p className="text-[color:var(--muted-text)] m-0 text-xs">
-              Pick a theme. Colors apply across the app.
-            </p>
-            <div className="flex items-center gap-3 flex-wrap">
+
+          <section className="flex flex-col gap-3 rounded-xl border border-[color:var(--panel-border)] bg-[color:var(--panel-bg)]/60 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="m-0 text-base font-semibold">Theme</h3>
+              </div>
               <div className="flex items-center gap-2">
                 <Switch
                   checked={settings.followSystem}
@@ -195,34 +314,36 @@ const SettingsModal = ({
                   }
                 />
                 <span className="text-[color:var(--panel-text)] text-[0.95em]">
-                  Follow system theme
+                  Follow system
                 </span>
               </div>
-              {!settings.followSystem && (
-                <Select
-                  value={settings.theme}
-                  onValueChange={(value) =>
-                    onChange({
-                      ...settings,
-                      theme: value as ThemeName,
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {themeOptions.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {themeDisplayName[option]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
             </div>
+
+            {!settings.followSystem && (
+              <Select
+                value={settings.theme}
+                onValueChange={(value) =>
+                  onChange({
+                    ...settings,
+                    theme: value as ThemeName,
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {themeOptions.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {themeDisplayName[option]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
             {settings.followSystem && (
-              <div className="flex gap-4 flex-wrap">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="flex items-center gap-2">
                   <span className="text-[color:var(--muted-text)] text-xs">
                     Light mode
@@ -276,12 +397,15 @@ const SettingsModal = ({
               </div>
             )}
           </section>
-          <section className="flex flex-col gap-2">
-            <h3 className="mt-3 text-base">Keybindings</h3>
-            <p className="text-[color:var(--muted-text)] m-0 text-xs">
-              Click change, then press a new shortcut. Use Cmd/Ctrl combos.
-            </p>
-            {keyBindingRows}
+
+          <section className="flex flex-col gap-3 rounded-xl border border-[color:var(--panel-border)] bg-[color:var(--panel-bg)]/60 p-4">
+            <div>
+              <h3 className="m-0 text-base font-semibold">Keybindings</h3>
+              <p className="text-[color:var(--muted-text)] m-0 text-xs">
+                Click change, then press a new shortcut. Use Cmd/Ctrl combos.
+              </p>
+            </div>
+            <div className="space-y-2">{keyBindingRows}</div>
             <div className="flex justify-start">
               <Button
                 type="button"
@@ -292,8 +416,9 @@ const SettingsModal = ({
               </Button>
             </div>
           </section>
-          <section className="flex flex-col gap-2">
-            <h3 className="mt-3 text-base">Developer</h3>
+
+          <section className="flex flex-col gap-3 rounded-xl border border-[color:var(--panel-border)] bg-[color:var(--panel-bg)]/60 p-4">
+            <h3 className="m-0 text-base font-semibold">Developer</h3>
             <p className="text-[color:var(--muted-text)] m-0 text-xs">
               Clear saved preferences to test defaults.
             </p>
@@ -304,6 +429,15 @@ const SettingsModal = ({
                 onClick={onClearLocalStorage}
               >
                 Clear local storage
+              </Button>
+            </div>
+            <div>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => window.electronAPI.openDevTools()}
+              >
+                Open DevTools
               </Button>
             </div>
           </section>

@@ -50,6 +50,7 @@ body {
 }
 
 :root {
+  --ui-font-size: 15px;
   --bg-body: #282c34;
   --text-body: #abb2bf;
   --shell-bg: #1f2329;
@@ -59,6 +60,15 @@ body {
   --button-bg: #3a3f4b;
   --button-border: #4b5263;
   --button-text: #eef1f6;
+  --ui-primary: #4f8bff;
+  --ui-primary-foreground: #0d1424;
+  --ui-primary-border: #75a7ff;
+  --ui-secondary: #3a3f4b;
+  --ui-secondary-foreground: #eef1f6;
+  --ui-secondary-border: #4b5263;
+  --ui-disabled-bg: #2a2e38;
+  --ui-disabled-text: #808695;
+  --ui-disabled-border: #363c48;
   --panel-bg: #1b1e24;
   --panel-border: #2a2f38;
   --panel-text: #e6e9ef;
@@ -70,6 +80,7 @@ body {
   --link-color: #61afef;
   --blockquote-border: #3f4755;
   --blockquote-text: #b6beca;
+  font-size: var(--ui-font-size);
 }
 
 .app-shell {

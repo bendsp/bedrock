@@ -112,3 +112,4 @@ export const clampKeyBindings = (bindings: KeyBindings): KeyBindings => ({
   save: normalizeBinding(bindings.save),
   openSettings: normalizeBinding(bindings.openSettings),
 });
+

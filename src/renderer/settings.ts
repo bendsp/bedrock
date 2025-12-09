@@ -6,6 +6,7 @@ export type KeyBindings = Record<KeyBindingAction, string>;
 
 export type UserSettings = {
   textSize: number;
+  uiScale: number; // percentage
   keyBindings: KeyBindings;
   theme: ThemeName;
   followSystem: boolean;
@@ -23,6 +24,7 @@ export const defaultKeyBindings: KeyBindings = {
 
 export const defaultSettings: UserSettings = {
   textSize: 16,
+  uiScale: 100,
   keyBindings: defaultKeyBindings,
   theme: "dark",
   followSystem: true,
@@ -60,10 +62,20 @@ export const loadSettings = (): UserSettings => {
       return defaultSettings;
     }
     const parsed = JSON.parse(raw) as Partial<UserSettings>;
+    const uiScaleFromLegacy =
+      typeof (parsed as any).uiTextSize === "number"
+        ? Math.round(((parsed as any).uiTextSize / 15) * 100)
+        : undefined;
     const textSize =
       typeof parsed.textSize === "number" && parsed.textSize > 8
         ? parsed.textSize
         : defaultSettings.textSize;
+    const uiScaleRaw =
+      typeof parsed.uiScale === "number" ? parsed.uiScale : uiScaleFromLegacy;
+    const uiScale =
+      typeof uiScaleRaw === "number" && uiScaleRaw >= 50 && uiScaleRaw <= 150
+        ? uiScaleRaw
+        : defaultSettings.uiScale;
     const keyBindings = normalizeKeyBindings(parsed.keyBindings);
     const theme =
       parsed.theme &&
@@ -86,6 +98,7 @@ export const loadSettings = (): UserSettings => {
         : defaultSettings.systemDarkTheme;
     return {
       textSize,
+      uiScale,
       keyBindings,
       theme,
       followSystem,

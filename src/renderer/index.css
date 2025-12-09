@@ -278,3 +278,80 @@ body {
 .cm-hybrid-hidden {
   display: none;
 }
+
+/* Hybrid markdown styling */
+.cm-line.cm-md-heading {
+  font-weight: 700;
+  color: var(--panel-text, #e6e9ef);
+}
+
+.cm-line.cm-md-atxheading1,
+.cm-line.cm-md-setextheading1 {
+  font-size: 1.6em;
+  line-height: 1.3;
+}
+
+.cm-line.cm-md-atxheading2,
+.cm-line.cm-md-setextheading2 {
+  font-size: 1.4em;
+  line-height: 1.35;
+}
+
+.cm-line.cm-md-atxheading3 {
+  font-size: 1.25em;
+  line-height: 1.4;
+}
+
+.cm-line.cm-md-atxheading4 {
+  font-size: 1.15em;
+}
+
+.cm-line.cm-md-atxheading5,
+.cm-line.cm-md-atxheading6 {
+  font-size: 1.05em;
+  letter-spacing: 0.01em;
+}
+
+.cm-line.cm-md-list {
+  position: relative;
+  padding-left: 1.2em;
+}
+
+.cm-line.cm-md-quote {
+  position: relative;
+  padding-left: 1.1em;
+  color: var(--blockquote-text, #b6beca);
+}
+
+.cm-line.cm-md-quote::before {
+  content: "";
+  position: absolute;
+  left: 0.2em;
+  top: 0.25em;
+  bottom: 0.25em;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--blockquote-border, #3f4755);
+}
+
+.cm-line.cm-md-code-block {
+  background: var(--code-bg, #2c313a);
+  border-radius: 6px;
+  padding: 0.35em 0.6em;
+  font-family: "Fira Code", "Source Code Pro", Monaco, Consolas, monospace;
+  color: var(--code-text, #e6edf3);
+}
+
+.cm-content .cm-md-inline-code {
+  background: var(--code-inline-bg, #2c313a);
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  font-family: "Fira Code", "Source Code Pro", Monaco, Consolas, monospace;
+  color: var(--code-text, #e6edf3);
+}
+
+.cm-md-hide-marker {
+  color: transparent;
+  text-shadow: none;
+  pointer-events: none;
+}

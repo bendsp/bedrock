@@ -11,6 +11,7 @@ import { indentUnit } from "@codemirror/language";
 import { CursorPosition, RenderMode } from "../../../shared/types";
 import { ThemeName } from "../../theme";
 import { buildThemeExtension } from "./theme";
+import { hybridMarkdown } from "./hybridMarkdown";
 
 type ExtensionOptions = {
   renderMode: RenderMode;
@@ -34,7 +35,12 @@ export type ExtensionBundle = {
 export const buildBaseKeymap =
   (): import("@codemirror/view").KeyBinding[] => [];
 
-export const renderModeExtension = (_mode: RenderMode): Extension => [];
+export const renderModeExtension = (mode: RenderMode): Extension => {
+  if (mode === "hybrid") {
+    return hybridMarkdown();
+  }
+  return [];
+};
 
 export const keymapExtension = (
   bindings: import("@codemirror/view").KeyBinding[],

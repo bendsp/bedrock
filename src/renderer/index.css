@@ -244,3 +244,33 @@ body {
 .inline-editor__raw-input:focus {
   outline: none;
 }
+
+/* CodeMirror styles */
+.cm-editor {
+  height: 100%;
+}
+
+.cm-editor-shell {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.cm-editor .cm-scroller {
+  padding: 0 8px;
+  background: var(--panel-bg);
+}
+
+.cm-editor .cm-content {
+  min-height: 100%;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+
+.cm-editor .cm-line {
+  white-space: pre-wrap;
+}
+
+.cm-hybrid-line {
+  cursor: text;
+}

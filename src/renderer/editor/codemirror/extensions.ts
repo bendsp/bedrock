@@ -2,9 +2,6 @@ import { EditorState, Compartment, Extension } from "@codemirror/state";
 import {
   EditorView,
   keymap,
-  lineNumbers,
-  highlightActiveLine,
-  highlightActiveLineGutter,
   drawSelection,
   placeholder as placeholderExt,
 } from "@codemirror/view";
@@ -67,9 +64,6 @@ export const createCmExtensions = (
   const baseKeys = buildBaseKeymap();
 
   const extensions: Extension[] = [
-    lineNumbers(),
-    highlightActiveLineGutter(),
-    highlightActiveLine(),
     drawSelection(),
     history(),
     markdown(),

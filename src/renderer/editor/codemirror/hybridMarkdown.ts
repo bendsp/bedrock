@@ -1,5 +1,7 @@
 import { Extension, RangeSetBuilder } from "@codemirror/state";
+import { syntaxTree } from "@codemirror/language";
 import { Decoration, DecorationSet, ViewPlugin } from "@codemirror/view";
+import type { SyntaxNode } from "@lezer/common";
 
 type LineKind =
   | { type: "heading"; level: number; markerEnd: number }
@@ -105,7 +107,11 @@ export const hybridMarkdown = (): Extension => {
       }
 
       update(update: import("@codemirror/view").ViewUpdate): void {
-        if (update.docChanged || update.selectionSet) {
+        if (
+          update.docChanged ||
+          update.selectionSet ||
+          update.viewportChanged
+        ) {
           this.decorations = this.buildDecorations(update.view);
         }
       }
@@ -114,8 +120,21 @@ export const hybridMarkdown = (): Extension => {
         view: import("@codemirror/view").EditorView
       ): DecorationSet {
         const doc = view.state.doc;
-        const activeLine = doc.lineAt(view.state.selection.main.head).number;
         const builder = new RangeSetBuilder<Decoration>();
+
+        const selectionTouches = (from: number, to: number): boolean => {
+          // Treat `to` as inclusive for UX purposes (cursor at end-of-range counts).
+          for (const range of view.state.selection.ranges) {
+            const a = Math.min(range.from, range.to);
+            const b = Math.max(range.from, range.to);
+            if (a === b) {
+              if (a >= from && a <= to) return true;
+              continue;
+            }
+            if (a <= to && b >= from) return true;
+          }
+          return false;
+        };
         const lines = [];
         for (let i = 1; i <= doc.lines; i += 1) {
           lines.push(doc.line(i).text);
@@ -123,14 +142,14 @@ export const hybridMarkdown = (): Extension => {
         const kinds = classifyLines(lines);
 
         const addLineClass = (lineNumber: number, cls: string) => {
-          if (lineNumber === activeLine) return;
-          const from = doc.line(lineNumber).from;
-          builder.add(from, from, Decoration.line({ class: cls }));
+          const line = doc.line(lineNumber);
+          if (selectionTouches(line.from, line.to)) return;
+          builder.add(line.from, line.from, Decoration.line({ class: cls }));
         };
 
         const hideRange = (lineNumber: number, from: number, to: number) => {
-          if (lineNumber === activeLine) return;
           const line = doc.line(lineNumber);
+          if (selectionTouches(line.from, line.to)) return;
           builder.add(
             line.from + from,
             line.from + to,
@@ -138,35 +157,9 @@ export const hybridMarkdown = (): Extension => {
           );
         };
 
-        const markInlineCode = (lineNumber: number, text: string) => {
-          if (lineNumber === activeLine) return;
-          let idx = 0;
-          while (idx < text.length) {
-            const start = text.indexOf("`", idx);
-            if (start === -1) break;
-            const end = text.indexOf("`", start + 1);
-            if (end === -1) break;
-            if (end > start + 1) {
-              const line = doc.line(lineNumber);
-              builder.add(
-                line.from + start,
-                line.from + end + 1,
-                Decoration.mark({
-                  class: "cm-md-inline-code",
-                  inclusive: false,
-                })
-              );
-              hideRange(lineNumber, start, start + 1);
-              hideRange(lineNumber, end, end + 1);
-            }
-            idx = end + 1;
-          }
-        };
-
         for (let i = 0; i < kinds.length; i += 1) {
           const lineNo = i + 1;
           const kind = kinds[i];
-          const lineText = lines[i] ?? "";
 
           switch (kind.type) {
             case "heading": {
@@ -186,7 +179,6 @@ export const hybridMarkdown = (): Extension => {
                 if (marker && "markerEnd" in marker) {
                   hideRange(ln, 0, marker.markerEnd);
                 }
-                markInlineCode(ln, text);
               }
               i = end;
               break;
@@ -200,7 +192,6 @@ export const hybridMarkdown = (): Extension => {
                 if (marker && "markerEnd" in marker) {
                   hideRange(ln, 0, marker.markerEnd);
                 }
-                markInlineCode(ln, text);
               }
               i = end;
               break;
@@ -214,13 +205,98 @@ export const hybridMarkdown = (): Extension => {
               addLineClass(lineNo, "cm-md-code-block");
               break;
             }
-            case "paragraph": {
-              markInlineCode(lineNo, lineText);
-              break;
-            }
             default:
               break;
           }
+        }
+
+        const addInlineMark = (from: number, to: number, cls: string) => {
+          builder.add(
+            from,
+            to,
+            Decoration.mark({ class: cls, inclusive: false })
+          );
+        };
+
+        const containerNames = new Set([
+          "Emphasis",
+          "StrongEmphasis",
+          "InlineCode",
+          "Link",
+          "Image",
+          "Strikethrough",
+        ]);
+
+        const findContainer = (node: SyntaxNode): SyntaxNode => {
+          let current: SyntaxNode | null = node.parent;
+          while (current) {
+            if (containerNames.has(current.type.name)) {
+              return current;
+            }
+            current = current.parent;
+          }
+          return node;
+        };
+
+        const hideIfInactive = (
+          nodeFrom: number,
+          nodeTo: number,
+          containerFrom: number,
+          containerTo: number
+        ) => {
+          if (selectionTouches(containerFrom, containerTo)) return;
+          builder.add(
+            nodeFrom,
+            nodeTo,
+            Decoration.mark({ class: "cm-md-hide-marker", inclusive: false })
+          );
+        };
+
+        // Inline markdown styling + "hide marks when cursor isn't inside" behavior.
+        const tree = syntaxTree(view.state);
+        for (const range of view.visibleRanges) {
+          tree.iterate({
+            from: range.from,
+            to: range.to,
+            enter: (node) => {
+              switch (node.name) {
+                case "StrongEmphasis":
+                  addInlineMark(node.from, node.to, "cm-md-strong");
+                  break;
+                case "Emphasis":
+                  addInlineMark(node.from, node.to, "cm-md-em");
+                  break;
+                case "Strikethrough":
+                  addInlineMark(node.from, node.to, "cm-md-strike");
+                  break;
+                case "Link":
+                  addInlineMark(node.from, node.to, "cm-md-link");
+                  break;
+                case "InlineCode":
+                  addInlineMark(node.from, node.to, "cm-md-inline-code");
+                  break;
+                // Marks / delimiters (hide when cursor isn't inside their container)
+                case "StrongEmphasisMark":
+                case "EmphasisMark":
+                case "CodeMark":
+                case "LinkMark":
+                case "ImageMark":
+                case "StrikethroughMark":
+                case "URL": {
+                  const container = findContainer(node.node);
+                  hideIfInactive(
+                    node.from,
+                    node.to,
+                    container.from,
+                    container.to
+                  );
+                  break;
+                }
+                default:
+                  break;
+              }
+            },
+          });
         }
 
         return builder.finish();

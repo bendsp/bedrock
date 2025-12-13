@@ -91,5 +91,9 @@ typings/
 # Electron-Forge
 out/
 
+# Accidental artifacts (should not be committed)
+bedrock@*
+electron-forge
+
 *.log
 local_notes.md

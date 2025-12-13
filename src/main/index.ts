@@ -1,4 +1,11 @@
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  MenuItemConstructorOptions,
+} from "electron";
 import { promises as fs } from "fs";
 import {
   DiscardAction,
@@ -138,6 +145,29 @@ if (require("electron-squirrel-startup")) {
   app.quit();
 }
 
+const installApplicationMenu = () => {
+  const isMac = process.platform === "darwin";
+
+  const template: MenuItemConstructorOptions[] = [
+    ...(isMac
+      ? ([
+          { role: "appMenu" },
+          { role: "fileMenu" },
+          { role: "editMenu" },
+          { role: "viewMenu" },
+          { role: "windowMenu" },
+        ] as MenuItemConstructorOptions[])
+      : ([
+          { role: "fileMenu" },
+          { role: "editMenu" },
+          { role: "viewMenu" },
+          { role: "windowMenu" },
+        ] as MenuItemConstructorOptions[])),
+  ];
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+};
+
 const createWindow = (): void => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -153,6 +183,11 @@ const createWindow = (): void => {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
     },
   });
+
+  if (process.platform !== "darwin") {
+    // Keep shortcuts active but hide the menu bar.
+    mainWindow.setMenuBarVisibility(false);
+  }
 
   const webContentsId = mainWindow.webContents.id;
 
@@ -197,6 +232,7 @@ const createWindow = (): void => {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on("ready", () => {
+  installApplicationMenu();
   createWindow();
 });
 

@@ -143,6 +143,12 @@ const createWindow = (): void => {
   const mainWindow = new BrowserWindow({
     height: 600,
     width: 800,
+    ...(process.platform === "darwin"
+      ? {
+          titleBarStyle: "hiddenInset" as const,
+          trafficLightPosition: { x: 16, y: 14 },
+        }
+      : {}),
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
     },

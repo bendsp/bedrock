@@ -45,6 +45,14 @@ body {
     Arial, sans-serif;
 }
 
+.bed-drag-region {
+  -webkit-app-region: drag;
+}
+
+.bed-no-drag {
+  -webkit-app-region: no-drag;
+}
+
 #root {
   height: 100%;
 }

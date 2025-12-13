@@ -362,6 +362,11 @@ const App = () => {
     ];
   }, [handleOpen, handleOpenSettings, handleSave, settings.keyBindings]);
 
+  const isMac = useMemo(() => {
+    // Renderer-safe platform check (nodeIntegration is disabled).
+    return navigator.platform.toLowerCase().includes("mac");
+  }, []);
+
   const runEditorCommand = useCallback(
     (command: (view: EditorView) => boolean) => {
       const view = editorViewRef.current;
@@ -378,8 +383,12 @@ const App = () => {
     <TooltipProvider delayDuration={150}>
       <div className="h-full w-full bg-sidebar p-3">
         <div className="h-full w-full text-sidebar-foreground flex flex-col gap-3">
-          <header className="flex items-center gap-3 px-1">
-            <div className="flex flex-wrap items-center gap-3">
+          <header
+            className={`bed-drag-region flex items-center gap-3 px-1 ${
+              isMac ? "pl-[72px]" : ""
+            }`}
+          >
+            <div className="bed-no-drag flex flex-wrap items-center gap-3">
               <ButtonGroup className="bg-transparent shadow-none">
                 <Button size="sm" variant="secondary" onClick={handleOpen}>
                   Open…
@@ -473,7 +482,7 @@ const App = () => {
               </ButtonGroup>
             </div>
 
-            <span className="ml-auto text-[13px] text-muted-foreground">
+            <span className="bed-no-drag ml-auto text-[13px] text-muted-foreground">
               {displayLabel}
             </span>
           </header>

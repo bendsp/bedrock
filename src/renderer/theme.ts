@@ -263,7 +263,11 @@ export const applyTheme = (themeName: ThemeName) => {
   setHslVar(root, "--popover", theme.variables["--panel-bg"]);
   setHslVar(root, "--popover-foreground", theme.variables["--panel-text"]);
   setHslVar(root, "--primary", theme.variables["--ui-primary"]);
-  setHslVar(root, "--primary-foreground", theme.variables["--ui-primary-foreground"]);
+  setHslVar(
+    root,
+    "--primary-foreground",
+    theme.variables["--ui-primary-foreground"]
+  );
   setHslVar(root, "--secondary", theme.variables["--ui-secondary"]);
   setHslVar(
     root,
@@ -292,7 +296,11 @@ export const applyTheme = (themeName: ThemeName) => {
     theme.variables["--ui-primary-foreground"]
   );
   setHslVar(root, "--sidebar-accent", theme.variables["--panel-border"]);
-  setHslVar(root, "--sidebar-accent-foreground", theme.variables["--panel-text"]);
+  setHslVar(
+    root,
+    "--sidebar-accent-foreground",
+    theme.variables["--panel-text"]
+  );
   setHslVar(root, "--sidebar-border", theme.variables["--panel-border"]);
   setHslVar(root, "--sidebar-ring", theme.variables["--ui-primary-border"]);
 };

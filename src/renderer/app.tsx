@@ -7,8 +7,8 @@ import React, {
 } from "react";
 import { createRoot } from "react-dom/client";
 import CodeMirrorEditor from "./components/CodeMirrorEditor";
+import { Chrome } from "./components/Chrome";
 import SettingsModal from "./components/SettingsModal";
-import { Button } from "./components/ui/button";
 import { RenderMode } from "../shared/types";
 import {
   defaultSettings,
@@ -31,7 +31,10 @@ import {
 } from "@codemirror/commands";
 import { EditorView, KeyBinding } from "@codemirror/view";
 import { markdownKeymap } from "@codemirror/lang-markdown";
-import { createSnippetCommand } from "./editor/codemirror/commands";
+import {
+  createMarkdownLinkCommand,
+  wrapSelectionKeyBinding,
+} from "./editor/codemirror/commands";
 
 const DEFAULT_FILE_NAME = "Untitled.md";
 
@@ -312,21 +315,29 @@ const App = () => {
     ];
 
     const snippetBindings: KeyBinding[] = [
-      {
-        key: "Mod-b",
-        preventDefault: true,
-        run: createSnippetCommand("****", 2),
-      },
-      {
-        key: "Mod-i",
-        preventDefault: true,
-        run: createSnippetCommand("**", 1),
-      },
+      wrapSelectionKeyBinding("Mod-b", {
+        before: "**",
+        after: "**",
+        emptySnippet: "****",
+        emptyCursorOffset: 2,
+      }),
+      wrapSelectionKeyBinding("Mod-i", {
+        before: "*",
+        after: "*",
+        emptySnippet: "**",
+        emptyCursorOffset: 1,
+      }),
       {
         key: "Mod-k",
         preventDefault: true,
-        run: createSnippetCommand("[](url)", 1),
+        run: createMarkdownLinkCommand,
       },
+      wrapSelectionKeyBinding("Mod-`", {
+        before: "`",
+        after: "`",
+        emptySnippet: "``",
+        emptyCursorOffset: 1,
+      }),
     ];
 
     return [
@@ -340,42 +351,30 @@ const App = () => {
   }, [handleOpen, handleOpenSettings, handleSave, settings.keyBindings]);
 
   return (
-    <div className="h-full w-full flex flex-col">
-      <header className="flex items-center gap-3 px-4 py-2 border-b border-[color:var(--header-border)] bg-[color:var(--header-bg)] text-[color:var(--header-text)]">
-        <div className="flex gap-2">
-          <Button size="sm" variant="secondary" onClick={handleOpen}>
-            Open…
-          </Button>
-          <Button size="sm" variant="secondary" onClick={handleSave}>
-            Save
-          </Button>
-          <Button size="sm" variant="secondary" onClick={handleSaveAs}>
-            Save As…
-          </Button>
-          <Button size="sm" variant="secondary" onClick={handleOpenSettings}>
-            Settings
-          </Button>
-        </div>
-        <span className="ml-auto text-[13px]">{displayLabel}</span>
-      </header>
-      <div className="flex-1">
-        <div className="app-shell">
-          <CodeMirrorEditor
-            value={doc}
-            renderMode={renderMode}
-            theme={activeTheme}
-            textSize={settings.textSize}
-            keyBindings={keyBindings}
-            placeholder="Start typing…"
-            onChange={handleDocChange}
-            onReady={(view) => {
-              editorViewRef.current = view;
-              view.focus();
-            }}
-            className="cm-editor-shell"
-          />
-        </div>
-      </div>
+    <>
+      <Chrome
+        title={displayLabel}
+        onOpen={handleOpen}
+        onSave={handleSave}
+        onSaveAs={handleSaveAs}
+        onOpenSettings={handleOpenSettings}
+      >
+        <CodeMirrorEditor
+          value={doc}
+          renderMode={renderMode}
+          theme={activeTheme}
+          textSize={settings.textSize}
+          keyBindings={keyBindings}
+          placeholder="Start typing…"
+          onChange={handleDocChange}
+          onReady={(view) => {
+            editorViewRef.current = view;
+            view.focus();
+          }}
+          className="cm-editor-shell"
+        />
+      </Chrome>
+
       {isSettingsOpen ? (
         <SettingsModal
           settings={settings}
@@ -385,7 +384,7 @@ const App = () => {
           onClearLocalStorage={handleClearLocalStorage}
         />
       ) : null}
-    </div>
+    </>
   );
 };
 

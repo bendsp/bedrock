@@ -16,11 +16,18 @@ export const buildThemeExtension = (
         backgroundColor: "transparent",
         color: "var(--panel-text)",
         fontSize: `${textSize}px`,
+        outline: "none",
+        boxShadow: "none",
+      },
+      "&.cm-focused": {
+        outline: "none",
+        boxShadow: "none",
       },
       ".cm-scroller": {
         fontFamily:
           '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         lineHeight: 1.6,
+        outline: "none",
       },
       ".cm-content": {
         padding: "16px 0",

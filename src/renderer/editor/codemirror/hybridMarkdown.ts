@@ -122,6 +122,14 @@ export const hybridMarkdown = (): Extension => {
         const doc = view.state.doc;
         const builder = new RangeSetBuilder<Decoration>();
 
+        // RangeSetBuilder requires decorations be added in ascending order.
+        // We collect them first (line-level + inline) and add them sorted.
+        const pending: Array<{ from: number; to: number; deco: Decoration }> =
+          [];
+        const pushDeco = (from: number, to: number, deco: Decoration) => {
+          pending.push({ from, to, deco });
+        };
+
         const selectionTouches = (from: number, to: number): boolean => {
           // Treat `to` as inclusive for UX purposes (cursor at end-of-range counts).
           for (const range of view.state.selection.ranges) {
@@ -144,13 +152,13 @@ export const hybridMarkdown = (): Extension => {
         const addLineClass = (lineNumber: number, cls: string) => {
           const line = doc.line(lineNumber);
           if (selectionTouches(line.from, line.to)) return;
-          builder.add(line.from, line.from, Decoration.line({ class: cls }));
+          pushDeco(line.from, line.from, Decoration.line({ class: cls }));
         };
 
         const hideRange = (lineNumber: number, from: number, to: number) => {
           const line = doc.line(lineNumber);
           if (selectionTouches(line.from, line.to)) return;
-          builder.add(
+          pushDeco(
             line.from + from,
             line.from + to,
             Decoration.mark({ class: "cm-md-hide-marker", inclusive: false })
@@ -211,11 +219,7 @@ export const hybridMarkdown = (): Extension => {
         }
 
         const addInlineMark = (from: number, to: number, cls: string) => {
-          builder.add(
-            from,
-            to,
-            Decoration.mark({ class: cls, inclusive: false })
-          );
+          pushDeco(from, to, Decoration.mark({ class: cls, inclusive: false }));
         };
 
         const containerNames = new Set([
@@ -245,7 +249,7 @@ export const hybridMarkdown = (): Extension => {
           containerTo: number
         ) => {
           if (selectionTouches(containerFrom, containerTo)) return;
-          builder.add(
+          pushDeco(
             nodeFrom,
             nodeTo,
             Decoration.mark({ class: "cm-md-hide-marker", inclusive: false })
@@ -297,6 +301,11 @@ export const hybridMarkdown = (): Extension => {
               }
             },
           });
+        }
+
+        pending.sort((a, b) => a.from - b.from || a.to - b.to);
+        for (const entry of pending) {
+          builder.add(entry.from, entry.to, entry.deco);
         }
 
         return builder.finish();

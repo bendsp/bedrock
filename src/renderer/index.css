@@ -350,7 +350,19 @@ body {
 
 .cm-line.cm-md-list {
   position: relative;
-  padding-left: 1.2em;
+  padding-left: 1.35em;
+}
+
+.cm-line.cm-md-list::before {
+  content: "";
+  position: absolute;
+  left: 0.35em;
+  top: 0.9em;
+  width: 0.42em;
+  height: 0.42em;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel-text, #e6e9ef) 85%, transparent);
+  transform: translateY(-50%);
 }
 
 .cm-line.cm-md-quote {

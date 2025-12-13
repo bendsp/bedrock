@@ -8,6 +8,7 @@ import {
 import { history } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { indentUnit } from "@codemirror/language";
+import { GFM } from "@lezer/markdown";
 import { CursorPosition, RenderMode } from "../../../shared/types";
 import { ThemeName } from "../../theme";
 import { buildThemeExtension } from "./theme";
@@ -72,7 +73,7 @@ export const createCmExtensions = (
   const extensions: Extension[] = [
     drawSelection(),
     history(),
-    markdown(),
+    markdown({ extensions: [GFM] }),
     indentUnit.of("  "),
     EditorView.lineWrapping,
     updateListener,

@@ -7,9 +7,8 @@ import React, {
 } from "react";
 import { createRoot } from "react-dom/client";
 import CodeMirrorEditor from "./components/CodeMirrorEditor";
+import { Chrome } from "./components/Chrome";
 import SettingsModal from "./components/SettingsModal";
-import { Button } from "./components/ui/button";
-import { ButtonGroup } from "./components/ui/button-group";
 import { RenderMode } from "../shared/types";
 import {
   defaultSettings,
@@ -34,19 +33,8 @@ import { EditorView, KeyBinding } from "@codemirror/view";
 import { markdownKeymap } from "@codemirror/lang-markdown";
 import {
   createMarkdownLinkCommand,
-  createWrapSelectionCommand,
   wrapSelectionKeyBinding,
 } from "./editor/codemirror/commands";
-import { TooltipProvider } from "./components/ui/tooltip";
-import {
-  Bold,
-  Italic,
-  Link2,
-  Code,
-  FolderOpen,
-  Save,
-  Settings as SettingsIcon,
-} from "lucide-react";
 
 const DEFAULT_FILE_NAME = "Untitled.md";
 
@@ -362,202 +350,41 @@ const App = () => {
     ];
   }, [handleOpen, handleOpenSettings, handleSave, settings.keyBindings]);
 
-  const isMac = useMemo(() => {
-    // Renderer-safe platform check (nodeIntegration is disabled).
-    return navigator.platform.toLowerCase().includes("mac");
-  }, []);
-
-  const runEditorCommand = useCallback(
-    (command: (view: EditorView) => boolean) => {
-      const view = editorViewRef.current;
-      if (!view) {
-        return;
-      }
-      command(view);
-      view.focus();
-    },
-    []
-  );
-
   return (
-    <TooltipProvider delayDuration={150}>
-      <div className="h-full w-full bg-sidebar p-3">
-        <div className="h-full w-full text-sidebar-foreground flex flex-col gap-3">
-          <header
-            className={`bed-drag-region flex items-center gap-3 px-1 ${
-              isMac ? "pl-[72px]" : ""
-            }`}
-          >
-            <div className="bed-no-drag flex flex-wrap items-center gap-3">
-              <ButtonGroup className="bg-transparent shadow-none">
-                <Button size="sm" variant="secondary" onClick={handleOpen}>
-                  Open…
-                </Button>
-                <Button size="sm" variant="secondary" onClick={handleSave}>
-                  Save
-                </Button>
-                <Button size="sm" variant="secondary" onClick={handleSaveAs}>
-                  Save As…
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={handleOpenSettings}
-                >
-                  Settings
-                </Button>
-              </ButtonGroup>
+    <>
+      <Chrome
+        title={displayLabel}
+        onOpen={handleOpen}
+        onSave={handleSave}
+        onSaveAs={handleSaveAs}
+        onOpenSettings={handleOpenSettings}
+      >
+        <CodeMirrorEditor
+          value={doc}
+          renderMode={renderMode}
+          theme={activeTheme}
+          textSize={settings.textSize}
+          keyBindings={keyBindings}
+          placeholder="Start typing…"
+          onChange={handleDocChange}
+          onReady={(view) => {
+            editorViewRef.current = view;
+            view.focus();
+          }}
+          className="cm-editor-shell"
+        />
+      </Chrome>
 
-              <ButtonGroup
-                aria-label="Formatting"
-                className="bg-transparent shadow-none"
-              >
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  className="h-8 w-8"
-                  aria-label="Bold"
-                  onClick={() =>
-                    runEditorCommand(
-                      createWrapSelectionCommand({
-                        before: "**",
-                        after: "**",
-                        emptySnippet: "****",
-                        emptyCursorOffset: 2,
-                      })
-                    )
-                  }
-                >
-                  <Bold className="size-4" />
-                </Button>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  className="h-8 w-8"
-                  aria-label="Italic"
-                  onClick={() =>
-                    runEditorCommand(
-                      createWrapSelectionCommand({
-                        before: "*",
-                        after: "*",
-                        emptySnippet: "**",
-                        emptyCursorOffset: 1,
-                      })
-                    )
-                  }
-                >
-                  <Italic className="size-4" />
-                </Button>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  className="h-8 w-8"
-                  aria-label="Link"
-                  onClick={() => runEditorCommand(createMarkdownLinkCommand)}
-                >
-                  <Link2 className="size-4" />
-                </Button>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  className="h-8 w-8"
-                  aria-label="Inline code"
-                  onClick={() =>
-                    runEditorCommand(
-                      createWrapSelectionCommand({
-                        before: "`",
-                        after: "`",
-                        emptySnippet: "``",
-                        emptyCursorOffset: 1,
-                      })
-                    )
-                  }
-                >
-                  <Code className="size-4" />
-                </Button>
-              </ButtonGroup>
-            </div>
-
-            <span className="bed-no-drag ml-auto text-[13px] text-muted-foreground">
-              {displayLabel}
-            </span>
-          </header>
-
-          <div className="flex-1 min-h-0 flex items-stretch gap-3">
-            <aside className="w-12 shrink-0 bg-transparent text-sidebar-foreground flex flex-col items-center py-2 gap-2">
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-9 w-9"
-                aria-label="Open…"
-                onClick={handleOpen}
-              >
-                <FolderOpen className="size-4" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-9 w-9"
-                aria-label="Save"
-                onClick={handleSave}
-              >
-                <Save className="size-4" />
-              </Button>
-              <div className="flex-1" />
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-9 w-9"
-                aria-label="Settings"
-                onClick={handleOpenSettings}
-              >
-                <SettingsIcon className="size-4" />
-              </Button>
-            </aside>
-
-            <div className="flex-1 min-w-0 overflow-hidden rounded-2xl border border-border bg-background text-foreground shadow-2xl flex flex-col">
-              <div className="flex-1 min-h-0 overflow-hidden">
-                <div className="app-shell">
-                  <div className="flex-1 min-h-0">
-                    <CodeMirrorEditor
-                      value={doc}
-                      renderMode={renderMode}
-                      theme={activeTheme}
-                      textSize={settings.textSize}
-                      keyBindings={keyBindings}
-                      placeholder="Start typing…"
-                      onChange={handleDocChange}
-                      onReady={(view) => {
-                        editorViewRef.current = view;
-                        view.focus();
-                      }}
-                      className="cm-editor-shell"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {isSettingsOpen ? (
-          <SettingsModal
-            settings={settings}
-            onClose={handleCloseSettings}
-            onChange={handleUpdateSettings}
-            onResetBindings={handleResetBindings}
-            onClearLocalStorage={handleClearLocalStorage}
-          />
-        ) : null}
-      </div>
-    </TooltipProvider>
+      {isSettingsOpen ? (
+        <SettingsModal
+          settings={settings}
+          onClose={handleCloseSettings}
+          onChange={handleUpdateSettings}
+          onResetBindings={handleResetBindings}
+          onClearLocalStorage={handleClearLocalStorage}
+        />
+      ) : null}
+    </>
   );
 };
 

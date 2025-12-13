@@ -145,3 +145,4 @@ If you’re unsure where a responsibility belongs: default to the model for text
 - 2025-11-28: Updated CSS for custom scrollbars and fixed box-sizing to prevent horizontal overflow.
 - 2025-12-06: Added `DocumentModel` (buffer-backed text model) alongside `LinesModel`, improved hybrid Markdown rendering for fenced code blocks, and added model/markdown regression tests.
 - 2025-12-06: Added `RopeModel` (balanced rope with chunked leaves, undo/redo, and chunk iteration) and a runtime model selector via `localStorage.getItem("bedrock:model")` (`document` | `lines` | `rope`); default model is now `rope`.
+- 2025-12-13: Updated Settings UI to a shadcn sidebar + item-row layout and bridged Bedrock theme tokens to shadcn HSL CSS variables.

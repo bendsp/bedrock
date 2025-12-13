@@ -80,6 +80,37 @@ body {
   --link-color: #61afef;
   --blockquote-border: #3f4755;
   --blockquote-text: #b6beca;
+
+  /* shadcn core palette (defaults match the Dark theme) */
+  --background: 220 13% 18%;
+  --foreground: 219 13.5% 71%;
+  --card: 220 14.3% 12.4%;
+  --card-foreground: 220 22% 92%;
+  --popover: 220 14.3% 12.4%;
+  --popover-foreground: 220 22% 92%;
+  --primary: 219.5 100% 65.5%;
+  --primary-foreground: 221.7 46.9% 9.6%;
+  --secondary: 222.4 12.8% 26.1%;
+  --secondary-foreground: 217.5 30.8% 94.9%;
+  --muted: 222.9 14.3% 19.2%;
+  --muted-foreground: 218.2 10.9% 60.4%;
+  --accent: 218.6 14.3% 19.2%;
+  --accent-foreground: 220 22% 92%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 218.6 14.3% 19.2%;
+  --input: 218.6 14.3% 19.2%;
+  --ring: 218.3 100% 72.9%;
+
+  /* shadcn sidebar palette (defaults match the Dark theme) */
+  --sidebar-background: 220 14.3% 12.4%;
+  --sidebar-foreground: 220 22% 92%;
+  --sidebar-primary: 219.5 100% 65.5%;
+  --sidebar-primary-foreground: 221.7 46.9% 9.6%;
+  --sidebar-accent: 218.6 14.3% 19.2%;
+  --sidebar-accent-foreground: 220 22% 92%;
+  --sidebar-border: 218.6 14.3% 19.2%;
+  --sidebar-ring: 218.3 100% 72.9%;
   font-size: var(--ui-font-size);
 }
 
@@ -360,4 +391,13 @@ body {
   text-shadow: none;
   pointer-events: none;
   font-size: 0;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }

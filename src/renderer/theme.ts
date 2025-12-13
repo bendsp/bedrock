@@ -189,12 +189,112 @@ const themes: Record<ThemeName, Theme> = {
   },
 };
 
+const hexToHslTriplet = (hex: string): string | null => {
+  const raw = hex.trim();
+  if (!raw.startsWith("#")) return null;
+  let h = raw.slice(1);
+  if (h.length === 3) {
+    h = h
+      .split("")
+      .map((c) => c + c)
+      .join("");
+  }
+  if (h.length !== 6) return null;
+  const n = Number.parseInt(h, 16);
+  if (Number.isNaN(n)) return null;
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+
+  let hue = 0;
+  let sat = 0;
+  if (max !== min) {
+    const d = max - min;
+    sat = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r:
+        hue = (g - b) / d + (g < b ? 6 : 0);
+        break;
+      case g:
+        hue = (b - r) / d + 2;
+        break;
+      default:
+        hue = (r - g) / d + 4;
+        break;
+    }
+    hue *= 60;
+  }
+
+  const hOut = Math.round(hue * 10) / 10;
+  const sOut = Math.round(sat * 1000) / 10;
+  const lOut = Math.round(l * 1000) / 10;
+  return `${hOut} ${sOut}% ${lOut}%`;
+};
+
+const setHslVar = (
+  root: HTMLElement,
+  cssVar: string,
+  hex: string | undefined
+) => {
+  if (!hex) return;
+  const triplet = hexToHslTriplet(hex);
+  if (!triplet) return;
+  root.style.setProperty(cssVar, triplet);
+};
+
 export const applyTheme = (themeName: ThemeName) => {
   const theme = themes[themeName] ?? themes.dark;
   const root = document.documentElement;
   Object.entries(theme.variables).forEach(([key, value]) => {
     root.style.setProperty(key, value);
   });
+
+  // Bridge Bedrock's hex-based theme variables into shadcn-style HSL tokens so
+  // shadcn UI components (and opacity modifiers like /90) work as intended.
+  // Base palette
+  setHslVar(root, "--background", theme.variables["--bg-body"]);
+  setHslVar(root, "--foreground", theme.variables["--text-body"]);
+  setHslVar(root, "--card", theme.variables["--panel-bg"]);
+  setHslVar(root, "--card-foreground", theme.variables["--panel-text"]);
+  setHslVar(root, "--popover", theme.variables["--panel-bg"]);
+  setHslVar(root, "--popover-foreground", theme.variables["--panel-text"]);
+  setHslVar(root, "--primary", theme.variables["--ui-primary"]);
+  setHslVar(root, "--primary-foreground", theme.variables["--ui-primary-foreground"]);
+  setHslVar(root, "--secondary", theme.variables["--ui-secondary"]);
+  setHslVar(
+    root,
+    "--secondary-foreground",
+    theme.variables["--ui-secondary-foreground"]
+  );
+  setHslVar(root, "--muted", theme.variables["--ui-disabled-bg"]);
+  setHslVar(root, "--muted-foreground", theme.variables["--muted-text"]);
+  setHslVar(root, "--accent", theme.variables["--panel-border"]);
+  setHslVar(root, "--accent-foreground", theme.variables["--panel-text"]);
+  setHslVar(root, "--border", theme.variables["--panel-border"]);
+  setHslVar(root, "--input", theme.variables["--panel-border"]);
+  setHslVar(root, "--ring", theme.variables["--ui-primary-border"]);
+
+  // Reasonable fixed destructive colors (not theme-specific today).
+  root.style.setProperty("--destructive", "0 84.2% 60.2%");
+  root.style.setProperty("--destructive-foreground", "0 0% 98%");
+
+  // Sidebar palette (used by `src/renderer/components/ui/sidebar.tsx`).
+  setHslVar(root, "--sidebar-background", theme.variables["--panel-bg"]);
+  setHslVar(root, "--sidebar-foreground", theme.variables["--panel-text"]);
+  setHslVar(root, "--sidebar-primary", theme.variables["--ui-primary"]);
+  setHslVar(
+    root,
+    "--sidebar-primary-foreground",
+    theme.variables["--ui-primary-foreground"]
+  );
+  setHslVar(root, "--sidebar-accent", theme.variables["--panel-border"]);
+  setHslVar(root, "--sidebar-accent-foreground", theme.variables["--panel-text"]);
+  setHslVar(root, "--sidebar-border", theme.variables["--panel-border"]);
+  setHslVar(root, "--sidebar-ring", theme.variables["--ui-primary-border"]);
 };
 
 export const getTheme = (themeName: ThemeName): Theme => {

@@ -7,7 +7,12 @@ import {
 } from "lucide-react";
 
 import { Button } from "./ui/button";
-import { TooltipProvider } from "./ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip";
 
 export type ChromeProps = {
   title: string;
@@ -47,47 +52,77 @@ export function Chrome({
 
           <div className="flex-1 min-h-0 flex items-stretch gap-2">
             <aside className="w-8 shrink-0 bg-transparent text-sidebar-foreground flex flex-col items-center py-2 gap-2">
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                aria-label="Open…"
-                onClick={onOpen}
-              >
-                <FolderOpen className="size-4" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                aria-label="Save"
-                onClick={onSave}
-              >
-                <Save className="size-4" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                aria-label="Save As…"
-                onClick={onSaveAs}
-              >
-                <SaveAll className="size-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    aria-label="Open…"
+                    onClick={onOpen}
+                  >
+                    <FolderOpen className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p>Open file</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    aria-label="Save"
+                    onClick={onSave}
+                  >
+                    <Save className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p>Save</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    aria-label="Save As…"
+                    onClick={onSaveAs}
+                  >
+                    <SaveAll className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p>Save as</p>
+                </TooltipContent>
+              </Tooltip>
               <div className="flex-1" />
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                aria-label="Settings"
-                onClick={onOpenSettings}
-              >
-                <SettingsIcon className="size-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    aria-label="Settings"
+                    onClick={onOpenSettings}
+                  >
+                    <SettingsIcon className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p>Settings</p>
+                </TooltipContent>
+              </Tooltip>
             </aside>
 
             <div className="flex-1 min-w-0 overflow-hidden rounded-2xl border border-border bg-background text-foreground shadow-2xl flex flex-col">

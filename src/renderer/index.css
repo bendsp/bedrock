@@ -118,8 +118,8 @@ body {
   display: flex;
   height: 100%;
   width: 100%;
-  background-color: var(--shell-bg, #1f2329);
-  padding: 24px 48px;
+  background-color: transparent;
+  padding: 20px 24px;
   box-sizing: border-box;
   overflow-y: auto;
 }
@@ -285,13 +285,13 @@ body {
   width: 100%;
   max-width: 960px;
   margin: 0 auto;
-  height: calc(100vh - 140px);
-  max-height: calc(100vh - 140px);
+  height: 100%;
+  max-height: 100%;
 }
 
 .cm-editor .cm-scroller {
   padding: 0 8px;
-  background: var(--panel-bg);
+  background: transparent;
   overflow: auto;
 }
 

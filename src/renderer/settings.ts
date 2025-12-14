@@ -7,7 +7,7 @@ export type KeyBindings = Record<KeyBindingAction, string>;
 
 export type UserSettings = {
   textSize: number;
-  uiScale: number; // percentage
+  uiScale: number; // percentage; custom UI scaling (separate from Electron zoom)
   keyBindings: KeyBindings;
   theme: ThemeName;
   followSystem: boolean;
@@ -74,9 +74,11 @@ export const loadSettings = (): UserSettings => {
         ? parsed.textSize
         : defaultSettings.textSize;
     const uiScaleRaw =
-      typeof parsed.uiScale === "number" ? parsed.uiScale : uiScaleFromLegacy;
+      typeof (parsed as any).uiScale === "number"
+        ? (parsed as any).uiScale
+        : uiScaleFromLegacy;
     const uiScale =
-      typeof uiScaleRaw === "number" && uiScaleRaw >= 50 && uiScaleRaw <= 150
+      typeof uiScaleRaw === "number" && uiScaleRaw >= 63 && uiScaleRaw <= 173
         ? uiScaleRaw
         : defaultSettings.uiScale;
     const keyBindings = normalizeKeyBindings(parsed.keyBindings);

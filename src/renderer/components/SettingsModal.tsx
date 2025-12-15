@@ -37,7 +37,18 @@ import {
   ItemSeparator,
   ItemTitle,
 } from "./ui/item";
-import { Keyboard, Palette, Type, Wrench, type LucideIcon } from "lucide-react";
+import {
+  Info,
+  Keyboard,
+  Palette,
+  Type,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
+
+// Webpack will bundle this asset; `require` avoids TS module resolution issues.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const bedrockLogo = require("../../assets/icon.png") as string;
 
 type SettingsModalProps = {
   settings: UserSettings;
@@ -47,7 +58,12 @@ type SettingsModalProps = {
   onClearLocalStorage: () => void;
 };
 
-type SettingsCategory = "editor" | "appearance" | "keybindings" | "developer";
+type SettingsCategory =
+  | "editor"
+  | "appearance"
+  | "keybindings"
+  | "developer"
+  | "about";
 
 const SettingsModal = ({
   settings,
@@ -62,6 +78,7 @@ const SettingsModal = ({
     null
   );
   const [pendingBinding, setPendingBinding] = useState<string | null>(null);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
   const originalBindingRef = React.useRef<{
     action: KeyBindingAction | null;
     binding: string | null;
@@ -128,6 +145,31 @@ const SettingsModal = ({
     };
   }, [listeningFor, onChange, pendingBinding, settings]);
 
+  useEffect(() => {
+    if (activeCategory !== "about") {
+      return;
+    }
+    if (appVersion) {
+      return;
+    }
+    let cancelled = false;
+    window.electronAPI
+      .getAppVersion()
+      .then((version) => {
+        if (!cancelled) {
+          setAppVersion(version);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAppVersion("Unknown");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCategory, appVersion]);
+
   const updateTextSize = (delta: number) => {
     const next = Math.min(28, Math.max(12, settings.textSize + delta));
     if (next !== settings.textSize) {
@@ -183,6 +225,7 @@ const SettingsModal = ({
       { id: "appearance", label: "Appearance", icon: Palette },
       { id: "keybindings", label: "Keybindings", icon: Keyboard },
       { id: "developer", label: "Developer", icon: Wrench },
+      { id: "about", label: "About", icon: Info },
     ];
     return list;
   }, []);
@@ -255,6 +298,11 @@ const SettingsModal = ({
                   {activeCategory === "developer" ? (
                     <p className="mt-1 text-sm text-muted-foreground">
                       Utilities for debugging and resetting local preferences.
+                    </p>
+                  ) : null}
+                  {activeCategory === "about" ? (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Bedrock version and credits.
                     </p>
                   ) : null}
                 </div>
@@ -623,6 +671,45 @@ const SettingsModal = ({
                       </ItemActions>
                     </Item>
                   </ItemGroup>
+                ) : null}
+
+                {activeCategory === "about" ? (
+                  <div className="rounded-md border border-border bg-background p-6">
+                    <div className="flex flex-col items-center text-center gap-3">
+                      <img
+                        src={bedrockLogo}
+                        alt="Bedrock"
+                        className="h-20 w-20 rounded-xl border border-border bg-card p-2"
+                      />
+                      <div className="space-y-1">
+                        <div className="text-lg font-semibold leading-tight">
+                          Bedrock
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Version{" "}
+                          <span className="font-medium text-foreground">
+                            {appVersion ?? "…"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="w-full max-w-md text-left">
+                        <ItemGroup className="rounded-md border border-border bg-background">
+                          <Item
+                            size="sm"
+                            className="rounded-none first:rounded-t-md last:rounded-b-md"
+                          >
+                            <ItemContent>
+                              <ItemTitle>Authors</ItemTitle>
+                              <ItemDescription>
+                                Ben Desprets, Felix Stavonhagen
+                              </ItemDescription>
+                            </ItemContent>
+                          </Item>
+                        </ItemGroup>
+                      </div>
+                    </div>
+                  </div>
                 ) : null}
               </div>
             </div>

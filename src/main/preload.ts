@@ -18,4 +18,5 @@ contextBridge.exposeInMainWorld("electronAPI", {
   openDevTools: (): void => {
     ipcRenderer.send("devtools:open");
   },
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke("app:get-version"),
 });

@@ -17,6 +17,7 @@ import {
 } from "./ui/select";
 import { Switch } from "./ui/switch";
 import { Kbd, KbdGroup } from "./ui/kbd";
+import { Slider } from "./ui/slider";
 import {
   Sidebar,
   SidebarContent,
@@ -41,6 +42,7 @@ import {
   Info,
   Keyboard,
   Palette,
+  RotateCcw,
   Type,
   Wrench,
   type LucideIcon,
@@ -77,6 +79,11 @@ const SettingsModal = ({
   onResetBindings,
   onClearLocalStorage,
 }: SettingsModalProps) => {
+  const settingsRef = React.useRef(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
   const [activeCategory, setActiveCategory] =
     useState<SettingsCategory>("editor");
   const [listeningFor, setListeningFor] = useState<KeyBindingAction | null>(
@@ -186,11 +193,37 @@ const SettingsModal = ({
     }
   };
 
+  const uiScaleDebounceRef = React.useRef<number | null>(null);
+  const [uiScaleDraft, setUiScaleDraft] = useState(settings.uiScale);
+
+  useEffect(() => {
+    setUiScaleDraft(settings.uiScale);
+  }, [settings.uiScale]);
+
+  useEffect(() => {
+    return () => {
+      if (uiScaleDebounceRef.current !== null) {
+        window.clearTimeout(uiScaleDebounceRef.current);
+        uiScaleDebounceRef.current = null;
+      }
+    };
+  }, []);
+
   const updateUiScale = (value: number) => {
-    const clamped = Math.min(150, Math.max(50, value));
-    if (clamped !== settings.uiScale) {
-      onChange({ ...settings, uiScale: clamped });
+    const clamped = Math.min(173, Math.max(63, value));
+    const current = settingsRef.current;
+    if (clamped !== current.uiScale) {
+      onChange({ ...current, uiScale: clamped });
     }
+  };
+
+  const resetUiScale = () => {
+    if (uiScaleDebounceRef.current !== null) {
+      window.clearTimeout(uiScaleDebounceRef.current);
+      uiScaleDebounceRef.current = null;
+    }
+    setUiScaleDraft(100);
+    updateUiScale(100);
   };
 
   const renderBinding = (binding: string) => {
@@ -358,29 +391,61 @@ const SettingsModal = ({
                       className="rounded-none first:rounded-t-md last:rounded-b-md"
                     >
                       <ItemContent>
-                        <ItemTitle>UI scaling</ItemTitle>
-                        <ItemDescription>
-                          Scale the UI text size across the app.
-                        </ItemDescription>
+                        <ItemTitle>UI scale</ItemTitle>
                       </ItemContent>
                       <ItemActions className="ml-auto">
-                        <Select
-                          value={String(settings.uiScale)}
-                          onValueChange={(value) =>
-                            updateUiScale(Number(value))
-                          }
-                        >
-                          <SelectTrigger className="w-[180px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {[50, 75, 100, 125, 150].map((value) => (
-                              <SelectItem key={value} value={String(value)}>
-                                {value === 100 ? "Default (100%)" : `${value}%`}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              type="button"
+                              aria-label="Reset UI scale"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                              disabled={
+                                settings.uiScale === 100 && uiScaleDraft === 100
+                              }
+                              onClick={resetUiScale}
+                            >
+                              <RotateCcw className="size-4" />
+                            </Button>
+                            <span className="tabular-nums min-w-[56px] text-right">
+                              {uiScaleDraft}%
+                            </span>
+                          </div>
+                          <Slider
+                            value={[uiScaleDraft]}
+                            min={63}
+                            max={173}
+                            step={1}
+                            className="w-[200px]"
+                            onValueChange={(value: number[]) => {
+                              const next = value[0] ?? uiScaleDraft;
+                              setUiScaleDraft(next);
+
+                              if (uiScaleDebounceRef.current !== null) {
+                                window.clearTimeout(uiScaleDebounceRef.current);
+                              }
+
+                              uiScaleDebounceRef.current = window.setTimeout(
+                                () => {
+                                  uiScaleDebounceRef.current = null;
+                                  updateUiScale(next);
+                                },
+                                180
+                              );
+                            }}
+                            onValueCommit={(value: number[]) => {
+                              const next = value[0] ?? uiScaleDraft;
+                              setUiScaleDraft(next);
+                              if (uiScaleDebounceRef.current !== null) {
+                                window.clearTimeout(uiScaleDebounceRef.current);
+                                uiScaleDebounceRef.current = null;
+                              }
+                              updateUiScale(next);
+                            }}
+                          />
+                        </div>
                       </ItemActions>
                     </Item>
                   </ItemGroup>

@@ -53,7 +53,7 @@ import {
 const bedrockLogo = require("../../assets/icon.png") as string;
 
 const ABOUT_LINKS = {
-  xBen: "https://x.com/bendesprets",
+  benWebsite: "https://desprets.net/",
   githubRepo: "https://github.com/bendsp/bedrock",
 } as const;
 
@@ -340,11 +340,6 @@ const SettingsModal = ({
                   {activeCategory === "developer" ? (
                     <p className="mt-1 text-sm text-muted-foreground">
                       Utilities for debugging and resetting local preferences.
-                    </p>
-                  ) : null}
-                  {activeCategory === "about" ? (
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Bedrock version and credits.
                     </p>
                   ) : null}
                 </div>
@@ -777,11 +772,11 @@ const SettingsModal = ({
                               <ItemTitle>Authors</ItemTitle>
                               <ItemDescription>
                                 <a
-                                  href={ABOUT_LINKS.xBen}
+                                  href={ABOUT_LINKS.benWebsite}
                                   className="underline underline-offset-4 hover:text-foreground text-muted-foreground"
                                   onClick={(e) => {
                                     e.preventDefault();
-                                    openExternal(ABOUT_LINKS.xBen);
+                                    openExternal(ABOUT_LINKS.benWebsite);
                                   }}
                                 >
                                   Ben Desprets

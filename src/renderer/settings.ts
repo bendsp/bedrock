@@ -1,7 +1,13 @@
 import { ThemeName, isThemeName } from "./theme";
 import { RenderMode } from "../shared/types";
 
-export type KeyBindingAction = "open" | "save" | "openSettings";
+export type KeyBindingAction =
+  | "open"
+  | "save"
+  | "openSettings"
+  | "bold"
+  | "italic"
+  | "strikethrough";
 
 export type KeyBindings = Record<KeyBindingAction, string>;
 
@@ -22,6 +28,9 @@ export const defaultKeyBindings: KeyBindings = {
   open: "mod+o",
   save: "mod+s",
   openSettings: "mod+,",
+  bold: "mod+b",
+  italic: "mod+i",
+  strikethrough: "mod+shift+x",
 };
 
 export const defaultSettings: UserSettings = {
@@ -51,6 +60,18 @@ const normalizeKeyBindings = (
       stored?.openSettings && typeof stored.openSettings === "string"
         ? stored.openSettings
         : defaultKeyBindings.openSettings,
+    bold:
+      stored?.bold && typeof stored.bold === "string"
+        ? stored.bold
+        : defaultKeyBindings.bold,
+    italic:
+      stored?.italic && typeof stored.italic === "string"
+        ? stored.italic
+        : defaultKeyBindings.italic,
+    strikethrough:
+      stored?.strikethrough && typeof stored.strikethrough === "string"
+        ? stored.strikethrough
+        : defaultKeyBindings.strikethrough,
   };
 };
 

@@ -64,7 +64,25 @@ const toCmKey = (binding: string): string => {
     if (lower === "ctrl") return "Ctrl";
     if (lower === "shift") return "Shift";
     if (lower === "alt" || lower === "option") return "Alt";
-    return part.length === 1 ? part.toUpperCase() : part;
+    // Key names in stored bindings are normalized to lowercase (see eventToBinding).
+    // CodeMirror keymap strings prefer:
+    // - lowercase for printable single chars: "Mod-b"
+    // - canonical casing for special keys: "ArrowLeft", "Enter", etc.
+    if (lower === "arrowleft") return "ArrowLeft";
+    if (lower === "arrowright") return "ArrowRight";
+    if (lower === "arrowup") return "ArrowUp";
+    if (lower === "arrowdown") return "ArrowDown";
+    if (lower === "escape" || lower === "esc") return "Escape";
+    if (lower === "enter" || lower === "return") return "Enter";
+    if (lower === "backspace") return "Backspace";
+    if (lower === "delete" || lower === "del") return "Delete";
+    if (lower === "tab") return "Tab";
+    if (lower === "space" || lower === " ") return "Space";
+    if (lower === "home") return "Home";
+    if (lower === "end") return "End";
+    if (lower === "pageup") return "PageUp";
+    if (lower === "pagedown") return "PageDown";
+    return part.length === 1 ? lower : part;
   });
   return mapped.join("-");
 };
@@ -315,19 +333,19 @@ const App = () => {
     ];
 
     const snippetBindings: KeyBinding[] = [
-      wrapSelectionKeyBinding("Mod-b", {
+      wrapSelectionKeyBinding(toCmKey(settings.keyBindings.bold), {
         before: "**",
         after: "**",
         emptySnippet: "****",
         emptyCursorOffset: 2,
       }),
-      wrapSelectionKeyBinding("Mod-i", {
+      wrapSelectionKeyBinding(toCmKey(settings.keyBindings.italic), {
         before: "*",
         after: "*",
         emptySnippet: "**",
         emptyCursorOffset: 1,
       }),
-      wrapSelectionKeyBinding("Mod-Shift-x", {
+      wrapSelectionKeyBinding(toCmKey(settings.keyBindings.strikethrough), {
         before: "~~",
         after: "~~",
         emptySnippet: "~~~~",
@@ -371,6 +389,11 @@ const App = () => {
           theme={activeTheme}
           textSize={settings.textSize}
           keyBindings={keyBindings}
+          formatKeyBindings={{
+            bold: settings.keyBindings.bold,
+            italic: settings.keyBindings.italic,
+            strikethrough: settings.keyBindings.strikethrough,
+          }}
           placeholder="Start typing…"
           onChange={handleDocChange}
           onReady={(view) => {

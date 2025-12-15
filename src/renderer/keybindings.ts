@@ -135,10 +135,16 @@ export const keyBindingLabels: Record<KeyBindingAction, string> = {
   open: "Open file",
   save: "Save file",
   openSettings: "Open settings",
+  bold: "Bold",
+  italic: "Italic",
+  strikethrough: "Strikethrough",
 };
 
 export const clampKeyBindings = (bindings: KeyBindings): KeyBindings => ({
   open: normalizeBinding(bindings.open),
   save: normalizeBinding(bindings.save),
   openSettings: normalizeBinding(bindings.openSettings),
+  bold: normalizeBinding(bindings.bold),
+  italic: normalizeBinding(bindings.italic),
+  strikethrough: normalizeBinding(bindings.strikethrough),
 });

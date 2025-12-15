@@ -39,6 +39,7 @@ import {
   ItemTitle,
 } from "./ui/item";
 import {
+  Info,
   Keyboard,
   Palette,
   RotateCcw,
@@ -46,6 +47,15 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
+
+// Webpack will bundle this asset; `require` avoids TS module resolution issues.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const bedrockLogo = require("../../assets/icon.png") as string;
+
+const ABOUT_LINKS = {
+  benWebsite: "https://desprets.net/",
+  githubRepo: "https://github.com/bendsp/bedrock",
+} as const;
 
 type SettingsModalProps = {
   settings: UserSettings;
@@ -55,7 +65,12 @@ type SettingsModalProps = {
   onClearLocalStorage: () => void;
 };
 
-type SettingsCategory = "editor" | "appearance" | "keybindings" | "developer";
+type SettingsCategory =
+  | "editor"
+  | "appearance"
+  | "keybindings"
+  | "developer"
+  | "about";
 
 const SettingsModal = ({
   settings,
@@ -75,10 +90,15 @@ const SettingsModal = ({
     null
   );
   const [pendingBinding, setPendingBinding] = useState<string | null>(null);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
   const originalBindingRef = React.useRef<{
     action: KeyBindingAction | null;
     binding: string | null;
   }>({ action: null, binding: null });
+
+  const openExternal = (url: string) => {
+    window.electronAPI.openExternal(url);
+  };
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -140,6 +160,31 @@ const SettingsModal = ({
       window.removeEventListener("keyup", handleKeyUp, { capture: true });
     };
   }, [listeningFor, onChange, pendingBinding, settings]);
+
+  useEffect(() => {
+    if (activeCategory !== "about") {
+      return;
+    }
+    if (appVersion) {
+      return;
+    }
+    let cancelled = false;
+    window.electronAPI
+      .getAppVersion()
+      .then((version) => {
+        if (!cancelled) {
+          setAppVersion(version);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAppVersion("Unknown");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCategory, appVersion]);
 
   const updateTextSize = (delta: number) => {
     const next = Math.min(28, Math.max(12, settings.textSize + delta));
@@ -222,6 +267,7 @@ const SettingsModal = ({
       { id: "appearance", label: "Appearance", icon: Palette },
       { id: "keybindings", label: "Keybindings", icon: Keyboard },
       { id: "developer", label: "Developer", icon: Wrench },
+      { id: "about", label: "About", icon: Info },
     ];
     return list;
   }, []);
@@ -368,7 +414,7 @@ const SettingsModal = ({
                             max={173}
                             step={1}
                             className="w-[200px]"
-                            onValueChange={(value) => {
+                            onValueChange={(value: number[]) => {
                               const next = value[0] ?? uiScaleDraft;
                               setUiScaleDraft(next);
 
@@ -384,7 +430,7 @@ const SettingsModal = ({
                                 180
                               );
                             }}
-                            onValueCommit={(value) => {
+                            onValueCommit={(value: number[]) => {
                               const next = value[0] ?? uiScaleDraft;
                               setUiScaleDraft(next);
                               if (uiScaleDebounceRef.current !== null) {
@@ -694,6 +740,76 @@ const SettingsModal = ({
                       </ItemActions>
                     </Item>
                   </ItemGroup>
+                ) : null}
+
+                {activeCategory === "about" ? (
+                  <div className="rounded-md border border-border bg-background p-6">
+                    <div className="flex flex-col items-center text-center gap-3">
+                      <img
+                        src={bedrockLogo}
+                        alt="Bedrock"
+                        className="h-20 w-20 rounded-xl border border-border bg-card p-2"
+                      />
+                      <div className="space-y-1">
+                        <div className="text-lg font-semibold leading-tight">
+                          Bedrock
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Version{" "}
+                          <span className="font-medium text-foreground">
+                            {appVersion ?? "…"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="w-full max-w-md text-left">
+                        <ItemGroup className="rounded-md border border-border bg-background">
+                          <Item
+                            size="sm"
+                            className="rounded-none first:rounded-t-md last:rounded-b-md"
+                          >
+                            <ItemContent>
+                              <ItemTitle>Authors</ItemTitle>
+                              <ItemDescription>
+                                <a
+                                  href={ABOUT_LINKS.benWebsite}
+                                  className="underline underline-offset-4 hover:text-foreground text-muted-foreground"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    openExternal(ABOUT_LINKS.benWebsite);
+                                  }}
+                                >
+                                  Ben Desprets
+                                </a>
+                                {", "}Felix Stavonhagen
+                              </ItemDescription>
+                            </ItemContent>
+                          </Item>
+                          <ItemSeparator />
+                          <Item
+                            size="sm"
+                            className="rounded-none first:rounded-t-md last:rounded-b-md"
+                          >
+                            <ItemContent>
+                              <ItemTitle>GitHub</ItemTitle>
+                              <ItemDescription>
+                                <a
+                                  href={ABOUT_LINKS.githubRepo}
+                                  className="underline underline-offset-4 hover:text-foreground text-muted-foreground"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    openExternal(ABOUT_LINKS.githubRepo);
+                                  }}
+                                >
+                                  {ABOUT_LINKS.githubRepo}
+                                </a>
+                              </ItemDescription>
+                            </ItemContent>
+                          </Item>
+                        </ItemGroup>
+                      </div>
+                    </div>
+                  </div>
                 ) : null}
               </div>
             </div>

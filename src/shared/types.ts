@@ -75,4 +75,6 @@ export interface IElectronAPI {
   confirmDiscardChanges: (payload: DiscardPromptPayload) => Promise<boolean>;
   notifyDirtyState: (isDirty: boolean) => void;
   openDevTools: () => void;
+  getAppVersion: () => Promise<string>;
+  openExternal: (url: string) => Promise<void>;
 }

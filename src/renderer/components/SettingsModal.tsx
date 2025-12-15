@@ -50,6 +50,11 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const bedrockLogo = require("../../assets/icon.png") as string;
 
+const ABOUT_LINKS = {
+  xBen: "https://x.com/bendesprets",
+  githubRepo: "https://github.com/bendsp/bedrock",
+} as const;
+
 type SettingsModalProps = {
   settings: UserSettings;
   onClose: () => void;
@@ -83,6 +88,10 @@ const SettingsModal = ({
     action: KeyBindingAction | null;
     binding: string | null;
   }>({ action: null, binding: null });
+
+  const openExternal = (url: string) => {
+    window.electronAPI.openExternal(url);
+  };
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -702,7 +711,38 @@ const SettingsModal = ({
                             <ItemContent>
                               <ItemTitle>Authors</ItemTitle>
                               <ItemDescription>
-                                Ben Desprets, Felix Stavonhagen
+                                <a
+                                  href={ABOUT_LINKS.xBen}
+                                  className="underline underline-offset-4 hover:text-foreground text-muted-foreground"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    openExternal(ABOUT_LINKS.xBen);
+                                  }}
+                                >
+                                  Ben Desprets
+                                </a>
+                                {", "}Felix Stavonhagen
+                              </ItemDescription>
+                            </ItemContent>
+                          </Item>
+                          <ItemSeparator />
+                          <Item
+                            size="sm"
+                            className="rounded-none first:rounded-t-md last:rounded-b-md"
+                          >
+                            <ItemContent>
+                              <ItemTitle>GitHub</ItemTitle>
+                              <ItemDescription>
+                                <a
+                                  href={ABOUT_LINKS.githubRepo}
+                                  className="underline underline-offset-4 hover:text-foreground text-muted-foreground"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    openExternal(ABOUT_LINKS.githubRepo);
+                                  }}
+                                >
+                                  {ABOUT_LINKS.githubRepo}
+                                </a>
                               </ItemDescription>
                             </ItemContent>
                           </Item>

@@ -101,6 +101,36 @@ export const formatBinding = (binding: string): string => {
     .join("+");
 };
 
+/**
+ * Formats a binding for compact UI "shortcut" display.
+ *
+ * - On macOS, uses symbol glyphs (e.g. "⌘⇧B")
+ * - Elsewhere, uses readable labels with "+" (e.g. "Ctrl+Shift+B")
+ */
+export const formatBindingShortcut = (binding: string): string => {
+  const isMac = navigator.platform.includes("Mac");
+  const parts = normalizeBinding(binding).split("+").filter(Boolean);
+  const joiner = isMac ? "" : "+";
+
+  return parts
+    .map((part) => {
+      if (part === "mod") {
+        return isMac ? "⌘" : "Ctrl";
+      }
+      if (part === "ctrl") {
+        return "Ctrl";
+      }
+      if (part === "alt") {
+        return isMac ? "⌥" : "Alt";
+      }
+      if (part === "shift") {
+        return isMac ? "⇧" : "Shift";
+      }
+      return part.length === 1 ? part.toUpperCase() : part;
+    })
+    .join(joiner);
+};
+
 export const keyBindingLabels: Record<KeyBindingAction, string> = {
   open: "Open file",
   save: "Save file",
@@ -112,4 +142,3 @@ export const clampKeyBindings = (bindings: KeyBindings): KeyBindings => ({
   save: normalizeBinding(bindings.save),
   openSettings: normalizeBinding(bindings.openSettings),
 });
-

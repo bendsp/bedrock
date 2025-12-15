@@ -327,6 +327,12 @@ const App = () => {
         emptySnippet: "**",
         emptyCursorOffset: 1,
       }),
+      wrapSelectionKeyBinding("Mod-Shift-x", {
+        before: "~~",
+        after: "~~",
+        emptySnippet: "~~~~",
+        emptyCursorOffset: 2,
+      }),
       {
         key: "Mod-k",
         preventDefault: true,

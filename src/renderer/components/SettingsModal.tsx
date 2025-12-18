@@ -582,7 +582,14 @@ const SettingsModal = ({
                 {activeCategory === "keybindings" ? (
                   <ItemGroup className="rounded-md border border-border bg-background">
                     {(
-                      ["open", "save", "openSettings"] as KeyBindingAction[]
+                      [
+                        "open",
+                        "save",
+                        "openSettings",
+                        "bold",
+                        "italic",
+                        "strikethrough",
+                      ] as KeyBindingAction[]
                     ).map((action, index, arr) => {
                       const isActive = listeningFor === action;
                       const isLast = index === arr.length - 1;
@@ -599,7 +606,13 @@ const SettingsModal = ({
                                   ? "Open a markdown file."
                                   : action === "save"
                                   ? "Save the current file."
-                                  : "Open this settings dialog."}
+                                  : action === "openSettings"
+                                  ? "Open this settings dialog."
+                                  : action === "bold"
+                                  ? "Toggle bold markdown (**…**) for the selection or word."
+                                  : action === "italic"
+                                  ? "Toggle italic markdown (*…*) for the selection or word."
+                                  : "Toggle strikethrough markdown (~~…~~) for the selection or word."}
                               </ItemDescription>
                             </ItemContent>
                             <ItemActions className="ml-auto flex-wrap justify-end">

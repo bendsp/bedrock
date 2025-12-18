@@ -8,8 +8,6 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
 - **Single-window** app; Node integration is disabled in the renderer for security.
 - The editor uses a **model (text state)**, a **controller (keyboard -> commands)**, and a **view (React `textarea`)** wired via events.
 
----
-
 ## Architecture Overview
 
 ### Processes and Entry Points

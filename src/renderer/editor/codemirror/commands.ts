@@ -63,6 +63,108 @@ export const createWrapSelectionCommand =
     return true;
   };
 
+type WrapSelectionOrWordOptions = WrapSelectionOptions & {
+  /**
+   * When there is no selection, try to expand to the word at/near the cursor.
+   * If no word is found, falls back to inserting `emptySnippet`.
+   *
+   * Defaults to true.
+   */
+  wrapWordWhenEmpty?: boolean;
+};
+
+const isWordChar = (ch: string): boolean => /[A-Za-z0-9_]/.test(ch);
+
+const getWordRangeAt = (
+  view: import("@codemirror/view").EditorView,
+  pos: number
+): { from: number; to: number } | null => {
+  const doc = view.state.doc;
+  const line = doc.lineAt(pos);
+  const text = line.text;
+  if (text.length === 0) {
+    return null;
+  }
+
+  let idx = pos - line.from;
+  // If the cursor is on whitespace/punctuation, but just after a word,
+  // prefer the word immediately to the left (common when right-clicking).
+  if ((idx >= text.length || !isWordChar(text[idx] ?? "")) && idx > 0) {
+    if (isWordChar(text[idx - 1] ?? "")) {
+      idx = idx - 1;
+    }
+  }
+
+  if (idx < 0 || idx >= text.length || !isWordChar(text[idx] ?? "")) {
+    return null;
+  }
+
+  let start = idx;
+  let end = idx + 1;
+  while (start > 0 && isWordChar(text[start - 1] ?? "")) {
+    start--;
+  }
+  while (end < text.length && isWordChar(text[end] ?? "")) {
+    end++;
+  }
+
+  return { from: line.from + start, to: line.from + end };
+};
+
+/**
+ * Wraps the current selection with a prefix/suffix. If there's no selection,
+ * tries to wrap the word at/near the cursor; if none, inserts `emptySnippet`.
+ */
+export const createWrapSelectionOrWordCommand =
+  ({
+    before,
+    after,
+    emptySnippet = `${before}${after}`,
+    emptyCursorOffset = before.length,
+    wrapWordWhenEmpty = true,
+  }: WrapSelectionOrWordOptions) =>
+  (view: import("@codemirror/view").EditorView): boolean => {
+    const { from, to } = view.state.selection.main;
+
+    if (from !== to) {
+      const selectedText = view.state.doc.sliceString(from, to);
+      const insert = `${before}${selectedText}${after}`;
+      view.dispatch({
+        changes: { from, to, insert },
+        selection: {
+          anchor: from + before.length,
+          head: from + before.length + selectedText.length,
+        },
+        scrollIntoView: true,
+      });
+      return true;
+    }
+
+    if (wrapWordWhenEmpty) {
+      const wordRange = getWordRangeAt(view, from);
+      if (wordRange) {
+        const word = view.state.doc.sliceString(wordRange.from, wordRange.to);
+        const insert = `${before}${word}${after}`;
+        view.dispatch({
+          changes: { from: wordRange.from, to: wordRange.to, insert },
+          selection: {
+            anchor: wordRange.from + before.length,
+            head: wordRange.from + before.length + word.length,
+          },
+          scrollIntoView: true,
+        });
+        return true;
+      }
+    }
+
+    view.dispatch({
+      changes: { from, to, insert: emptySnippet },
+      selection: { anchor: from + emptyCursorOffset },
+      scrollIntoView: true,
+    });
+    return true;
+  };
+
 export const createMarkdownLinkCommand = (
   view: import("@codemirror/view").EditorView
 ): boolean => {

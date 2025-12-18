@@ -32,6 +32,7 @@ const config: ForgeConfig = {
         owner: "bendsp",
         name: "bedrock",
       },
+      tagPrefix: "",
       prerelease: false,
       draft: true,
     }),

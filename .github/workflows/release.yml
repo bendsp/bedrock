@@ -8,13 +8,9 @@ on:
 
 jobs:
   release:
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     permissions:
       contents: write
-
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest]
 
     steps:
       - name: Checkout code
@@ -29,7 +25,14 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build and Publish
-        run: npm run publish
+      - name: Build Windows App
+        run: npm run build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Windows Installer
+        shell: bash
+        run: |
+          gh release upload ${{ github.ref_name }} out/make/squirrel/win32/x64/*.exe --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

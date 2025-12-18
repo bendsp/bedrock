@@ -393,7 +393,9 @@ const App = () => {
             bold: settings.keyBindings.bold,
             italic: settings.keyBindings.italic,
             strikethrough: settings.keyBindings.strikethrough,
+            openSettings: settings.keyBindings.openSettings,
           }}
+          onOpenSettings={handleOpenSettings}
           placeholder="Start typing…"
           onChange={handleDocChange}
           onReady={(view) => {

@@ -23,11 +23,13 @@ type CodeMirrorEditorProps = {
   onChange: (nextValue: string) => void;
   onCursorChange?: (cursor: CursorPosition) => void;
   onReady?: (view: EditorView) => void;
+  onOpenSettings?: () => void;
   className?: string;
   formatKeyBindings?: {
     bold: string;
     italic: string;
     strikethrough: string;
+    openSettings: string;
   };
 };
 
@@ -41,6 +43,7 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
   onChange,
   onCursorChange,
   onReady,
+  onOpenSettings,
   className,
   formatKeyBindings,
 }) => {
@@ -51,6 +54,7 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
   const boldBinding = formatKeyBindings?.bold ?? "mod+b";
   const italicBinding = formatKeyBindings?.italic ?? "mod+i";
   const strikeBinding = formatKeyBindings?.strikethrough ?? "mod+shift+x";
+  const openSettingsBinding = formatKeyBindings?.openSettings ?? "mod+,";
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -143,10 +147,12 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
   return (
     <EditorContextMenu
       getView={() => viewRef.current}
+      onOpenSettings={onOpenSettings}
       keyBindings={{
         bold: boldBinding,
         italic: italicBinding,
         strikethrough: strikeBinding,
+        openSettings: openSettingsBinding,
       }}
     >
       <div ref={containerRef} className={className} />

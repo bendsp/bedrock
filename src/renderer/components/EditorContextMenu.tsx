@@ -8,6 +8,9 @@ import {
   ContextMenuLabel,
   ContextMenuSeparator,
   ContextMenuShortcut,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { createWrapSelectionOrWordCommand } from "../editor/codemirror/commands";
@@ -17,10 +20,12 @@ type FormatKeyBindings = {
   bold: string;
   italic: string;
   strikethrough: string;
+  openSettings: string;
 };
 
 export type EditorContextMenuProps = {
   getView: () => EditorView | null;
+  onOpenSettings?: () => void;
   keyBindings: FormatKeyBindings;
   // We need to be able to attach an `onContextMenu` handler to the trigger element.
   // Constraining the child props avoids `unknown` props during webpack builds.
@@ -29,6 +34,7 @@ export type EditorContextMenuProps = {
 
 export function EditorContextMenu({
   getView,
+  onOpenSettings,
   keyBindings,
   children,
 }: EditorContextMenuProps) {
@@ -113,24 +119,44 @@ export function EditorContextMenu({
     <ContextMenu>
       <ContextMenuTrigger asChild>{child}</ContextMenuTrigger>
       <ContextMenuContent className="w-52">
-        <ContextMenuLabel inset>Format</ContextMenuLabel>
-        <ContextMenuSeparator />
-        <ContextMenuItem inset onSelect={() => runCommand(boldCommand)}>
-          Bold
+        <ContextMenuSub>
+          <ContextMenuSubTrigger inset>Format</ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            <ContextMenuItem inset onSelect={() => runCommand(boldCommand)}>
+              Bold
+              <ContextMenuShortcut>
+                {formatBindingShortcut(keyBindings.bold)}
+              </ContextMenuShortcut>
+            </ContextMenuItem>
+            <ContextMenuItem inset onSelect={() => runCommand(italicCommand)}>
+              Italic
+              <ContextMenuShortcut>
+                {formatBindingShortcut(keyBindings.italic)}
+              </ContextMenuShortcut>
+            </ContextMenuItem>
+            <ContextMenuItem inset onSelect={() => runCommand(strikeCommand)}>
+              Strikethrough
+              <ContextMenuShortcut>
+                {formatBindingShortcut(keyBindings.strikethrough)}
+              </ContextMenuShortcut>
+            </ContextMenuItem>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+
+        <ContextMenuSub>
+          <ContextMenuSubTrigger inset>Insert</ContextMenuSubTrigger>
+          <ContextMenuSubContent></ContextMenuSubContent>
+        </ContextMenuSub>
+        <ContextMenuSeparator></ContextMenuSeparator>
+        <ContextMenuItem
+          inset
+          onSelect={() => {
+            onOpenSettings?.();
+          }}
+        >
+          Settings
           <ContextMenuShortcut>
-            {formatBindingShortcut(keyBindings.bold)}
-          </ContextMenuShortcut>
-        </ContextMenuItem>
-        <ContextMenuItem inset onSelect={() => runCommand(italicCommand)}>
-          Italic
-          <ContextMenuShortcut>
-            {formatBindingShortcut(keyBindings.italic)}
-          </ContextMenuShortcut>
-        </ContextMenuItem>
-        <ContextMenuItem inset onSelect={() => runCommand(strikeCommand)}>
-          Strikethrough
-          <ContextMenuShortcut>
-            {formatBindingShortcut(keyBindings.strikethrough)}
+            {formatBindingShortcut(keyBindings.openSettings)}
           </ContextMenuShortcut>
         </ContextMenuItem>
       </ContextMenuContent>

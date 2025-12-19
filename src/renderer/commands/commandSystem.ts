@@ -8,7 +8,7 @@ import {
   formatBindingShortcut,
   normalizeBinding,
 } from "../keybindings";
-import type { UserSettings } from "../settings";
+import type { KeyBindingAction, UserSettings } from "../settings";
 import type { ThemeName } from "../theme";
 
 export type CommandId =
@@ -49,14 +49,25 @@ export type CommandDefinition<ID extends CommandId = CommandId> = {
      */
     defaultBinding?: string;
     /**
+     * If set, the command will use the binding from UserSettings.keyBindings[settingsKey]
+     * if it exists, overriding the defaultBinding.
+     */
+    settingsKey?: KeyBindingAction;
+    /**
      * If true, the command requires an active CodeMirror editor view.
+     * The runner will automatically check this and return false if missing.
      */
     requiresEditor?: boolean;
+    /**
+     * If true, this command can be triggered via a global window-level shortcut
+     * even if the editor isn't focused.
+     */
+    isGlobal?: boolean;
     /**
      * Run the command.
      *
      * - Return true if handled.
-     * - Return false if it could not run (missing editor, etc.).
+     * - Return false if it could not run.
      */
     run: (
       ctx: CommandRunContext,
@@ -128,6 +139,8 @@ export const createCommandRegistry = (): CommandRegistry => {
       title: "Open…",
       category: "File",
       defaultBinding: "mod+o",
+      settingsKey: "open",
+      isGlobal: true,
       run: async (ctx) => {
         await ctx.openFile();
         return true;
@@ -138,6 +151,8 @@ export const createCommandRegistry = (): CommandRegistry => {
       title: "Save",
       category: "File",
       defaultBinding: "mod+s",
+      settingsKey: "save",
+      isGlobal: true,
       run: async (ctx) => {
         await ctx.saveFile();
         return true;
@@ -147,6 +162,7 @@ export const createCommandRegistry = (): CommandRegistry => {
       id: "file.saveAs",
       title: "Save As…",
       category: "File",
+      isGlobal: true,
       // Intentionally no default binding (platforms differ, avoid collisions).
       run: async (ctx) => {
         await ctx.saveFileAs();
@@ -158,6 +174,8 @@ export const createCommandRegistry = (): CommandRegistry => {
       title: "Settings",
       category: "App",
       defaultBinding: "mod+,",
+      settingsKey: "openSettings",
+      isGlobal: true,
       run: (ctx) => {
         ctx.openSettings();
         return true;
@@ -168,11 +186,11 @@ export const createCommandRegistry = (): CommandRegistry => {
       title: "Bold",
       category: "Format",
       defaultBinding: "mod+b",
+      settingsKey: "bold",
       requiresEditor: true,
       run: (ctx) => {
         const view = ctx.getEditorView();
-        if (!view) return false;
-        return editorCommands.bold(view);
+        return view ? editorCommands.bold(view) : false;
       },
     },
     {
@@ -180,11 +198,11 @@ export const createCommandRegistry = (): CommandRegistry => {
       title: "Italic",
       category: "Format",
       defaultBinding: "mod+i",
+      settingsKey: "italic",
       requiresEditor: true,
       run: (ctx) => {
         const view = ctx.getEditorView();
-        if (!view) return false;
-        return editorCommands.italic(view);
+        return view ? editorCommands.italic(view) : false;
       },
     },
     {
@@ -192,11 +210,11 @@ export const createCommandRegistry = (): CommandRegistry => {
       title: "Strikethrough",
       category: "Format",
       defaultBinding: "mod+shift+x",
+      settingsKey: "strikethrough",
       requiresEditor: true,
       run: (ctx) => {
         const view = ctx.getEditorView();
-        if (!view) return false;
-        return editorCommands.strikethrough(view);
+        return view ? editorCommands.strikethrough(view) : false;
       },
     },
     {
@@ -204,11 +222,11 @@ export const createCommandRegistry = (): CommandRegistry => {
       title: "Inline code",
       category: "Format",
       defaultBinding: "mod+`",
+      settingsKey: "inlineCode",
       requiresEditor: true,
       run: (ctx) => {
         const view = ctx.getEditorView();
-        if (!view) return false;
-        return editorCommands.inlineCode(view);
+        return view ? editorCommands.inlineCode(view) : false;
       },
     },
     {
@@ -216,11 +234,11 @@ export const createCommandRegistry = (): CommandRegistry => {
       title: "Insert link",
       category: "Insert",
       defaultBinding: "mod+k",
+      settingsKey: "link",
       requiresEditor: true,
       run: (ctx) => {
         const view = ctx.getEditorView();
-        if (!view) return false;
-        return editorCommands.link(view);
+        return view ? editorCommands.link(view) : false;
       },
     },
     {
@@ -248,26 +266,16 @@ export const createCommandRegistry = (): CommandRegistry => {
   };
 };
 
-const bindingOverrides: Partial<
-  Record<CommandId, (settings: UserSettings) => string>
-> = {
-  "file.open": (s) => s.keyBindings.open,
-  "file.save": (s) => s.keyBindings.save,
-  "app.openSettings": (s) => s.keyBindings.openSettings,
-  "format.bold": (s) => s.keyBindings.bold,
-  "format.italic": (s) => s.keyBindings.italic,
-  "format.strikethrough": (s) => s.keyBindings.strikethrough,
-  "format.inlineCode": (s) => s.keyBindings.inlineCode,
-  "insert.link": (s) => s.keyBindings.link,
-};
-
 export const resolveCommandBinding = (
   registry: CommandRegistry,
   id: CommandId,
   settings: UserSettings
 ): string | null => {
-  const override = bindingOverrides[id];
-  const raw = override ? override(settings) : registry.get(id).defaultBinding;
+  const cmd = registry.get(id);
+  const raw = cmd.settingsKey
+    ? settings.keyBindings[cmd.settingsKey]
+    : cmd.defaultBinding;
+
   if (!raw) return null;
   return normalizeBinding(raw);
 };
@@ -299,6 +307,12 @@ export const createCommandRunner = (
     ...args: CommandArgs[ID] extends void ? [] : [CommandArgs[ID]]
   ): Promise<boolean> => {
     const cmd = registry.get(id) as CommandDefinition<ID>;
+
+    // Automatic editor check
+    if (cmd.requiresEditor && !ctx.getEditorView()) {
+      return false;
+    }
+
     return await cmd.run(
       ctx,
       (args[0] as CommandArgs[ID]) ?? (undefined as CommandArgs[ID])
@@ -311,6 +325,7 @@ export const createCommandRunner = (
     ...args: CommandArgs[ID] extends void ? [] : [CommandArgs[ID]]
   ): Promise<boolean> => {
     const cmd = registry.get(id) as CommandDefinition<ID>;
+
     return await cmd.run(
       {
         ...ctx,

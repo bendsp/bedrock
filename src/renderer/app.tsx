@@ -271,12 +271,8 @@ const App = () => {
       const id = commands.findByBinding(binding, settings);
       if (!id) return;
 
-      // Only treat File/App commands as global shortcuts; let CodeMirror own editor commands.
-      if (
-        id !== "file.open" &&
-        id !== "file.save" &&
-        id !== "app.openSettings"
-      ) {
+      const cmd = commandRegistry.get(id);
+      if (!cmd.isGlobal) {
         return;
       }
 

@@ -33,6 +33,7 @@ jobs:
       - name: Upload Windows Installer
         shell: bash
         run: |
-          gh release upload ${{ github.ref_name }} out/make/**/*.exe --clobber
+          ls -R out/make
+          find out/make -name "*.exe" | xargs -I {} gh release upload ${{ github.ref_name }} "{}" --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

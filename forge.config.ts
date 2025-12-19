@@ -30,7 +30,7 @@ const config: ForgeConfig = {
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({
-      setupExe: "Bedrock Installer.exe",
+      setupExe: "Bedrock.exe",
     }),
     new MakerZIP({}, ["darwin"]),
     new MakerDMG(

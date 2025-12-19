@@ -29,7 +29,9 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({}),
+    new MakerSquirrel({
+      setupExe: "Bedrock Installer.exe",
+    }),
     new MakerZIP({}, ["darwin"]),
     new MakerDMG(
       {

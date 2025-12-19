@@ -159,5 +159,3 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
     </EditorContextMenu>
   );
 };
-
-export default CodeMirrorEditor;

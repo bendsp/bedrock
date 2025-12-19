@@ -85,19 +85,21 @@ export const loadSettings = (): UserSettings => {
     if (!raw) {
       return defaultSettings;
     }
-    const parsed = JSON.parse(raw) as Partial<UserSettings>;
+    type StoredSettings = Partial<UserSettings> & {
+      uiTextSize?: unknown;
+      uiScale?: unknown;
+    };
+    const parsed = JSON.parse(raw) as StoredSettings;
     const uiScaleFromLegacy =
-      typeof (parsed as any).uiTextSize === "number"
-        ? Math.round(((parsed as any).uiTextSize / 15) * 100)
+      typeof parsed.uiTextSize === "number"
+        ? Math.round((parsed.uiTextSize / 15) * 100)
         : undefined;
     const textSize =
       typeof parsed.textSize === "number" && parsed.textSize > 8
         ? parsed.textSize
         : defaultSettings.textSize;
     const uiScaleRaw =
-      typeof (parsed as any).uiScale === "number"
-        ? (parsed as any).uiScale
-        : uiScaleFromLegacy;
+      typeof parsed.uiScale === "number" ? parsed.uiScale : uiScaleFromLegacy;
     const uiScale =
       typeof uiScaleRaw === "number" && uiScaleRaw >= 63 && uiScaleRaw <= 173
         ? uiScaleRaw

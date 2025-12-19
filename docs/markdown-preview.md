@@ -1,42 +1,36 @@
-# Markdown Preview Architecture Notes
+# Hybrid Markdown (CodeMirror 6) — Architecture Notes
 
-## Library Selection
+This document describes Bedrock’s **hybrid Markdown** behavior as implemented in CodeMirror 6.
 
--   **Renderer**: [`markdown-it`](https://github.com/markdown-it/markdown-it) chosen for its small bundle size (~35 kB minified), CommonMark compliance, rich plugin ecosystem, and first-class TypeScript types.
--   **Sanitizer**: [`dompurify`](https://github.com/cure53/DOMPurify) runs in the renderer process, strips scriptable attributes, and keeps the output DOM-safe without depending on Node APIs.
--   **Alternatives considered**:
-    -   `remark`: flexible AST tooling but substantially larger; requires additional bridges (unified, rehype) to reach HTML output.
-    -   `marked`: very small footprint but lacks built-in plugin system and produces raw HTML without guards; hardening would require custom patches.
--   **Configuration assumptions**:
-    -   We only enable built-in Markdown rules (no HTML by default); `markdown-it` is constructed with `html: false`, `linkify: true`, `typographer: true`.
-    -   Sanitization runs on every render; custom plugins must emit safe output or register whitelists with DOMPurify.
-    -   Rendering occurs entirely in the renderer thread; expensive plugins should be avoided to keep typing latency low.
+## Overview
 
-## Rendering Pipeline Overview
+Bedrock uses CodeMirror’s Markdown language package for parsing and a custom view plugin to provide a hybrid experience:
 
-1. Assemble the full buffer via `LinesModel.getAll()`.
-2. Pass the string through `markdown-it` for HTML generation.
-3. Sanitize the resulting markup with `dompurify`.
-4. Render sanitized HTML inside `MarkdownPreview` using `dangerouslySetInnerHTML`.
-5. Use throttled updates (250 ms default) to balance responsiveness and performance.
+- **Raw mode**: normal CodeMirror markdown editing.
+- **Hybrid mode**: adds _decorations_ that style Markdown structure and hide certain markers when the cursor/selection isn’t in that region.
 
-## Inline Editing Mode
+## Where it lives
 
--   Every non-active line now renders as Markdown inline while the focused line stays raw for editing.
--   `Ctrl+Shift+M` toggles between the hybrid inline mode and a full raw-text mode for parity with traditional editors.
--   Click interactions move the cursor to the start of the requested line; keyboard navigation still flows entirely through the controller.
--   Both modes share the same controller shortcuts and sanitization pipeline, keeping future features consistent.
+- `src/renderer/editor/codemirror/extensions.ts`
+  - Builds the extension bundle and update listeners.
+  - Enables `hybridMarkdown()` only when render mode is `"hybrid"`.
+- `src/renderer/editor/codemirror/hybridMarkdown.ts`
+  - Implements a `ViewPlugin` that classifies lines (headings/lists/quotes/fences) and applies:
+    - line decorations (classes)
+    - mark decorations to hide syntax markers when inactive
 
-## Extension Points
+## Rendering model
 
--   Future plugins are registered in `markdownRenderer.ts` before export.
--   Syntax highlighting for fenced code blocks can be added by wiring `markdown-it`'s `highlight` callback to a client-safe highlighter such as `shiki` or `prism`.
--   IPC hooks can later hydrate the renderer with persisted Markdown documents or export HTML.
+Hybrid mode is **not** HTML preview. It is still CodeMirror text rendering + decorations.
 
-## QA Checklist
+Why:
 
--   Launch via `npm start`, type Markdown in the editor, and confirm the preview mirrors content within 250 ms.
--   Exercise formatting shortcuts (`Ctrl/Cmd+B`, `Ctrl/Cmd+I`, `Ctrl/Cmd+K`) and verify rendered output matches expectations.
--   Paste potentially unsafe HTML (for example `<script>alert(1)</script>`) and ensure it is stripped from the preview.
--   Test multi-line documents and code fences to confirm scrolling and block styling remain stable.
--   Toggle between hybrid and raw modes (`Ctrl+Shift+M`) while editing headings, lists, and fenced code blocks to confirm active-line swapping and sanitization fidelity.
+- Avoids `dangerouslySetInnerHTML`
+- Keeps selection/IME behavior stable
+- Keeps performance predictable (recomputes only on doc/selection/viewport changes)
+
+## QA checklist
+
+- Toggle hybrid/raw mode and verify headings/lists/quotes/fences behave.
+- Ensure markers hide/show correctly as you move the cursor into/out of regions.
+- Verify right-click formatting targets the expected word when there is no selection.

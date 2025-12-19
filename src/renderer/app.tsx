@@ -6,7 +6,7 @@ import React, {
   useRef,
 } from "react";
 import { createRoot } from "react-dom/client";
-import CodeMirrorEditor from "./components/CodeMirrorEditor";
+import { CodeMirrorEditor } from "./components/CodeMirrorEditor";
 import { Chrome } from "./components/Chrome";
 import SettingsModal from "./components/SettingsModal";
 import { RenderMode } from "../shared/types";

@@ -1,5 +1,6 @@
 import { strict as assert } from "assert";
 import { createSnippetCommand } from "../src/renderer/editor/codemirror/commands";
+import type { EditorView } from "@codemirror/view";
 
 type Selection = { from: number; to: number };
 
@@ -40,7 +41,7 @@ runTest("bold shortcut inserts paired asterisks and centers cursor", () => {
   const run = createSnippetCommand("****", 2);
   const view = new FakeView("");
 
-  run(view as any);
+  run(view as unknown as EditorView);
 
   assert.equal(view.text, "****");
   assert.deepEqual(view.state.selection.main, { from: 2, to: 2 });
@@ -50,7 +51,7 @@ runTest("italic shortcut inserts double asterisks and centers cursor", () => {
   const run = createSnippetCommand("**", 1);
   const view = new FakeView("");
 
-  run(view as any);
+  run(view as unknown as EditorView);
 
   assert.equal(view.text, "**");
   assert.deepEqual(view.state.selection.main, { from: 1, to: 1 });
@@ -62,7 +63,7 @@ runTest(
     const run = createSnippetCommand("[](url)", 1);
     const view = new FakeView("");
 
-    run(view as any);
+    run(view as unknown as EditorView);
 
     assert.equal(view.text, "[](url)");
     assert.deepEqual(view.state.selection.main, { from: 1, to: 1 });

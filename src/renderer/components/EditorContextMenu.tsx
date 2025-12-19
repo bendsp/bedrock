@@ -1,11 +1,10 @@
-import React, { useCallback, useMemo } from "react";
-import type { HTMLAttributes, ReactElement } from "react";
+import { cloneElement, useCallback, useMemo } from "react";
+import type { HTMLAttributes, ReactElement, MouseEvent } from "react";
 import { EditorView } from "@codemirror/view";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
-  ContextMenuLabel,
   ContextMenuSeparator,
   ContextMenuShortcut,
   ContextMenuSub,
@@ -82,7 +81,7 @@ export function EditorContextMenu({
   );
 
   const handleContextMenu = useCallback(
-    (event: React.MouseEvent<HTMLElement>) => {
+    (event: MouseEvent<HTMLElement>) => {
       const view = getView();
       if (!view) {
         return;
@@ -108,8 +107,8 @@ export function EditorContextMenu({
     [getView]
   );
 
-  const child = React.cloneElement(children, {
-    onContextMenu: (event: React.MouseEvent<HTMLElement>) => {
+  const child = cloneElement(children, {
+    onContextMenu: (event: MouseEvent<HTMLElement>) => {
       handleContextMenu(event);
       children.props.onContextMenu?.(event);
     },

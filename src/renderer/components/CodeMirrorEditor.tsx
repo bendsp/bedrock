@@ -2,6 +2,8 @@ import React, { useEffect, useRef } from "react";
 import { EditorView } from "@codemirror/view";
 import { RenderMode, CursorPosition } from "../../shared/types";
 import { ThemeName } from "../theme";
+import type { CommandRegistry, CommandRunner } from "../commands/commandSystem";
+import type { UserSettings } from "../settings";
 import {
   createCmExtensions,
   createState,
@@ -18,19 +20,15 @@ type CodeMirrorEditorProps = {
   renderMode: RenderMode;
   theme: ThemeName;
   textSize: number;
+  settings: UserSettings;
+  commandRegistry: CommandRegistry;
+  commands: CommandRunner;
   keyBindings: import("@codemirror/view").KeyBinding[];
   placeholder?: string;
   onChange: (nextValue: string) => void;
   onCursorChange?: (cursor: CursorPosition) => void;
   onReady?: (view: EditorView) => void;
-  onOpenSettings?: () => void;
   className?: string;
-  formatKeyBindings?: {
-    bold: string;
-    italic: string;
-    strikethrough: string;
-    openSettings: string;
-  };
 };
 
 export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
@@ -38,23 +36,19 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
   renderMode,
   theme,
   textSize,
+  settings,
+  commandRegistry,
+  commands,
   keyBindings,
   placeholder,
   onChange,
   onCursorChange,
   onReady,
-  onOpenSettings,
   className,
-  formatKeyBindings,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const bundleRef = useRef<ExtensionBundle | null>(null);
-
-  const boldBinding = formatKeyBindings?.bold ?? "mod+b";
-  const italicBinding = formatKeyBindings?.italic ?? "mod+i";
-  const strikeBinding = formatKeyBindings?.strikethrough ?? "mod+shift+x";
-  const openSettingsBinding = formatKeyBindings?.openSettings ?? "mod+,";
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -147,13 +141,9 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
   return (
     <EditorContextMenu
       getView={() => viewRef.current}
-      onOpenSettings={onOpenSettings}
-      keyBindings={{
-        bold: boldBinding,
-        italic: italicBinding,
-        strikethrough: strikeBinding,
-        openSettings: openSettingsBinding,
-      }}
+      commands={commands}
+      commandRegistry={commandRegistry}
+      settings={settings}
     >
       <div ref={containerRef} className={className} />
     </EditorContextMenu>

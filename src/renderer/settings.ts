@@ -7,6 +7,8 @@ export type KeyBindingAction =
   | "openSettings"
   | "bold"
   | "italic"
+  | "link"
+  | "inlineCode"
   | "strikethrough";
 
 export type KeyBindings = Record<KeyBindingAction, string>;
@@ -30,6 +32,8 @@ export const defaultKeyBindings: KeyBindings = {
   openSettings: "mod+,",
   bold: "mod+b",
   italic: "mod+i",
+  link: "mod+k",
+  inlineCode: "mod+`",
   strikethrough: "mod+shift+x",
 };
 
@@ -68,6 +72,14 @@ const normalizeKeyBindings = (
       stored?.italic && typeof stored.italic === "string"
         ? stored.italic
         : defaultKeyBindings.italic,
+    link:
+      stored?.link && typeof stored.link === "string"
+        ? stored.link
+        : defaultKeyBindings.link,
+    inlineCode:
+      stored?.inlineCode && typeof stored.inlineCode === "string"
+        ? stored.inlineCode
+        : defaultKeyBindings.inlineCode,
     strikethrough:
       stored?.strikethrough && typeof stored.strikethrough === "string"
         ? stored.strikethrough

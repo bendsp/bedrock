@@ -131,12 +131,46 @@ export const formatBindingShortcut = (binding: string): string => {
     .join(joiner);
 };
 
+/**
+ * Converts a normalized binding like `mod+shift+x` into a CodeMirror key string
+ * like `Mod-Shift-x`.
+ */
+export const bindingToCodeMirrorKey = (binding: string): string => {
+  const parts = normalizeBinding(binding).split("+").filter(Boolean);
+  const mapped = parts.map((part) => {
+    const lower = part.toLowerCase();
+    if (lower === "mod") return "Mod";
+    if (lower === "cmd") return "Mod";
+    if (lower === "ctrl") return "Ctrl";
+    if (lower === "shift") return "Shift";
+    if (lower === "alt" || lower === "option") return "Alt";
+    if (lower === "arrowleft") return "ArrowLeft";
+    if (lower === "arrowright") return "ArrowRight";
+    if (lower === "arrowup") return "ArrowUp";
+    if (lower === "arrowdown") return "ArrowDown";
+    if (lower === "escape" || lower === "esc") return "Escape";
+    if (lower === "enter" || lower === "return") return "Enter";
+    if (lower === "backspace") return "Backspace";
+    if (lower === "delete" || lower === "del") return "Delete";
+    if (lower === "tab") return "Tab";
+    if (lower === "space" || lower === " ") return "Space";
+    if (lower === "home") return "Home";
+    if (lower === "end") return "End";
+    if (lower === "pageup") return "PageUp";
+    if (lower === "pagedown") return "PageDown";
+    return part.length === 1 ? lower : part;
+  });
+  return mapped.join("-");
+};
+
 export const keyBindingLabels: Record<KeyBindingAction, string> = {
   open: "Open file",
   save: "Save file",
   openSettings: "Open settings",
   bold: "Bold",
   italic: "Italic",
+  link: "Insert link",
+  inlineCode: "Inline code",
   strikethrough: "Strikethrough",
 };
 
@@ -146,5 +180,7 @@ export const clampKeyBindings = (bindings: KeyBindings): KeyBindings => ({
   openSettings: normalizeBinding(bindings.openSettings),
   bold: normalizeBinding(bindings.bold),
   italic: normalizeBinding(bindings.italic),
+  link: normalizeBinding(bindings.link),
+  inlineCode: normalizeBinding(bindings.inlineCode),
   strikethrough: normalizeBinding(bindings.strikethrough),
 });

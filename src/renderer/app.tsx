@@ -18,11 +18,7 @@ import {
   UserSettings,
   clearSettingsStorage,
 } from "./settings";
-import {
-  clampKeyBindings,
-  eventToBinding,
-  matchesBinding,
-} from "./keybindings";
+import { clampKeyBindings, eventToBinding } from "./keybindings";
 import { applyTheme, ThemeName } from "./theme";
 import {
   defaultKeymap,
@@ -32,9 +28,9 @@ import {
 import { EditorView, KeyBinding } from "@codemirror/view";
 import { markdownKeymap } from "@codemirror/lang-markdown";
 import {
-  createMarkdownLinkCommand,
-  wrapSelectionKeyBinding,
-} from "./editor/codemirror/commands";
+  createCommandRegistry,
+  createCommandRunner,
+} from "./commands/commandSystem";
 
 const DEFAULT_FILE_NAME = "Untitled.md";
 
@@ -55,38 +51,6 @@ const buildWindowTitle = (fileName: string, isDirty: boolean): string => {
   return `${formatFileName(fileName, isDirty)} — Bedrock`;
 };
 
-const toCmKey = (binding: string): string => {
-  const parts = binding.split("+").filter(Boolean);
-  const mapped = parts.map((part) => {
-    const lower = part.toLowerCase();
-    if (lower === "mod") return "Mod";
-    if (lower === "cmd") return "Mod";
-    if (lower === "ctrl") return "Ctrl";
-    if (lower === "shift") return "Shift";
-    if (lower === "alt" || lower === "option") return "Alt";
-    // Key names in stored bindings are normalized to lowercase (see eventToBinding).
-    // CodeMirror keymap strings prefer:
-    // - lowercase for printable single chars: "Mod-b"
-    // - canonical casing for special keys: "ArrowLeft", "Enter", etc.
-    if (lower === "arrowleft") return "ArrowLeft";
-    if (lower === "arrowright") return "ArrowRight";
-    if (lower === "arrowup") return "ArrowUp";
-    if (lower === "arrowdown") return "ArrowDown";
-    if (lower === "escape" || lower === "esc") return "Escape";
-    if (lower === "enter" || lower === "return") return "Enter";
-    if (lower === "backspace") return "Backspace";
-    if (lower === "delete" || lower === "del") return "Delete";
-    if (lower === "tab") return "Tab";
-    if (lower === "space" || lower === " ") return "Space";
-    if (lower === "home") return "Home";
-    if (lower === "end") return "End";
-    if (lower === "pageup") return "PageUp";
-    if (lower === "pagedown") return "PageDown";
-    return part.length === 1 ? lower : part;
-  });
-  return mapped.join("-");
-};
-
 const App = () => {
   const [doc, setDoc] = useState<string>("");
   const [renderMode] = useState<RenderMode>("hybrid");
@@ -96,6 +60,7 @@ const App = () => {
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
   const suppressDirtyRef = useRef(false);
   const editorViewRef = useRef<EditorView | null>(null);
+  const commandRegistry = useMemo(() => createCommandRegistry(), []);
   const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(
     () => window.matchMedia("(prefers-color-scheme: dark)").matches
   );
@@ -268,6 +233,30 @@ const App = () => {
     setSettings(defaultSettings);
   }, []);
 
+  const commands = useMemo(() => {
+    return createCommandRunner(commandRegistry, {
+      getEditorView: () => editorViewRef.current,
+      openFile: handleOpen,
+      saveFile: handleSave,
+      saveFileAs: handleSaveAs,
+      openSettings: handleOpenSettings,
+      setTheme: (theme) => {
+        setSettings((prev) => ({
+          ...prev,
+          followSystem: false,
+          theme,
+        }));
+      },
+    });
+  }, [
+    commandRegistry,
+    handleOpen,
+    handleOpenSettings,
+    handleSave,
+    handleSaveAs,
+    setSettings,
+  ]);
+
   useEffect(() => {
     if (isSettingsOpen) {
       return;
@@ -279,123 +268,56 @@ const App = () => {
         return;
       }
 
-      if (matchesBinding(binding, settings.keyBindings.open)) {
-        event.preventDefault();
-        handleOpen();
+      const id = commands.findByBinding(binding, settings);
+      if (!id) return;
+
+      // Only treat File/App commands as global shortcuts; let CodeMirror own editor commands.
+      if (
+        id !== "file.open" &&
+        id !== "file.save" &&
+        id !== "app.openSettings"
+      ) {
         return;
       }
 
-      if (matchesBinding(binding, settings.keyBindings.save)) {
-        event.preventDefault();
-        handleSave();
-        return;
-      }
-
-      if (matchesBinding(binding, settings.keyBindings.openSettings)) {
-        event.preventDefault();
-        setIsSettingsOpen(true);
-        return;
-      }
+      event.preventDefault();
+      void commands.run(id);
     };
 
     window.addEventListener("keydown", handleGlobalShortcut);
     return () => window.removeEventListener("keydown", handleGlobalShortcut);
-  }, [handleOpen, handleSave, isSettingsOpen, settings.keyBindings]);
+  }, [commands, isSettingsOpen, settings]);
 
   const displayLabel = formatFileName(fileName, isDirty);
 
   const keyBindings = useMemo<KeyBinding[]>(() => {
-    const appBindings: KeyBinding[] = [
-      {
-        key: toCmKey(settings.keyBindings.open),
-        preventDefault: true,
-        run: () => {
-          handleOpen();
-          return true;
-        },
-      },
-      {
-        key: toCmKey(settings.keyBindings.save),
-        preventDefault: true,
-        run: () => {
-          handleSave();
-          return true;
-        },
-      },
-      {
-        key: toCmKey(settings.keyBindings.openSettings),
-        preventDefault: true,
-        run: () => {
-          handleOpenSettings();
-          return true;
-        },
-      },
-    ];
-
-    const snippetBindings: KeyBinding[] = [
-      wrapSelectionKeyBinding(toCmKey(settings.keyBindings.bold), {
-        before: "**",
-        after: "**",
-        emptySnippet: "****",
-        emptyCursorOffset: 2,
-      }),
-      wrapSelectionKeyBinding(toCmKey(settings.keyBindings.italic), {
-        before: "*",
-        after: "*",
-        emptySnippet: "**",
-        emptyCursorOffset: 1,
-      }),
-      wrapSelectionKeyBinding(toCmKey(settings.keyBindings.strikethrough), {
-        before: "~~",
-        after: "~~",
-        emptySnippet: "~~~~",
-        emptyCursorOffset: 2,
-      }),
-      {
-        key: "Mod-k",
-        preventDefault: true,
-        run: createMarkdownLinkCommand,
-      },
-      wrapSelectionKeyBinding("Mod-`", {
-        before: "`",
-        after: "`",
-        emptySnippet: "``",
-        emptyCursorOffset: 1,
-      }),
-    ];
-
     return [
-      ...snippetBindings,
-      ...appBindings,
+      ...commands.buildCodeMirrorKeymap(settings),
       indentWithTab,
       ...defaultKeymap,
       ...historyKeymap,
       ...markdownKeymap,
     ];
-  }, [handleOpen, handleOpenSettings, handleSave, settings.keyBindings]);
+  }, [commands, settings]);
 
   return (
     <>
       <Chrome
         title={displayLabel}
-        onOpen={handleOpen}
-        onSave={handleSave}
-        onSaveAs={handleSaveAs}
-        onOpenSettings={handleOpenSettings}
+        onOpen={() => void commands.run("file.open")}
+        onSave={() => void commands.run("file.save")}
+        onSaveAs={() => void commands.run("file.saveAs")}
+        onOpenSettings={() => void commands.run("app.openSettings")}
       >
         <CodeMirrorEditor
           value={doc}
           renderMode={renderMode}
           theme={activeTheme}
           textSize={settings.textSize}
+          settings={settings}
+          commandRegistry={commandRegistry}
+          commands={commands}
           keyBindings={keyBindings}
-          formatKeyBindings={{
-            bold: settings.keyBindings.bold,
-            italic: settings.keyBindings.italic,
-            strikethrough: settings.keyBindings.strikethrough,
-            openSettings: settings.keyBindings.openSettings,
-          }}
-          onOpenSettings={handleOpenSettings}
           placeholder="Start typing…"
           onChange={handleDocChange}
           onReady={(view) => {

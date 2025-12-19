@@ -588,6 +588,8 @@ const SettingsModal = ({
                         "openSettings",
                         "bold",
                         "italic",
+                        "link",
+                        "inlineCode",
                         "strikethrough",
                       ] as KeyBindingAction[]
                     ).map((action, index, arr) => {
@@ -612,6 +614,10 @@ const SettingsModal = ({
                                   ? "Toggle bold markdown (**…**) for the selection or word."
                                   : action === "italic"
                                   ? "Toggle italic markdown (*…*) for the selection or word."
+                                  : action === "link"
+                                  ? "Insert a markdown link, or wrap the selection."
+                                  : action === "inlineCode"
+                                  ? "Toggle inline code markdown (`…`) for the selection or word."
                                   : "Toggle strikethrough markdown (~~…~~) for the selection or word."}
                               </ItemDescription>
                             </ItemContent>

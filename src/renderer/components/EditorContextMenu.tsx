@@ -12,20 +12,19 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { createWrapSelectionOrWordCommand } from "../editor/codemirror/commands";
-import { formatBindingShortcut } from "../keybindings";
-
-type FormatKeyBindings = {
-  bold: string;
-  italic: string;
-  strikethrough: string;
-  openSettings: string;
-};
+import type {
+  CommandId,
+  CommandRegistry,
+  CommandRunner,
+} from "../commands/commandSystem";
+import { resolveCommandShortcutLabel } from "../commands/commandSystem";
+import type { UserSettings } from "../settings";
 
 export type EditorContextMenuProps = {
   getView: () => EditorView | null;
-  onOpenSettings?: () => void;
-  keyBindings: FormatKeyBindings;
+  commands: CommandRunner;
+  commandRegistry: CommandRegistry;
+  settings: UserSettings;
   // We need to be able to attach an `onContextMenu` handler to the trigger element.
   // Constraining the child props avoids `unknown` props during webpack builds.
   children: ReactElement<HTMLAttributes<HTMLElement>>;
@@ -33,51 +32,35 @@ export type EditorContextMenuProps = {
 
 export function EditorContextMenu({
   getView,
-  onOpenSettings,
-  keyBindings,
+  commands,
+  commandRegistry,
+  settings,
   children,
 }: EditorContextMenuProps) {
-  const boldCommand = useMemo(
-    () =>
-      createWrapSelectionOrWordCommand({
-        before: "**",
-        after: "**",
-        emptySnippet: "****",
-        emptyCursorOffset: 2,
-      }),
-    []
-  );
-  const italicCommand = useMemo(
-    () =>
-      createWrapSelectionOrWordCommand({
-        before: "*",
-        after: "*",
-        emptySnippet: "**",
-        emptyCursorOffset: 1,
-      }),
-    []
-  );
-  const strikeCommand = useMemo(
-    () =>
-      createWrapSelectionOrWordCommand({
-        before: "~~",
-        after: "~~",
-        emptySnippet: "~~~~",
-        emptyCursorOffset: 2,
-      }),
-    []
-  );
+  const shortcuts = useMemo(() => {
+    const get = (id: CommandId) =>
+      resolveCommandShortcutLabel(commandRegistry, id, settings) ?? "";
+
+    return {
+      bold: get("format.bold"),
+      italic: get("format.italic"),
+      strikethrough: get("format.strikethrough"),
+      inlineCode: get("format.inlineCode"),
+      link: get("insert.link"),
+      settings: get("app.openSettings"),
+    };
+  }, [commandRegistry, settings]);
 
   const runCommand = useCallback(
-    (command: (view: EditorView) => boolean) => {
+    (id: Parameters<CommandRunner["runWithView"]>[0]) => {
       const view = getView();
       if (!view) {
         return;
       }
       view.focus();
-      command(view);
+      void commands.runWithView(id, view);
     },
-    [getView]
+    [commands, getView]
   );
 
   const handleContextMenu = useCallback(
@@ -121,42 +104,46 @@ export function EditorContextMenu({
         <ContextMenuSub>
           <ContextMenuSubTrigger inset>Format</ContextMenuSubTrigger>
           <ContextMenuSubContent>
-            <ContextMenuItem inset onSelect={() => runCommand(boldCommand)}>
+            <ContextMenuItem inset onSelect={() => runCommand("format.bold")}>
               Bold
-              <ContextMenuShortcut>
-                {formatBindingShortcut(keyBindings.bold)}
-              </ContextMenuShortcut>
+              <ContextMenuShortcut>{shortcuts.bold}</ContextMenuShortcut>
             </ContextMenuItem>
-            <ContextMenuItem inset onSelect={() => runCommand(italicCommand)}>
+            <ContextMenuItem inset onSelect={() => runCommand("format.italic")}>
               Italic
-              <ContextMenuShortcut>
-                {formatBindingShortcut(keyBindings.italic)}
-              </ContextMenuShortcut>
+              <ContextMenuShortcut>{shortcuts.italic}</ContextMenuShortcut>
             </ContextMenuItem>
-            <ContextMenuItem inset onSelect={() => runCommand(strikeCommand)}>
+            <ContextMenuItem
+              inset
+              onSelect={() => runCommand("format.strikethrough")}
+            >
               Strikethrough
               <ContextMenuShortcut>
-                {formatBindingShortcut(keyBindings.strikethrough)}
+                {shortcuts.strikethrough}
               </ContextMenuShortcut>
+            </ContextMenuItem>
+            <ContextMenuItem
+              inset
+              onSelect={() => runCommand("format.inlineCode")}
+            >
+              Inline code
+              <ContextMenuShortcut>{shortcuts.inlineCode}</ContextMenuShortcut>
             </ContextMenuItem>
           </ContextMenuSubContent>
         </ContextMenuSub>
 
         <ContextMenuSub>
           <ContextMenuSubTrigger inset>Insert</ContextMenuSubTrigger>
-          <ContextMenuSubContent></ContextMenuSubContent>
+          <ContextMenuSubContent>
+            <ContextMenuItem inset onSelect={() => runCommand("insert.link")}>
+              Link
+              <ContextMenuShortcut>{shortcuts.link}</ContextMenuShortcut>
+            </ContextMenuItem>
+          </ContextMenuSubContent>
         </ContextMenuSub>
         <ContextMenuSeparator></ContextMenuSeparator>
-        <ContextMenuItem
-          inset
-          onSelect={() => {
-            onOpenSettings?.();
-          }}
-        >
+        <ContextMenuItem inset onSelect={() => runCommand("app.openSettings")}>
           Settings
-          <ContextMenuShortcut>
-            {formatBindingShortcut(keyBindings.openSettings)}
-          </ContextMenuShortcut>
+          <ContextMenuShortcut>{shortcuts.settings}</ContextMenuShortcut>
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>

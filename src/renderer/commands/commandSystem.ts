@@ -1,3 +1,4 @@
+import { undo, redo } from "@codemirror/commands";
 import type { EditorView, KeyBinding } from "@codemirror/view";
 import {
   createMarkdownLinkCommand,
@@ -21,7 +22,9 @@ export type CommandId =
   | "format.strikethrough"
   | "format.inlineCode"
   | "insert.link"
-  | "theme.set";
+  | "theme.set"
+  | "editor.undo"
+  | "editor.redo";
 
 export type CommandArgs = {
   "file.open": void;
@@ -34,15 +37,24 @@ export type CommandArgs = {
   "format.inlineCode": void;
   "insert.link": void;
   "theme.set": { theme: ThemeName };
+  "editor.undo": void;
+  "editor.redo": void;
 };
 
-export type CommandCategory = "File" | "App" | "Format" | "Insert" | "Theme";
+export type CommandCategory =
+  | "File"
+  | "App"
+  | "Format"
+  | "Insert"
+  | "Theme"
+  | "Edit";
 
 export type CommandDefinition<ID extends CommandId = CommandId> = {
   [K in ID]: {
     id: K;
     title: string;
     category: CommandCategory;
+    description?: string;
     /**
      * Default binding in Bedrock normalized form (e.g. "mod+shift+x").
      * If omitted, the command has no keyboard shortcut by default.
@@ -138,6 +150,7 @@ export const createCommandRegistry = (): CommandRegistry => {
       id: "file.open",
       title: "Open…",
       category: "File",
+      description: "Open a Markdown file from your computer.",
       defaultBinding: "mod+o",
       settingsKey: "open",
       isGlobal: true,
@@ -150,6 +163,7 @@ export const createCommandRegistry = (): CommandRegistry => {
       id: "file.save",
       title: "Save",
       category: "File",
+      description: "Save the current file to disk.",
       defaultBinding: "mod+s",
       settingsKey: "save",
       isGlobal: true,
@@ -162,8 +176,10 @@ export const createCommandRegistry = (): CommandRegistry => {
       id: "file.saveAs",
       title: "Save As…",
       category: "File",
+      description: "Save the current file with a new name.",
+      defaultBinding: "mod+shift+s",
+      settingsKey: "saveAs",
       isGlobal: true,
-      // Intentionally no default binding (platforms differ, avoid collisions).
       run: async (ctx) => {
         await ctx.saveFileAs();
         return true;
@@ -173,6 +189,7 @@ export const createCommandRegistry = (): CommandRegistry => {
       id: "app.openSettings",
       title: "Settings",
       category: "App",
+      description: "Open the Bedrock settings dialog.",
       defaultBinding: "mod+,",
       settingsKey: "openSettings",
       isGlobal: true,
@@ -185,6 +202,7 @@ export const createCommandRegistry = (): CommandRegistry => {
       id: "format.bold",
       title: "Bold",
       category: "Format",
+      description: "Make the selection or current word bold.",
       defaultBinding: "mod+b",
       settingsKey: "bold",
       requiresEditor: true,
@@ -197,6 +215,7 @@ export const createCommandRegistry = (): CommandRegistry => {
       id: "format.italic",
       title: "Italic",
       category: "Format",
+      description: "Make the selection or current word italic.",
       defaultBinding: "mod+i",
       settingsKey: "italic",
       requiresEditor: true,
@@ -209,6 +228,7 @@ export const createCommandRegistry = (): CommandRegistry => {
       id: "format.strikethrough",
       title: "Strikethrough",
       category: "Format",
+      description: "Add strikethrough to the selection or current word.",
       defaultBinding: "mod+shift+x",
       settingsKey: "strikethrough",
       requiresEditor: true,
@@ -221,6 +241,7 @@ export const createCommandRegistry = (): CommandRegistry => {
       id: "format.inlineCode",
       title: "Inline code",
       category: "Format",
+      description: "Wrap the selection or current word in backticks.",
       defaultBinding: "mod+`",
       settingsKey: "inlineCode",
       requiresEditor: true,
@@ -233,6 +254,7 @@ export const createCommandRegistry = (): CommandRegistry => {
       id: "insert.link",
       title: "Insert link",
       category: "Insert",
+      description: "Create a Markdown link from the selection.",
       defaultBinding: "mod+k",
       settingsKey: "link",
       requiresEditor: true,
@@ -242,9 +264,38 @@ export const createCommandRegistry = (): CommandRegistry => {
       },
     },
     {
+      id: "editor.undo",
+      title: "Undo",
+      category: "Edit",
+      description: "Undo the last change.",
+      defaultBinding: "mod+z",
+      settingsKey: "undo",
+      requiresEditor: true,
+      run: (ctx) => {
+        const view = ctx.getEditorView();
+        if (!view) return false;
+        return undo(view);
+      },
+    },
+    {
+      id: "editor.redo",
+      title: "Redo",
+      category: "Edit",
+      description: "Redo the last undone change.",
+      defaultBinding: "mod+y",
+      settingsKey: "redo",
+      requiresEditor: true,
+      run: (ctx) => {
+        const view = ctx.getEditorView();
+        if (!view) return false;
+        return redo(view);
+      },
+    },
+    {
       id: "theme.set",
       title: "Set theme",
       category: "Theme",
+      description: "Change the editor color theme.",
       run: (ctx, args) => {
         ctx.setTheme(args.theme);
         return true;

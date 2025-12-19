@@ -20,11 +20,7 @@ import {
 } from "./settings";
 import { clampKeyBindings, eventToBinding } from "./keybindings";
 import { applyTheme, ThemeName } from "./theme";
-import {
-  defaultKeymap,
-  historyKeymap,
-  indentWithTab,
-} from "@codemirror/commands";
+import { defaultKeymap, indentWithTab } from "@codemirror/commands";
 import { EditorView, KeyBinding } from "@codemirror/view";
 import { markdownKeymap } from "@codemirror/lang-markdown";
 import {
@@ -291,7 +287,6 @@ const App = () => {
       ...commands.buildCodeMirrorKeymap(settings),
       indentWithTab,
       ...defaultKeymap,
-      ...historyKeymap,
       ...markdownKeymap,
     ];
   }, [commands, settings]);

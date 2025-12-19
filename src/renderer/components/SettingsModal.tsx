@@ -585,7 +585,10 @@ const SettingsModal = ({
                       [
                         "open",
                         "save",
+                        "saveAs",
                         "openSettings",
+                        "undo",
+                        "redo",
                         "bold",
                         "italic",
                         "link",
@@ -608,8 +611,14 @@ const SettingsModal = ({
                                   ? "Open a markdown file."
                                   : action === "save"
                                   ? "Save the current file."
+                                  : action === "saveAs"
+                                  ? "Save the current file with a new name."
                                   : action === "openSettings"
                                   ? "Open this settings dialog."
+                                  : action === "undo"
+                                  ? "Undo the last change."
+                                  : action === "redo"
+                                  ? "Redo the last undone change."
                                   : action === "bold"
                                   ? "Toggle bold markdown (**…**) for the selection or word."
                                   : action === "italic"

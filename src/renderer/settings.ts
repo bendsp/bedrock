@@ -4,12 +4,15 @@ import { RenderMode } from "../shared/types";
 export type KeyBindingAction =
   | "open"
   | "save"
+  | "saveAs"
   | "openSettings"
   | "bold"
   | "italic"
   | "link"
   | "inlineCode"
-  | "strikethrough";
+  | "strikethrough"
+  | "undo"
+  | "redo";
 
 export type KeyBindings = Record<KeyBindingAction, string>;
 
@@ -29,12 +32,15 @@ const STORAGE_KEY = "bedrock:settings";
 export const defaultKeyBindings: KeyBindings = {
   open: "mod+o",
   save: "mod+s",
+  saveAs: "mod+shift+s",
   openSettings: "mod+,",
   bold: "mod+b",
   italic: "mod+i",
   link: "mod+k",
   inlineCode: "mod+`",
   strikethrough: "mod+shift+x",
+  undo: "mod+z",
+  redo: "mod+y",
 };
 
 export const defaultSettings: UserSettings = {
@@ -84,6 +90,18 @@ const normalizeKeyBindings = (
       stored?.strikethrough && typeof stored.strikethrough === "string"
         ? stored.strikethrough
         : defaultKeyBindings.strikethrough,
+    saveAs:
+      stored?.saveAs && typeof stored.saveAs === "string"
+        ? stored.saveAs
+        : defaultKeyBindings.saveAs,
+    undo:
+      stored?.undo && typeof stored.undo === "string"
+        ? stored.undo
+        : defaultKeyBindings.undo,
+    redo:
+      stored?.redo && typeof stored.redo === "string"
+        ? stored.redo
+        : defaultKeyBindings.redo,
   };
 };
 

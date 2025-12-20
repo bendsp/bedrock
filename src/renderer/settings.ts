@@ -4,10 +4,15 @@ import { RenderMode } from "../shared/types";
 export type KeyBindingAction =
   | "open"
   | "save"
+  | "saveAs"
   | "openSettings"
   | "bold"
   | "italic"
-  | "strikethrough";
+  | "link"
+  | "inlineCode"
+  | "strikethrough"
+  | "undo"
+  | "redo";
 
 export type KeyBindings = Record<KeyBindingAction, string>;
 
@@ -27,10 +32,15 @@ const STORAGE_KEY = "bedrock:settings";
 export const defaultKeyBindings: KeyBindings = {
   open: "mod+o",
   save: "mod+s",
+  saveAs: "mod+shift+s",
   openSettings: "mod+,",
   bold: "mod+b",
   italic: "mod+i",
+  link: "mod+k",
+  inlineCode: "mod+`",
   strikethrough: "mod+shift+x",
+  undo: "mod+z",
+  redo: "mod+y",
 };
 
 export const defaultSettings: UserSettings = {
@@ -68,10 +78,30 @@ const normalizeKeyBindings = (
       stored?.italic && typeof stored.italic === "string"
         ? stored.italic
         : defaultKeyBindings.italic,
+    link:
+      stored?.link && typeof stored.link === "string"
+        ? stored.link
+        : defaultKeyBindings.link,
+    inlineCode:
+      stored?.inlineCode && typeof stored.inlineCode === "string"
+        ? stored.inlineCode
+        : defaultKeyBindings.inlineCode,
     strikethrough:
       stored?.strikethrough && typeof stored.strikethrough === "string"
         ? stored.strikethrough
         : defaultKeyBindings.strikethrough,
+    saveAs:
+      stored?.saveAs && typeof stored.saveAs === "string"
+        ? stored.saveAs
+        : defaultKeyBindings.saveAs,
+    undo:
+      stored?.undo && typeof stored.undo === "string"
+        ? stored.undo
+        : defaultKeyBindings.undo,
+    redo:
+      stored?.redo && typeof stored.redo === "string"
+        ? stored.redo
+        : defaultKeyBindings.redo,
   };
 };
 
@@ -85,19 +115,21 @@ export const loadSettings = (): UserSettings => {
     if (!raw) {
       return defaultSettings;
     }
-    const parsed = JSON.parse(raw) as Partial<UserSettings>;
+    type StoredSettings = Partial<UserSettings> & {
+      uiTextSize?: unknown;
+      uiScale?: unknown;
+    };
+    const parsed = JSON.parse(raw) as StoredSettings;
     const uiScaleFromLegacy =
-      typeof (parsed as any).uiTextSize === "number"
-        ? Math.round(((parsed as any).uiTextSize / 15) * 100)
+      typeof parsed.uiTextSize === "number"
+        ? Math.round((parsed.uiTextSize / 15) * 100)
         : undefined;
     const textSize =
       typeof parsed.textSize === "number" && parsed.textSize > 8
         ? parsed.textSize
         : defaultSettings.textSize;
     const uiScaleRaw =
-      typeof (parsed as any).uiScale === "number"
-        ? (parsed as any).uiScale
-        : uiScaleFromLegacy;
+      typeof parsed.uiScale === "number" ? parsed.uiScale : uiScaleFromLegacy;
     const uiScale =
       typeof uiScaleRaw === "number" && uiScaleRaw >= 63 && uiScaleRaw <= 173
         ? uiScaleRaw

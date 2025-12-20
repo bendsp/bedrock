@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { KeyBindingAction, UserSettings } from "../settings";
 import {
   eventToBinding,
@@ -79,7 +79,7 @@ const SettingsModal = ({
   onResetBindings,
   onClearLocalStorage,
 }: SettingsModalProps) => {
-  const settingsRef = React.useRef(settings);
+  const settingsRef = useRef(settings);
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
@@ -91,7 +91,7 @@ const SettingsModal = ({
   );
   const [pendingBinding, setPendingBinding] = useState<string | null>(null);
   const [appVersion, setAppVersion] = useState<string | null>(null);
-  const originalBindingRef = React.useRef<{
+  const originalBindingRef = useRef<{
     action: KeyBindingAction | null;
     binding: string | null;
   }>({ action: null, binding: null });
@@ -193,7 +193,7 @@ const SettingsModal = ({
     }
   };
 
-  const uiScaleDebounceRef = React.useRef<number | null>(null);
+  const uiScaleDebounceRef = useRef<number | null>(null);
   const [uiScaleDraft, setUiScaleDraft] = useState(settings.uiScale);
 
   useEffect(() => {
@@ -247,10 +247,10 @@ const SettingsModal = ({
               : part;
           const showPlus = index < parts.length - 1;
           return (
-            <React.Fragment key={`${binding}-${index}`}>
+            <Fragment key={`${binding}-${index}`}>
               <Kbd className="">{label}</Kbd>
               {showPlus ? <span> + </span> : null}
-            </React.Fragment>
+            </Fragment>
           );
         })}
       </KbdGroup>
@@ -585,16 +585,21 @@ const SettingsModal = ({
                       [
                         "open",
                         "save",
+                        "saveAs",
                         "openSettings",
+                        "undo",
+                        "redo",
                         "bold",
                         "italic",
+                        "link",
+                        "inlineCode",
                         "strikethrough",
                       ] as KeyBindingAction[]
                     ).map((action, index, arr) => {
                       const isActive = listeningFor === action;
                       const isLast = index === arr.length - 1;
                       return (
-                        <React.Fragment key={action}>
+                        <Fragment key={action}>
                           <Item
                             size="sm"
                             className="rounded-none first:rounded-t-md last:rounded-b-md"
@@ -606,12 +611,22 @@ const SettingsModal = ({
                                   ? "Open a markdown file."
                                   : action === "save"
                                   ? "Save the current file."
+                                  : action === "saveAs"
+                                  ? "Save the current file with a new name."
                                   : action === "openSettings"
                                   ? "Open this settings dialog."
+                                  : action === "undo"
+                                  ? "Undo the last change."
+                                  : action === "redo"
+                                  ? "Redo the last undone change."
                                   : action === "bold"
                                   ? "Toggle bold markdown (**…**) for the selection or word."
                                   : action === "italic"
                                   ? "Toggle italic markdown (*…*) for the selection or word."
+                                  : action === "link"
+                                  ? "Insert a markdown link, or wrap the selection."
+                                  : action === "inlineCode"
+                                  ? "Toggle inline code markdown (`…`) for the selection or word."
                                   : "Toggle strikethrough markdown (~~…~~) for the selection or word."}
                               </ItemDescription>
                             </ItemContent>
@@ -682,7 +697,7 @@ const SettingsModal = ({
                             </ItemActions>
                           </Item>
                           {!isLast ? <ItemSeparator /> : null}
-                        </React.Fragment>
+                        </Fragment>
                       );
                     })}
                     <ItemSeparator />

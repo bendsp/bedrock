@@ -38,7 +38,7 @@ export const createWrapSelectionCommand =
     emptyCursorOffset = before.length,
   }: WrapSelectionOptions) =>
   (view: import("@codemirror/view").EditorView): boolean => {
-    const { from, to } = view.state.selection.main;
+    let { from, to } = view.state.selection.main;
 
     if (from === to) {
       view.dispatch({
@@ -49,7 +49,19 @@ export const createWrapSelectionCommand =
       return true;
     }
 
-    const selectedText = view.state.doc.sliceString(from, to);
+    let selectedText = view.state.doc.sliceString(from, to);
+
+    // Trim whitespace from the selection so that markers "stick" to the text.
+    const trimmedStart = selectedText.length - selectedText.trimStart().length;
+    const trimmedEnd = selectedText.length - selectedText.trimEnd().length;
+
+    // Only apply trimming if there's actual text remaining
+    if (trimmedStart + trimmedEnd < selectedText.length) {
+      from += trimmedStart;
+      to -= trimmedEnd;
+      selectedText = selectedText.trim();
+    }
+
     const insert = `${before}${selectedText}${after}`;
 
     view.dispatch({
@@ -124,10 +136,23 @@ export const createWrapSelectionOrWordCommand =
     wrapWordWhenEmpty = true,
   }: WrapSelectionOrWordOptions) =>
   (view: import("@codemirror/view").EditorView): boolean => {
-    const { from, to } = view.state.selection.main;
+    let { from, to } = view.state.selection.main;
 
     if (from !== to) {
-      const selectedText = view.state.doc.sliceString(from, to);
+      let selectedText = view.state.doc.sliceString(from, to);
+
+      // Trim whitespace from the selection so that markers "stick" to the text.
+      const trimmedStart =
+        selectedText.length - selectedText.trimStart().length;
+      const trimmedEnd = selectedText.length - selectedText.trimEnd().length;
+
+      // Only apply trimming if there's actual text remaining
+      if (trimmedStart + trimmedEnd < selectedText.length) {
+        from += trimmedStart;
+        to -= trimmedEnd;
+        selectedText = selectedText.trim();
+      }
+
       const insert = `${before}${selectedText}${after}`;
       view.dispatch({
         changes: { from, to, insert },
@@ -168,7 +193,7 @@ export const createWrapSelectionOrWordCommand =
 export const createMarkdownLinkCommand = (
   view: import("@codemirror/view").EditorView
 ): boolean => {
-  const { from, to } = view.state.selection.main;
+  let { from, to } = view.state.selection.main;
   const urlPlaceholder = "url";
 
   if (from === to) {
@@ -181,7 +206,19 @@ export const createMarkdownLinkCommand = (
     return true;
   }
 
-  const selectedText = view.state.doc.sliceString(from, to);
+  let selectedText = view.state.doc.sliceString(from, to);
+
+  // Trim whitespace from the selection so that markers "stick" to the text.
+  const trimmedStart = selectedText.length - selectedText.trimStart().length;
+  const trimmedEnd = selectedText.length - selectedText.trimEnd().length;
+
+  // Only apply trimming if there's actual text remaining
+  if (trimmedStart + trimmedEnd < selectedText.length) {
+    from += trimmedStart;
+    to -= trimmedEnd;
+    selectedText = selectedText.trim();
+  }
+
   const insert = `[${selectedText}](${urlPlaceholder})`;
   const urlStart = from + 1 + selectedText.length + 2; // "[" + text + "]("
 

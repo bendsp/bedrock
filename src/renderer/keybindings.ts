@@ -166,21 +166,27 @@ export const bindingToCodeMirrorKey = (binding: string): string => {
 export const keyBindingLabels: Record<KeyBindingAction, string> = {
   open: "Open file",
   save: "Save file",
+  saveAs: "Save as",
   openSettings: "Open settings",
   bold: "Bold",
   italic: "Italic",
   link: "Insert link",
   inlineCode: "Inline code",
   strikethrough: "Strikethrough",
+  undo: "Undo",
+  redo: "Redo",
 };
 
 export const clampKeyBindings = (bindings: KeyBindings): KeyBindings => ({
   open: normalizeBinding(bindings.open),
   save: normalizeBinding(bindings.save),
+  saveAs: normalizeBinding(bindings.saveAs),
   openSettings: normalizeBinding(bindings.openSettings),
   bold: normalizeBinding(bindings.bold),
   italic: normalizeBinding(bindings.italic),
   link: normalizeBinding(bindings.link),
   inlineCode: normalizeBinding(bindings.inlineCode),
   strikethrough: normalizeBinding(bindings.strikethrough),
+  undo: normalizeBinding(bindings.undo),
+  redo: normalizeBinding(bindings.redo),
 });

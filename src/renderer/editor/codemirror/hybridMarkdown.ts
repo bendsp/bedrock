@@ -233,13 +233,36 @@ export const hybridMarkdown = (): Extension => {
 
         const findContainer = (node: SyntaxNode): SyntaxNode => {
           let current: SyntaxNode | null = node.parent;
+          let outermost: SyntaxNode | null = null;
           while (current) {
             if (containerNames.has(current.type.name)) {
-              return current;
+              outermost = current;
             }
             current = current.parent;
           }
-          return node;
+          return outermost || node;
+        };
+
+        const stylingContainerNames = new Set([
+          "Emphasis",
+          "StrongEmphasis",
+          "Strikethrough",
+        ]);
+
+        const findOutermostStylingContainer = (
+          node: SyntaxNode
+        ): SyntaxNode => {
+          let current: SyntaxNode | null = node;
+          let outermost = node;
+          while (current) {
+            if (stylingContainerNames.has(current.type.name)) {
+              outermost = current;
+              current = current.parent;
+            } else {
+              break;
+            }
+          }
+          return outermost;
         };
 
         const hideIfInactive = (
@@ -264,15 +287,21 @@ export const hybridMarkdown = (): Extension => {
             to: range.to,
             enter: (node) => {
               switch (node.name) {
-                case "StrongEmphasis":
-                  addInlineMark(node.from, node.to, "cm-md-strong");
+                case "StrongEmphasis": {
+                  const container = findOutermostStylingContainer(node.node);
+                  addInlineMark(container.from, container.to, "cm-md-strong");
                   break;
-                case "Emphasis":
-                  addInlineMark(node.from, node.to, "cm-md-em");
+                }
+                case "Emphasis": {
+                  const container = findOutermostStylingContainer(node.node);
+                  addInlineMark(container.from, container.to, "cm-md-em");
                   break;
-                case "Strikethrough":
-                  addInlineMark(node.from, node.to, "cm-md-strike");
+                }
+                case "Strikethrough": {
+                  const container = findOutermostStylingContainer(node.node);
+                  addInlineMark(container.from, container.to, "cm-md-strike");
                   break;
+                }
                 case "Link":
                   addInlineMark(node.from, node.to, "cm-md-link");
                   break;

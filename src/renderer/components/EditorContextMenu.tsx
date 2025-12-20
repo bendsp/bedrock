@@ -1,8 +1,10 @@
-import { cloneElement, useCallback, useMemo } from "react";
+import { cloneElement, useCallback, useMemo, useState } from "react";
 import type { HTMLAttributes, ReactElement, MouseEvent } from "react";
 import { EditorView } from "@codemirror/view";
+import { syntaxTree } from "@codemirror/language";
 import {
   ContextMenu,
+  ContextMenuCheckboxItem,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
@@ -37,6 +39,18 @@ export function EditorContextMenu({
   settings,
   children,
 }: EditorContextMenuProps) {
+  const [activeFormats, setActiveFormats] = useState<{
+    bold: boolean;
+    italic: boolean;
+    strikethrough: boolean;
+    inlineCode: boolean;
+  }>({
+    bold: false,
+    italic: false,
+    strikethrough: false,
+    inlineCode: false,
+  });
+
   const shortcuts = useMemo(() => {
     const get = (id: CommandId) =>
       resolveCommandShortcutLabel(commandRegistry, id, settings) ?? "";
@@ -86,6 +100,63 @@ export function EditorContextMenu({
         selection: { anchor: pos },
         scrollIntoView: false,
       });
+
+      // Update active formats state for the context menu
+      const tree = syntaxTree(view.state);
+      const currentSel = view.state.selection.main;
+      const checkPos =
+        currentSel.from === currentSel.to
+          ? currentSel.from
+          : currentSel.from + 1;
+
+      let bold = false;
+      let italic = false;
+      let strikethrough = false;
+      let inlineCode = false;
+
+      let node = tree.resolveInner(checkPos, 1);
+      while (node) {
+        if (node.name === "StrongEmphasis") bold = true;
+        if (node.name === "Emphasis") italic = true;
+        if (node.name === "Strikethrough") strikethrough = true;
+        if (node.name === "InlineCode") inlineCode = true;
+        node = node.parent;
+      }
+
+      setActiveFormats({ bold, italic, strikethrough, inlineCode });
+    },
+    [getView]
+  );
+
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (open) {
+        const view = getView();
+        if (!view) return;
+
+        const tree = syntaxTree(view.state);
+        const currentSel = view.state.selection.main;
+        const checkPos =
+          currentSel.from === currentSel.to
+            ? currentSel.from
+            : currentSel.from + 1;
+
+        let bold = false;
+        let italic = false;
+        let strikethrough = false;
+        let inlineCode = false;
+
+        let node = tree.resolveInner(checkPos, 1);
+        while (node) {
+          if (node.name === "StrongEmphasis") bold = true;
+          if (node.name === "Emphasis") italic = true;
+          if (node.name === "Strikethrough") strikethrough = true;
+          if (node.name === "InlineCode") inlineCode = true;
+          node = node.parent;
+        }
+
+        setActiveFormats({ bold, italic, strikethrough, inlineCode });
+      }
     },
     [getView]
   );
@@ -98,36 +169,42 @@ export function EditorContextMenu({
   } as HTMLAttributes<HTMLElement>);
 
   return (
-    <ContextMenu>
+    <ContextMenu onOpenChange={handleOpenChange}>
       <ContextMenuTrigger asChild>{child}</ContextMenuTrigger>
       <ContextMenuContent className="w-52">
         <ContextMenuSub>
           <ContextMenuSubTrigger inset>Format</ContextMenuSubTrigger>
           <ContextMenuSubContent>
-            <ContextMenuItem inset onSelect={() => runCommand("format.bold")}>
+            <ContextMenuCheckboxItem
+              checked={activeFormats.bold}
+              onSelect={() => runCommand("format.bold")}
+            >
               Bold
               <ContextMenuShortcut>{shortcuts.bold}</ContextMenuShortcut>
-            </ContextMenuItem>
-            <ContextMenuItem inset onSelect={() => runCommand("format.italic")}>
+            </ContextMenuCheckboxItem>
+            <ContextMenuCheckboxItem
+              checked={activeFormats.italic}
+              onSelect={() => runCommand("format.italic")}
+            >
               Italic
               <ContextMenuShortcut>{shortcuts.italic}</ContextMenuShortcut>
-            </ContextMenuItem>
-            <ContextMenuItem
-              inset
+            </ContextMenuCheckboxItem>
+            <ContextMenuCheckboxItem
+              checked={activeFormats.strikethrough}
               onSelect={() => runCommand("format.strikethrough")}
             >
               Strikethrough
               <ContextMenuShortcut>
                 {shortcuts.strikethrough}
               </ContextMenuShortcut>
-            </ContextMenuItem>
-            <ContextMenuItem
-              inset
+            </ContextMenuCheckboxItem>
+            <ContextMenuCheckboxItem
+              checked={activeFormats.inlineCode}
               onSelect={() => runCommand("format.inlineCode")}
             >
               Inline code
               <ContextMenuShortcut>{shortcuts.inlineCode}</ContextMenuShortcut>
-            </ContextMenuItem>
+            </ContextMenuCheckboxItem>
           </ContextMenuSubContent>
         </ContextMenuSub>
 

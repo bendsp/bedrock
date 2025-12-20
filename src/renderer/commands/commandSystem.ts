@@ -120,24 +120,28 @@ const editorCommands = {
   bold: createWrapSelectionOrWordCommand({
     before: "**",
     after: "**",
+    nodeName: "StrongEmphasis",
     emptySnippet: "****",
     emptyCursorOffset: 2,
   }),
   italic: createWrapSelectionOrWordCommand({
     before: "*",
     after: "*",
+    nodeName: "Emphasis",
     emptySnippet: "**",
     emptyCursorOffset: 1,
   }),
   strikethrough: createWrapSelectionOrWordCommand({
     before: "~~",
     after: "~~",
+    nodeName: "Strikethrough",
     emptySnippet: "~~~~",
     emptyCursorOffset: 2,
   }),
   inlineCode: createWrapSelectionOrWordCommand({
     before: "`",
     after: "`",
+    nodeName: "InlineCode",
     emptySnippet: "``",
     emptyCursorOffset: 1,
   }),

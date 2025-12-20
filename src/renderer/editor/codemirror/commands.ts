@@ -1,4 +1,6 @@
 import { KeyBinding } from "@codemirror/view";
+import { syntaxTree } from "@codemirror/language";
+import type { SyntaxNode } from "@lezer/common";
 
 export const createSnippetCommand =
   (snippet: string, cursorOffset: number) =>
@@ -16,6 +18,10 @@ type WrapSelectionOptions = {
   before: string;
   after: string;
   /**
+   * Optional node name to check for toggling (e.g. "StrongEmphasis").
+   */
+  nodeName?: string;
+  /**
    * Inserted when there's no selection. Defaults to `${before}${after}`.
    */
   emptySnippet?: string;
@@ -26,6 +32,29 @@ type WrapSelectionOptions = {
   emptyCursorOffset?: number;
 };
 
+const findNodeInRange = (
+  view: import("@codemirror/view").EditorView,
+  from: number,
+  to: number,
+  nodeName: string
+): SyntaxNode | null => {
+  const tree = syntaxTree(view.state);
+  // Check a bit inside the range to avoid boundary issues,
+  // but also handle empty selections.
+  const pos = from === to ? from : from + 1;
+  let node = tree.resolveInner(pos, 1);
+  while (node) {
+    if (node.name === nodeName) {
+      // Check if this node encompasses our selection/word range
+      if (node.from <= from && node.to >= to) {
+        return node;
+      }
+    }
+    node = node.parent;
+  }
+  return null;
+};
+
 /**
  * Wraps the current selection with a prefix/suffix. If there's no selection,
  * inserts a snippet and places the cursor inside it.
@@ -34,11 +63,41 @@ export const createWrapSelectionCommand =
   ({
     before,
     after,
+    nodeName,
     emptySnippet = `${before}${after}`,
     emptyCursorOffset = before.length,
   }: WrapSelectionOptions) =>
   (view: import("@codemirror/view").EditorView): boolean => {
     let { from, to } = view.state.selection.main;
+
+    // Toggle logic if nodeName is provided
+    if (nodeName) {
+      const node = findNodeInRange(view, from, to, nodeName);
+      if (node) {
+        // Find the markers. We assume they are at the very start and end of the node.
+        // For standard markdown, this is usually true.
+        const content = view.state.doc.sliceString(node.from, node.to);
+        // We need to determine how many chars to remove from start and end.
+        // If it's StrongEmphasis, it's usually 2. If Emphasis, it's 1.
+        // We can use before.length and after.length as a guide.
+        const markerBeforeLen = before.length;
+        const markerAfterLen = after.length;
+
+        const newText = content.slice(
+          markerBeforeLen,
+          content.length - markerAfterLen
+        );
+        view.dispatch({
+          changes: { from: node.from, to: node.to, insert: newText },
+          selection: {
+            anchor: node.from,
+            head: node.from + newText.length,
+          },
+          scrollIntoView: true,
+        });
+        return true;
+      }
+    }
 
     if (from === to) {
       view.dispatch({
@@ -131,12 +190,46 @@ export const createWrapSelectionOrWordCommand =
   ({
     before,
     after,
+    nodeName,
     emptySnippet = `${before}${after}`,
     emptyCursorOffset = before.length,
     wrapWordWhenEmpty = true,
   }: WrapSelectionOrWordOptions) =>
   (view: import("@codemirror/view").EditorView): boolean => {
     let { from, to } = view.state.selection.main;
+
+    // Toggle logic if nodeName is provided
+    if (nodeName) {
+      // First check if the selection is already within the node
+      let node = findNodeInRange(view, from, to, nodeName);
+
+      // If no selection and we should wrap word, check if the word is already within the node
+      if (!node && from === to && wrapWordWhenEmpty) {
+        const wordRange = getWordRangeAt(view, from);
+        if (wordRange) {
+          node = findNodeInRange(view, wordRange.from, wordRange.to, nodeName);
+        }
+      }
+
+      if (node) {
+        const content = view.state.doc.sliceString(node.from, node.to);
+        const markerBeforeLen = before.length;
+        const markerAfterLen = after.length;
+        const newText = content.slice(
+          markerBeforeLen,
+          content.length - markerAfterLen
+        );
+        view.dispatch({
+          changes: { from: node.from, to: node.to, insert: newText },
+          selection: {
+            anchor: node.from,
+            head: node.from + newText.length,
+          },
+          scrollIntoView: true,
+        });
+        return true;
+      }
+    }
 
     if (from !== to) {
       let selectedText = view.state.doc.sliceString(from, to);

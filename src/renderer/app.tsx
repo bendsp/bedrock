@@ -62,6 +62,9 @@ const App = () => {
   );
   useEffect(() => {
     const handleDevToolsShortcut = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) {
+        return;
+      }
       if (event.key === "F12") {
         event.preventDefault();
         window.electronAPI.openDevTools();
@@ -259,6 +262,10 @@ const App = () => {
     }
 
     const handleGlobalShortcut = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) {
+        return;
+      }
+
       const binding = eventToBinding(event);
       if (!binding) {
         return;

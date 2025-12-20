@@ -421,6 +421,15 @@ body {
 .cm-content .cm-md-link {
   color: var(--link-text, #7aa2f7);
   text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.cm-content .cm-link {
+  cursor: pointer;
+}
+
+.cm-content .cm-link:hover {
+  color: var(--link-color, #61afef);
 }
 
 .cm-md-hide-marker {

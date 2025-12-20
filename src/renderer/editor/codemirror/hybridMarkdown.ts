@@ -218,8 +218,17 @@ export const hybridMarkdown = (): Extension => {
           }
         }
 
-        const addInlineMark = (from: number, to: number, cls: string) => {
-          pushDeco(from, to, Decoration.mark({ class: cls, inclusive: false }));
+        const addInlineMark = (
+          from: number,
+          to: number,
+          cls: string,
+          attrs?: { [key: string]: string }
+        ) => {
+          pushDeco(
+            from,
+            to,
+            Decoration.mark({ class: cls, inclusive: false, attributes: attrs })
+          );
         };
 
         const containerNames = new Set([
@@ -281,6 +290,7 @@ export const hybridMarkdown = (): Extension => {
 
         // Inline markdown styling + "hide marks when cursor isn't inside" behavior.
         const tree = syntaxTree(view.state);
+
         for (const range of view.visibleRanges) {
           tree.iterate({
             from: range.from,
@@ -302,9 +312,12 @@ export const hybridMarkdown = (): Extension => {
                   addInlineMark(container.from, container.to, "cm-md-strike");
                   break;
                 }
-                case "Link":
-                  addInlineMark(node.from, node.to, "cm-md-link");
+                case "Link": {
+                  addInlineMark(node.from, node.to, "cm-md-link cm-link", {
+                    title: "Click to open link",
+                  });
                   break;
+                }
                 case "InlineCode":
                   addInlineMark(node.from, node.to, "cm-md-inline-code");
                   break;
@@ -323,6 +336,13 @@ export const hybridMarkdown = (): Extension => {
                     container.from,
                     container.to
                   );
+
+                  // If it's a bare URL (not inside a Link node), mark it as a link too
+                  if (node.name === "URL" && container.name !== "Link") {
+                    addInlineMark(node.from, node.to, "cm-link", {
+                      title: "Click to open link",
+                    });
+                  }
                   break;
                 }
                 default:

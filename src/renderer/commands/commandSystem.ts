@@ -394,6 +394,10 @@ export const createCommandRunner = (
     const keymap: KeyBinding[] = [];
 
     for (const cmd of registry.list()) {
+      // Skip global commands as they are handled by the window-level listener
+      // in App.tsx. Adding them here causes double-triggering.
+      if (cmd.isGlobal) continue;
+
       const key = resolveCommandCodeMirrorKey(registry, cmd.id, settings);
       if (!key) continue;
 

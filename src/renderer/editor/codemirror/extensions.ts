@@ -13,6 +13,7 @@ import { CursorPosition, RenderMode } from "../../../shared/types";
 import { ThemeName } from "../../theme";
 import { buildThemeExtension } from "./theme";
 import { hybridMarkdown } from "./hybridMarkdown";
+import { linkClickHandler } from "./links";
 
 type ExtensionOptions = {
   renderMode: RenderMode;
@@ -77,6 +78,7 @@ export const createCmExtensions = (
     indentUnit.of("  "),
     EditorView.lineWrapping,
     updateListener,
+    linkClickHandler,
     keymapCompartment.of(keymapExtension(options.keyBindings, baseKeys)),
     themeCompartment.of(buildThemeExtension(options.theme, options.textSize)),
     renderModeCompartment.of(renderModeExtension(options.renderMode)),

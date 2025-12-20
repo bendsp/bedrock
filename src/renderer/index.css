@@ -418,8 +418,9 @@ body {
   text-decoration: line-through;
 }
 
-.cm-content .cm-md-link {
-  color: var(--link-text, #7aa2f7);
+.cm-content .cm-md-link,
+.cm-content .cm-link {
+  color: var(--muted-text);
   text-decoration: underline;
   text-underline-offset: 4px;
 }
@@ -429,7 +430,7 @@ body {
 }
 
 .cm-content .cm-link:hover {
-  color: var(--link-color, #61afef);
+  color: var(--text-body);
 }
 
 .cm-md-hide-marker {

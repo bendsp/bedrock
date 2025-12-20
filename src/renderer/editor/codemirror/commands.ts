@@ -287,7 +287,7 @@ export const createMarkdownLinkCommand = (
   view: import("@codemirror/view").EditorView
 ): boolean => {
   let { from, to } = view.state.selection.main;
-  const urlPlaceholder = "url";
+  const urlPlaceholder = "https://";
 
   if (from === to) {
     const snippet = `[](${urlPlaceholder})`;
@@ -317,7 +317,7 @@ export const createMarkdownLinkCommand = (
 
   view.dispatch({
     changes: { from, to, insert },
-    selection: { anchor: urlStart, head: urlStart + urlPlaceholder.length },
+    selection: { anchor: urlStart + urlPlaceholder.length },
     scrollIntoView: true,
   });
   return true;

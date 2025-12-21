@@ -1,5 +1,28 @@
-import { EditorView } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
+import { EditorView } from "@codemirror/view";
+
+const normalizeUrlForExternalOpen = (raw: string): string | null => {
+  const url = raw.trim();
+  if (!url) return null;
+
+  // Already has a protocol (https, http, mailto, etc.)
+  if (/^[a-z][\w+.-]*:\/\//i.test(url) || /^mailto:/i.test(url)) {
+    return url;
+  }
+
+  // Protocol-relative URLs like //example.com
+  if (url.startsWith("//")) {
+    return `https:${url}`;
+  }
+
+  // Looks like a bare domain (with optional path/query)
+  const domainLike = /^[\w.-]+\.[a-z]{2,}(?:[/?#].*)?$/i;
+  if (domainLike.test(url)) {
+    return `https://${url}`;
+  }
+
+  return null;
+};
 
 /**
  * An extension that makes links in the editor clickable.
@@ -38,15 +61,9 @@ export const linkClickHandler = EditorView.domEventHandlers({
       }
     }
 
-    if (url) {
-      // Ensure the URL has a protocol
-      if (!/^https?:\/\//i.test(url) && !/^mailto:/i.test(url)) {
-        // If it looks like a relative path or doesn't have a protocol,
-        // we might want to handle it differently, but for now we only
-        // open absolute links.
-        return;
-      }
-      window.electronAPI.openExternal(url);
+    const normalized = normalizeUrlForExternalOpen(url);
+    if (normalized) {
+      window.electronAPI.openExternal(normalized);
       event.preventDefault();
       return true;
     }

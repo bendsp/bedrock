@@ -326,7 +326,7 @@ export const createMarkdownLinkCommand = (
 export const insertHorizontalRuleCommand = (
   view: import("@codemirror/view").EditorView
 ): boolean => {
-  const { from, to } = view.state.selection.main;
+  const { from } = view.state.selection.main;
   const line = view.state.doc.lineAt(from);
 
   // If we're on an empty line, just insert it.

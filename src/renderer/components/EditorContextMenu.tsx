@@ -1,7 +1,6 @@
 import { cloneElement, useCallback, useMemo, useState } from "react";
 import type { HTMLAttributes, ReactElement, MouseEvent } from "react";
 import { EditorView } from "@codemirror/view";
-import { syntaxTree } from "@codemirror/language";
 import {
   ContextMenu,
   ContextMenuCheckboxItem,
@@ -21,6 +20,7 @@ import type {
 } from "../commands/commandSystem";
 import { resolveCommandShortcutLabel } from "../commands/commandSystem";
 import type { UserSettings } from "../settings";
+import { getActiveFormats } from "../lib/getActiveFormats";
 
 export type EditorContextMenuProps = {
   getView: () => EditorView | null;
@@ -77,6 +77,13 @@ export function EditorContextMenu({
     [commands, getView]
   );
 
+  const updateActiveFormats = useCallback(() => {
+    const view = getView();
+    if (!view) return;
+
+    setActiveFormats(getActiveFormats(view));
+  }, [getView]);
+
   const handleContextMenu = useCallback(
     (event: MouseEvent<HTMLElement>) => {
       const view = getView();
@@ -87,78 +94,29 @@ export function EditorContextMenu({
       // If there's already a selection, preserve it. Otherwise, move the cursor
       // to the right-click position so formatting targets the expected word.
       const sel = view.state.selection.main;
-      if (sel.from !== sel.to) {
-        return;
+      if (sel.from === sel.to) {
+        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+        if (pos != null) {
+          view.dispatch({
+            selection: { anchor: pos },
+            scrollIntoView: false,
+          });
+        }
       }
-
-      const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
-      if (pos == null) {
-        return;
-      }
-
-      view.dispatch({
-        selection: { anchor: pos },
-        scrollIntoView: false,
-      });
 
       // Update active formats state for the context menu
-      const tree = syntaxTree(view.state);
-      const currentSel = view.state.selection.main;
-      const checkPos =
-        currentSel.from === currentSel.to
-          ? currentSel.from
-          : currentSel.from + 1;
-
-      let bold = false;
-      let italic = false;
-      let strikethrough = false;
-      let inlineCode = false;
-
-      let node = tree.resolveInner(checkPos, 1);
-      while (node) {
-        if (node.name === "StrongEmphasis") bold = true;
-        if (node.name === "Emphasis") italic = true;
-        if (node.name === "Strikethrough") strikethrough = true;
-        if (node.name === "InlineCode") inlineCode = true;
-        node = node.parent;
-      }
-
-      setActiveFormats({ bold, italic, strikethrough, inlineCode });
+      updateActiveFormats();
     },
-    [getView]
+    [getView, updateActiveFormats]
   );
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
       if (open) {
-        const view = getView();
-        if (!view) return;
-
-        const tree = syntaxTree(view.state);
-        const currentSel = view.state.selection.main;
-        const checkPos =
-          currentSel.from === currentSel.to
-            ? currentSel.from
-            : currentSel.from + 1;
-
-        let bold = false;
-        let italic = false;
-        let strikethrough = false;
-        let inlineCode = false;
-
-        let node = tree.resolveInner(checkPos, 1);
-        while (node) {
-          if (node.name === "StrongEmphasis") bold = true;
-          if (node.name === "Emphasis") italic = true;
-          if (node.name === "Strikethrough") strikethrough = true;
-          if (node.name === "InlineCode") inlineCode = true;
-          node = node.parent;
-        }
-
-        setActiveFormats({ bold, italic, strikethrough, inlineCode });
+        updateActiveFormats();
       }
     },
-    [getView]
+    [updateActiveFormats]
   );
 
   const child = cloneElement(children, {

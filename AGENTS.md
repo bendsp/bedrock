@@ -89,6 +89,7 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
 - `src/renderer/app.tsx`: React app root.
 - `src/renderer/components/CodeMirrorEditor.tsx`: CodeMirror mount + reconfigure.
 - `src/renderer/editor/codemirror/*`: CodeMirror commands/extensions/theme.
+- `src/renderer/lib/*`: shared renderer utilities (editor logic, etc).
 - `src/renderer/settings.ts`: persisted user settings.
 - `src/shared/types.ts`: shared IPC types + editor mode/cursor types.
 

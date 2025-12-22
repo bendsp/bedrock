@@ -7,11 +7,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  release:
-    runs-on: windows-latest
+  bump-version:
+    runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -38,8 +37,29 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  release:
+    needs: bump-version
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Update version from tag (local build only)
+        run: npm version ${{ github.ref_name }} --no-git-tag-version
+
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build Windows App
         run: npm run build
@@ -50,5 +70,69 @@ jobs:
         shell: bash
         run: |
           find out/make -name "Bedrock.exe" | xargs -I {} gh release upload ${{ github.ref_name }} "{}" --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release-mac:
+    needs: bump-version
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Update version from tag (local build only)
+        run: npm version ${{ github.ref_name }} --no-git-tag-version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Import Apple Developer ID certificate
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          p12-password: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+
+      - name: Write App Store Connect API key (.p8)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+
+          key_b64 = os.environ["APPLE_API_KEY_P8_BASE64"]
+          out = Path(os.environ["RUNNER_TEMP"]) / "appstoreconnect" / "AuthKey.p8"
+          out.parent.mkdir(parents=True, exist_ok=True)
+          out.write_bytes(base64.b64decode(key_b64))
+          out.chmod(0o600)
+          PY
+        env:
+          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+
+      - name: Build macOS app (signed + notarized)
+        run: npm run make:mac
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_IDENTITY: ${{ secrets.APPLE_IDENTITY }}
+          APPLE_API_KEY: ${{ runner.temp }}/appstoreconnect/AuthKey.p8
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+
+      - name: Upload macOS artifacts (.dmg, .zip)
+        shell: bash
+        run: |
+          find out/make -name "*.dmg" -o -name "*.zip" | xargs -I {} gh release upload ${{ github.ref_name }} "{}" --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

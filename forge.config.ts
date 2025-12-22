@@ -16,16 +16,53 @@ dotenv.config({ override: true });
 import { mainConfig } from "./webpack.main.config";
 import { rendererConfig } from "./webpack.renderer.config";
 
+function getOsxNotarizeConfig():
+  | {
+      tool?: "notarytool";
+      appleApiKey?: string;
+      appleApiKeyId?: string;
+      appleApiIssuer?: string;
+      appleId?: string;
+      appleIdPassword?: string;
+      teamId?: string;
+    }
+  | undefined {
+  // Preferred for CI: App Store Connect API key (.p8) + notarytool
+  if (
+    process.env.APPLE_API_KEY &&
+    process.env.APPLE_API_KEY_ID &&
+    process.env.APPLE_API_ISSUER_ID
+  ) {
+    return {
+      tool: "notarytool",
+      appleApiKey: process.env.APPLE_API_KEY,
+      appleApiKeyId: process.env.APPLE_API_KEY_ID,
+      appleApiIssuer: process.env.APPLE_API_ISSUER_ID,
+      teamId: process.env.APPLE_TEAM_ID,
+    };
+  }
+
+  // Local fallback: Apple ID + app-specific password
+  if (process.env.APPLE_ID && process.env.APPLE_PASSWORD) {
+    return {
+      appleId: process.env.APPLE_ID,
+      appleIdPassword: process.env.APPLE_PASSWORD,
+      teamId: process.env.APPLE_TEAM_ID,
+    };
+  }
+
+  // Notarization disabled if credentials aren't present
+  return undefined;
+}
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     icon: "./src/assets/icon",
-    osxSign: {},
-    osxNotarize: {
-      appleId: process.env.APPLE_ID,
-      appleIdPassword: process.env.APPLE_PASSWORD,
-      teamId: process.env.APPLE_TEAM_ID,
-    },
+    osxSign: process.env.APPLE_IDENTITY
+      ? { identity: process.env.APPLE_IDENTITY }
+      : {},
+    osxNotarize: getOsxNotarizeConfig(),
   },
   rebuildConfig: {},
   makers: [

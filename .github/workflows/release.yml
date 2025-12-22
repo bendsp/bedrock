@@ -76,6 +76,7 @@ jobs:
   release-mac:
     needs: bump-version
     runs-on: macos-latest
+    environment: Build
     permissions:
       contents: write
 

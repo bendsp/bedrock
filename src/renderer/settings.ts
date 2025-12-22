@@ -12,7 +12,8 @@ export type KeyBindingAction =
   | "inlineCode"
   | "strikethrough"
   | "undo"
-  | "redo";
+  | "redo"
+  | "find";
 
 export type KeyBindings = Record<KeyBindingAction, string>;
 
@@ -41,6 +42,7 @@ export const defaultKeyBindings: KeyBindings = {
   strikethrough: "mod+shift+x",
   undo: "mod+z",
   redo: "mod+y",
+  find: "mod+f",
 };
 
 export const defaultSettings: UserSettings = {
@@ -102,6 +104,10 @@ const normalizeKeyBindings = (
       stored?.redo && typeof stored.redo === "string"
         ? stored.redo
         : defaultKeyBindings.redo,
+    find:
+      stored?.find && typeof stored.find === "string"
+        ? stored.find
+        : defaultKeyBindings.find,
   };
 };
 

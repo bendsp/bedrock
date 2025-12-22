@@ -257,6 +257,12 @@ const App = () => {
   ]);
 
   useEffect(() => {
+    window.electronAPI.onFind(() => {
+      void commands.run("editor.find");
+    });
+  }, [commands]);
+
+  useEffect(() => {
     if (isSettingsOpen) {
       return;
     }

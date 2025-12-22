@@ -6,6 +6,7 @@ import {
   placeholder as placeholderExt,
 } from "@codemirror/view";
 import { history } from "@codemirror/commands";
+import { search, searchKeymap } from "@codemirror/search";
 import { markdown } from "@codemirror/lang-markdown";
 import { indentUnit } from "@codemirror/language";
 import { GFM } from "@lezer/markdown";
@@ -13,6 +14,7 @@ import { CursorPosition, RenderMode } from "../../../shared/types";
 import { ThemeName } from "../../theme";
 import { buildThemeExtension } from "./theme";
 import { hybridMarkdown } from "./hybridMarkdown";
+import { createReactSearchPanel } from "./searchPanel";
 
 type ExtensionOptions = {
   renderMode: RenderMode;
@@ -34,7 +36,7 @@ export type ExtensionBundle = {
 };
 
 export const buildBaseKeymap =
-  (): import("@codemirror/view").KeyBinding[] => [];
+  (): import("@codemirror/view").KeyBinding[] => [...searchKeymap];
 
 export const renderModeExtension = (mode: RenderMode): Extension => {
   if (mode === "hybrid") {
@@ -76,6 +78,10 @@ export const createCmExtensions = (
     markdown({ extensions: [GFM] }),
     indentUnit.of("  "),
     EditorView.lineWrapping,
+    search({
+      top: true,
+      createPanel: createReactSearchPanel,
+    }),
     updateListener,
     keymapCompartment.of(keymapExtension(options.keyBindings, baseKeys)),
     themeCompartment.of(buildThemeExtension(options.theme, options.textSize)),

@@ -16,7 +16,8 @@ const normalizeUrlForExternalOpen = (raw: string): string | null => {
   }
 
   // Looks like a bare domain (with optional path/query)
-  const domainLike = /^[\w.-]+\.[a-z]{2,}(?:[/?#].*)?$/i;
+  // Require at least one dot-separated label before a realistic TLD (2–63 chars, letters/digits/hyphens)
+  const domainLike = /^(?:[\w-]+\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:[/?#].*)?$/i;
   if (domainLike.test(url)) {
     return `https://${url}`;
   }

@@ -11,6 +11,7 @@ import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
 import * as dotenv from "dotenv";
 
+// Only load .env if we're not in CI to avoid conflicting with GitHub Secrets
 if (!process.env.GITHUB_ACTIONS) {
   dotenv.config({ override: true });
 }
@@ -18,49 +19,39 @@ if (!process.env.GITHUB_ACTIONS) {
 import { mainConfig } from "./webpack.main.config";
 import { rendererConfig } from "./webpack.renderer.config";
 
-function getOsxNotarizeConfig():
-  | {
-      tool?: "notarytool";
-      appleApiKey?: string;
-      appleApiKeyId?: string;
-      appleApiIssuer?: string;
-      appleId?: string;
-      appleIdPassword?: string;
-      teamId?: string;
-      keychain?: string;
-      keychainProfile?: string;
-    }
-  | undefined {
+function getOsxNotarizeConfig() {
   // Preferred for CI: App Store Connect API key (.p8) + notarytool
   if (
     process.env.APPLE_API_KEY &&
     process.env.APPLE_API_KEY_ID &&
     process.env.APPLE_API_ISSUER_ID
   ) {
+    console.log(
+      "Forge: Configuring notarization via App Store Connect API Key"
+    );
     return {
-      tool: "notarytool",
+      tool: "notarytool" as const,
       appleApiKey: process.env.APPLE_API_KEY,
       appleApiKeyId: process.env.APPLE_API_KEY_ID,
       appleApiIssuer: process.env.APPLE_API_ISSUER_ID,
       teamId: process.env.APPLE_TEAM_ID,
-      // Force-clear other methods to avoid conflicts
-      appleId: undefined,
-      appleIdPassword: undefined,
-      keychain: undefined,
-      keychainProfile: undefined,
     };
   }
 
   // Local fallback: Apple ID + app-specific password
   if (process.env.APPLE_ID && process.env.APPLE_PASSWORD) {
+    console.log("Forge: Configuring notarization via Apple ID / Password");
     return {
+      tool: "notarytool" as const,
       appleId: process.env.APPLE_ID,
       appleIdPassword: process.env.APPLE_PASSWORD,
       teamId: process.env.APPLE_TEAM_ID,
     };
   }
 
-  // Notarization disabled if credentials aren't present
+  console.log(
+    "Forge: Notarization credentials not found, skipping notarization step"
+  );
   return undefined;
 }
 

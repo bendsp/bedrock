@@ -5,6 +5,7 @@ import { markdownToHtml } from "../lib/export";
 import {
   createMarkdownLinkCommand,
   createWrapSelectionOrWordCommand,
+  insertHorizontalRuleCommand,
 } from "../editor/codemirror/commands";
 import {
   bindingToCodeMirrorKey,
@@ -24,6 +25,7 @@ export type CommandId =
   | "format.strikethrough"
   | "format.inlineCode"
   | "insert.link"
+  | "insert.horizontalRule"
   | "theme.set"
   | "editor.undo"
   | "editor.redo"
@@ -41,6 +43,7 @@ export type CommandArgs = {
   "format.strikethrough": void;
   "format.inlineCode": void;
   "insert.link": void;
+  "insert.horizontalRule": void;
   "theme.set": { theme: ThemeName };
   "editor.undo": void;
   "editor.redo": void;
@@ -129,28 +132,33 @@ const editorCommands = {
   bold: createWrapSelectionOrWordCommand({
     before: "**",
     after: "**",
+    nodeName: "StrongEmphasis",
     emptySnippet: "****",
     emptyCursorOffset: 2,
   }),
   italic: createWrapSelectionOrWordCommand({
     before: "*",
     after: "*",
+    nodeName: "Emphasis",
     emptySnippet: "**",
     emptyCursorOffset: 1,
   }),
   strikethrough: createWrapSelectionOrWordCommand({
     before: "~~",
     after: "~~",
+    nodeName: "Strikethrough",
     emptySnippet: "~~~~",
     emptyCursorOffset: 2,
   }),
   inlineCode: createWrapSelectionOrWordCommand({
     before: "`",
     after: "`",
+    nodeName: "InlineCode",
     emptySnippet: "``",
     emptyCursorOffset: 1,
   }),
   link: createMarkdownLinkCommand,
+  horizontalRule: insertHorizontalRuleCommand,
 } as const;
 
 export const createCommandRegistry = (): CommandRegistry => {
@@ -270,6 +278,17 @@ export const createCommandRegistry = (): CommandRegistry => {
       run: (ctx) => {
         const view = ctx.getEditorView();
         return view ? editorCommands.link(view) : false;
+      },
+    },
+    {
+      id: "insert.horizontalRule",
+      title: "Horizontal rule",
+      category: "Insert",
+      description: "Insert a horizontal rule.",
+      requiresEditor: true,
+      run: (ctx) => {
+        const view = ctx.getEditorView();
+        return view ? editorCommands.horizontalRule(view) : false;
       },
     },
     {
@@ -441,6 +460,10 @@ export const createCommandRunner = (
     const keymap: KeyBinding[] = [];
 
     for (const cmd of registry.list()) {
+      // Skip global commands as they are handled by the window-level listener
+      // in App.tsx. Adding them here causes double-triggering.
+      if (cmd.isGlobal) continue;
+
       const key = resolveCommandCodeMirrorKey(registry, cmd.id, settings);
       if (!key) continue;
 

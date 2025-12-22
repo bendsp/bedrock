@@ -398,6 +398,22 @@ body {
   color: var(--code-text, #e6edf3);
 }
 
+.cm-md-hr-widget {
+  display: inline-block;
+  vertical-align: middle;
+  width: 100%;
+  height: 1px;
+  background-color: var(--blockquote-border, #3f4755);
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+}
+
+.cm-line.cm-md-hr-active {
+  color: var(--muted-text);
+  background: color-mix(in srgb, var(--ui-primary) 5%, transparent);
+}
+
 .cm-content .cm-md-inline-code {
   background: var(--code-inline-bg, #2c313a);
   padding: 0.15em 0.35em;
@@ -418,9 +434,19 @@ body {
   text-decoration: line-through;
 }
 
-.cm-content .cm-md-link {
-  color: var(--link-text, #7aa2f7);
+.cm-content .cm-md-link,
+.cm-content .cm-link {
+  color: var(--muted-text);
   text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.cm-content .cm-link {
+  cursor: pointer;
+}
+
+.cm-content .cm-link:hover {
+  color: var(--text-body);
 }
 
 .cm-md-hide-marker {

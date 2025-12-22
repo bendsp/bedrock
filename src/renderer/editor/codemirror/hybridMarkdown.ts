@@ -1,7 +1,24 @@
 import { Extension, RangeSetBuilder } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
-import { Decoration, DecorationSet, ViewPlugin } from "@codemirror/view";
+import {
+  Decoration,
+  DecorationSet,
+  ViewPlugin,
+  WidgetType,
+} from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
+
+class HRWidget extends WidgetType {
+  toDOM() {
+    const span = document.createElement("span");
+    span.className = "cm-md-hr-widget";
+    return span;
+  }
+
+  ignoreEvent() {
+    return true;
+  }
+}
 
 type LineKind =
   | { type: "heading"; level: number; markerEnd: number }
@@ -9,6 +26,7 @@ type LineKind =
   | { type: "list"; markerEnd: number }
   | { type: "fenceDelimiter"; markerEnd: number }
   | { type: "fenceContent" }
+  | { type: "horizontalRule" }
   | { type: "paragraph" };
 
 const headingMatch = (text: string): LineKind | null => {
@@ -36,10 +54,18 @@ const fenceMatch = (text: string): LineKind | null => {
   return { type: "fenceDelimiter", markerEnd: match[0].length };
 };
 
+const horizontalRuleMatch = (text: string): LineKind | null => {
+  if (text.match(/^(?:-{3,}|\*{3,}|_{3,})$/)) {
+    return { type: "horizontalRule" };
+  }
+  return null;
+};
+
 const classifyLines = (lines: string[]): LineKind[] => {
   const kinds: LineKind[] = [];
   let inFence = false;
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     if (inFence) {
       const fence = fenceMatch(line);
       if (fence) {
@@ -74,6 +100,18 @@ const classifyLines = (lines: string[]): LineKind[] => {
     if (quote) {
       kinds.push(quote);
       continue;
+    }
+
+    const hr = horizontalRuleMatch(line);
+    if (hr) {
+      const isFirstLine = i === 0;
+      const prevLine = isFirstLine ? null : lines[i - 1];
+      const isPrevBlank = isFirstLine || prevLine?.trim() === "";
+
+      if (isPrevBlank) {
+        kinds.push(hr);
+        continue;
+      }
     }
 
     kinds.push({ type: "paragraph" });
@@ -213,13 +251,38 @@ export const hybridMarkdown = (): Extension => {
               addLineClass(lineNo, "cm-md-code-block");
               break;
             }
+            case "horizontalRule": {
+              const line = doc.line(lineNo);
+              if (!selectionTouches(line.from, line.to)) {
+                pushDeco(
+                  line.from,
+                  line.to,
+                  Decoration.replace({
+                    widget: new HRWidget(),
+                    inclusive: false,
+                  })
+                );
+              } else {
+                addLineClass(lineNo, "cm-md-hr-active");
+              }
+              break;
+            }
             default:
               break;
           }
         }
 
-        const addInlineMark = (from: number, to: number, cls: string) => {
-          pushDeco(from, to, Decoration.mark({ class: cls, inclusive: false }));
+        const addInlineMark = (
+          from: number,
+          to: number,
+          cls: string,
+          attrs?: { [key: string]: string }
+        ) => {
+          pushDeco(
+            from,
+            to,
+            Decoration.mark({ class: cls, inclusive: false, attributes: attrs })
+          );
         };
 
         const containerNames = new Set([
@@ -233,13 +296,36 @@ export const hybridMarkdown = (): Extension => {
 
         const findContainer = (node: SyntaxNode): SyntaxNode => {
           let current: SyntaxNode | null = node.parent;
+          let outermost: SyntaxNode | null = null;
           while (current) {
             if (containerNames.has(current.type.name)) {
-              return current;
+              outermost = current;
             }
             current = current.parent;
           }
-          return node;
+          return outermost || node;
+        };
+
+        const stylingContainerNames = new Set([
+          "Emphasis",
+          "StrongEmphasis",
+          "Strikethrough",
+        ]);
+
+        const findOutermostStylingContainer = (
+          node: SyntaxNode
+        ): SyntaxNode => {
+          let current: SyntaxNode | null = node;
+          let outermost = node;
+          while (current) {
+            if (stylingContainerNames.has(current.type.name)) {
+              outermost = current;
+              current = current.parent;
+            } else {
+              break;
+            }
+          }
+          return outermost;
         };
 
         const hideIfInactive = (
@@ -258,24 +344,34 @@ export const hybridMarkdown = (): Extension => {
 
         // Inline markdown styling + "hide marks when cursor isn't inside" behavior.
         const tree = syntaxTree(view.state);
+
         for (const range of view.visibleRanges) {
           tree.iterate({
             from: range.from,
             to: range.to,
             enter: (node) => {
               switch (node.name) {
-                case "StrongEmphasis":
-                  addInlineMark(node.from, node.to, "cm-md-strong");
+                case "StrongEmphasis": {
+                  const container = findOutermostStylingContainer(node.node);
+                  addInlineMark(container.from, container.to, "cm-md-strong");
                   break;
-                case "Emphasis":
-                  addInlineMark(node.from, node.to, "cm-md-em");
+                }
+                case "Emphasis": {
+                  const container = findOutermostStylingContainer(node.node);
+                  addInlineMark(container.from, container.to, "cm-md-em");
                   break;
-                case "Strikethrough":
-                  addInlineMark(node.from, node.to, "cm-md-strike");
+                }
+                case "Strikethrough": {
+                  const container = findOutermostStylingContainer(node.node);
+                  addInlineMark(container.from, container.to, "cm-md-strike");
                   break;
-                case "Link":
-                  addInlineMark(node.from, node.to, "cm-md-link");
+                }
+                case "Link": {
+                  addInlineMark(node.from, node.to, "cm-md-link cm-link", {
+                    title: "Click to open link",
+                  });
                   break;
+                }
                 case "InlineCode":
                   addInlineMark(node.from, node.to, "cm-md-inline-code");
                   break;
@@ -294,6 +390,13 @@ export const hybridMarkdown = (): Extension => {
                     container.from,
                     container.to
                   );
+
+                  // If it's a bare URL (not inside a Link node), mark it as a link too
+                  if (node.name === "URL" && container.name !== "Link") {
+                    addInlineMark(node.from, node.to, "cm-link", {
+                      title: "Click to open link",
+                    });
+                  }
                   break;
                 }
                 default:

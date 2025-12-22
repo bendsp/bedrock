@@ -14,6 +14,7 @@ import { CursorPosition, RenderMode } from "../../../shared/types";
 import { ThemeName } from "../../theme";
 import { buildThemeExtension } from "./theme";
 import { hybridMarkdown } from "./hybridMarkdown";
+import { linkClickHandler } from "./links";
 import { createReactSearchPanel } from "./searchPanel";
 
 type ExtensionOptions = {
@@ -83,6 +84,7 @@ export const createCmExtensions = (
       createPanel: createReactSearchPanel,
     }),
     updateListener,
+    linkClickHandler,
     keymapCompartment.of(keymapExtension(options.keyBindings, baseKeys)),
     themeCompartment.of(buildThemeExtension(options.theme, options.textSize)),
     renderModeCompartment.of(renderModeExtension(options.renderMode)),

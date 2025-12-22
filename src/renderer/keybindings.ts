@@ -175,6 +175,7 @@ export const keyBindingLabels: Record<KeyBindingAction, string> = {
   strikethrough: "Strikethrough",
   undo: "Undo",
   redo: "Redo",
+  find: "Find",
 };
 
 export const clampKeyBindings = (bindings: KeyBindings): KeyBindings => ({
@@ -189,4 +190,5 @@ export const clampKeyBindings = (bindings: KeyBindings): KeyBindings => ({
   strikethrough: normalizeBinding(bindings.strikethrough),
   undo: normalizeBinding(bindings.undo),
   redo: normalizeBinding(bindings.redo),
+  find: normalizeBinding(bindings.find),
 });

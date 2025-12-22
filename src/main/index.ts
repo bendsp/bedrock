@@ -173,13 +173,56 @@ const installApplicationMenu = () => {
       ? ([
           { role: "appMenu" },
           { role: "fileMenu" },
-          { role: "editMenu" },
+          {
+            label: "Edit",
+            submenu: [
+              { role: "undo" },
+              { role: "redo" },
+              { type: "separator" },
+              { role: "cut" },
+              { role: "copy" },
+              { role: "paste" },
+              { role: "pasteAndMatchStyle" },
+              { role: "delete" },
+              { role: "selectAll" },
+              { type: "separator" },
+              {
+                label: "Find",
+                accelerator: "CmdOrCtrl+F",
+                click: (menuItem, browserWindow) => {
+                  (browserWindow as BrowserWindow)?.webContents.send("editor:find");
+                },
+              },
+            ],
+          },
           { role: "viewMenu" },
           { role: "windowMenu" },
         ] as MenuItemConstructorOptions[])
       : ([
           { role: "fileMenu" },
-          { role: "editMenu" },
+          {
+            label: "Edit",
+            submenu: [
+              { role: "undo" },
+              { role: "redo" },
+              { type: "separator" },
+              { role: "cut" },
+              { role: "copy" },
+              { role: "paste" },
+              { role: "pasteAndMatchStyle" },
+              { role: "delete" },
+              { type: "separator" },
+              { role: "selectAll" },
+              { type: "separator" },
+              {
+                label: "Find",
+                accelerator: "CmdOrCtrl+F",
+                click: (menuItem, browserWindow) => {
+                  (browserWindow as BrowserWindow)?.webContents.send("editor:find");
+                },
+              },
+            ],
+          },
           { role: "viewMenu" },
           { role: "windowMenu" },
         ] as MenuItemConstructorOptions[])),

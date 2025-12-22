@@ -21,4 +21,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getAppVersion: (): Promise<string> => ipcRenderer.invoke("app:get-version"),
   openExternal: (url: string): Promise<void> =>
     ipcRenderer.invoke("shell:open-external", url),
+  onFind: (callback: () => void): void => {
+    ipcRenderer.on("editor:find", callback);
+  },
 });

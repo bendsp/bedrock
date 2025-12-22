@@ -1,4 +1,5 @@
 import { undo, redo } from "@codemirror/commands";
+import { openSearchPanel, closeSearchPanel } from "@codemirror/search";
 import type { EditorView, KeyBinding } from "@codemirror/view";
 import {
   createMarkdownLinkCommand,
@@ -26,7 +27,8 @@ export type CommandId =
   | "insert.horizontalRule"
   | "theme.set"
   | "editor.undo"
-  | "editor.redo";
+  | "editor.redo"
+  | "editor.find";
 
 export type CommandArgs = {
   "file.open": void;
@@ -42,6 +44,7 @@ export type CommandArgs = {
   "theme.set": { theme: ThemeName };
   "editor.undo": void;
   "editor.redo": void;
+  "editor.find": void;
 };
 
 export type CommandCategory =
@@ -308,6 +311,28 @@ export const createCommandRegistry = (): CommandRegistry => {
         const view = ctx.getEditorView();
         if (!view) return false;
         return redo(view);
+      },
+    },
+    {
+      id: "editor.find",
+      title: "Find",
+      category: "Edit",
+      description: "Search for text in the current file.",
+      defaultBinding: "mod+f",
+      settingsKey: "find",
+      requiresEditor: true,
+      run: (ctx) => {
+        const view = ctx.getEditorView();
+        if (!view) return false;
+
+        // Toggle logic: if the search panel is already visible in this view, close it.
+        const isPanelVisible = view.dom.querySelector(".cm-search-panel-container");
+        if (isPanelVisible) {
+          closeSearchPanel(view);
+        } else {
+          openSearchPanel(view);
+        }
+        return true;
       },
     },
     {

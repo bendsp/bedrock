@@ -35,4 +35,5 @@ export interface IElectronAPI {
   openDevTools: () => void;
   getAppVersion: () => Promise<string>;
   openExternal: (url: string) => Promise<void>;
+  onFind: (callback: () => void) => void;
 }

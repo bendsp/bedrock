@@ -430,6 +430,35 @@ body {
   font-size: 0;
 }
 
+/* Custom search panel styling */
+.cm-panels {
+  background: transparent !important;
+  border: none !important;
+}
+
+.cm-panel {
+  background: transparent !important;
+  border: none !important;
+}
+
+.cm-panels-top {
+  position: absolute;
+  top: 12px;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: transparent !important;
+  border-bottom: none !important;
+  pointer-events: none;
+}
+
+.cm-search-panel-container {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  pointer-events: auto;
+}
+
 @layer base {
   * {
     @apply border-border;

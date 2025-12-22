@@ -257,6 +257,12 @@ const App = () => {
   ]);
 
   useEffect(() => {
+    window.electronAPI.onFind(() => {
+      void commands.run("editor.find");
+    });
+  }, [commands]);
+
+  useEffect(() => {
     if (isSettingsOpen) {
       return;
     }
@@ -305,6 +311,7 @@ const App = () => {
         onOpen={() => void commands.run("file.open")}
         onSave={() => void commands.run("file.save")}
         onSaveAs={() => void commands.run("file.saveAs")}
+        onSearch={() => void commands.run("editor.find")}
         onOpenSettings={() => void commands.run("app.openSettings")}
       >
         <CodeMirrorEditor

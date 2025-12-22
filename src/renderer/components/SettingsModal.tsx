@@ -589,6 +589,7 @@ const SettingsModal = ({
                         "openSettings",
                         "undo",
                         "redo",
+                        "find",
                         "bold",
                         "italic",
                         "link",
@@ -619,6 +620,8 @@ const SettingsModal = ({
                                   ? "Undo the last change."
                                   : action === "redo"
                                   ? "Redo the last undone change."
+                                  : action === "find"
+                                  ? "Search for text in the current file."
                                   : action === "bold"
                                   ? "Toggle bold markdown (**…**) for the selection or word."
                                   : action === "italic"

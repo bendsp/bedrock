@@ -1,6 +1,7 @@
 import { undo, redo } from "@codemirror/commands";
 import { openSearchPanel, closeSearchPanel } from "@codemirror/search";
 import type { EditorView, KeyBinding } from "@codemirror/view";
+import { markdownToHtml } from "../lib/export";
 import {
   createMarkdownLinkCommand,
   createWrapSelectionOrWordCommand,
@@ -26,7 +27,9 @@ export type CommandId =
   | "theme.set"
   | "editor.undo"
   | "editor.redo"
-  | "editor.find";
+  | "editor.find"
+  | "file.exportHtml"
+  | "file.exportPdf";
 
 export type CommandArgs = {
   "file.open": void;
@@ -42,6 +45,8 @@ export type CommandArgs = {
   "editor.undo": void;
   "editor.redo": void;
   "editor.find": void;
+  "file.exportHtml": void;
+  "file.exportPdf": void;
 };
 
 export type CommandCategory =
@@ -98,6 +103,7 @@ export type CommandRunContext = {
   saveFileAs: () => Promise<void>;
   openSettings: () => void;
   setTheme: (theme: ThemeName) => void;
+  exportFile: (format: "html" | "pdf") => Promise<void>;
 };
 
 export type CommandRegistry = {
@@ -313,6 +319,26 @@ export const createCommandRegistry = (): CommandRegistry => {
         } else {
           openSearchPanel(view);
         }
+        return true;
+      },
+    },
+    {
+      id: "file.exportHtml",
+      title: "Export to HTML",
+      category: "File",
+      description: "Save the current file as a styled HTML document.",
+      run: async (ctx) => {
+        await ctx.exportFile("html");
+        return true;
+      },
+    },
+    {
+      id: "file.exportPdf",
+      title: "Export to PDF",
+      category: "File",
+      description: "Save the current file as a PDF document.",
+      run: async (ctx) => {
+        await ctx.exportFile("pdf");
         return true;
       },
     },

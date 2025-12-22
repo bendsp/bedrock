@@ -4,6 +4,7 @@ import {
   DiscardPromptPayload,
   OpenFileResult,
   SaveFileResult,
+  ExportFilePayload,
 } from "../shared/types";
 
 contextBridge.exposeInMainWorld("electronAPI", {
@@ -24,4 +25,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onFind: (callback: () => void): void => {
     ipcRenderer.on("editor:find", callback);
   },
+  exportFile: (payload: ExportFilePayload): Promise<boolean> =>
+    ipcRenderer.invoke("file:export", payload),
 });

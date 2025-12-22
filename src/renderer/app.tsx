@@ -10,6 +10,7 @@ import { CodeMirrorEditor } from "./components/CodeMirrorEditor";
 import { Chrome } from "./components/Chrome";
 import SettingsModal from "./components/SettingsModal";
 import { RenderMode } from "../shared/types";
+import { markdownToHtml } from "./lib/export";
 import {
   defaultSettings,
   defaultKeyBindings,
@@ -246,9 +247,14 @@ const App = () => {
           theme,
         }));
       },
+      exportFile: async (format) => {
+        const content = markdownToHtml(doc);
+        await window.electronAPI.exportFile({ content, format });
+      },
     });
   }, [
     commandRegistry,
+    doc,
     handleOpen,
     handleOpenSettings,
     handleSave,
@@ -312,6 +318,8 @@ const App = () => {
         onSave={() => void commands.run("file.save")}
         onSaveAs={() => void commands.run("file.saveAs")}
         onSearch={() => void commands.run("editor.find")}
+        onExportHtml={() => void commands.run("file.exportHtml")}
+        onExportPdf={() => void commands.run("file.exportPdf")}
         onOpenSettings={() => void commands.run("app.openSettings")}
       >
         <CodeMirrorEditor

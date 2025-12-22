@@ -5,6 +5,9 @@ import {
   SaveAll,
   Search,
   Settings as SettingsIcon,
+  Share,
+  FileCode,
+  FileText,
 } from "lucide-react";
 
 import { Button } from "./ui/button";
@@ -14,6 +17,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 export type ChromeProps = {
   title: string;
@@ -21,6 +30,8 @@ export type ChromeProps = {
   onSave: () => void;
   onSaveAs: () => void;
   onSearch: () => void;
+  onExportHtml: () => void;
+  onExportPdf: () => void;
   onOpenSettings: () => void;
   children: React.ReactNode;
 };
@@ -31,6 +42,8 @@ export function Chrome({
   onSave,
   onSaveAs,
   onSearch,
+  onExportHtml,
+  onExportPdf,
   onOpenSettings,
   children,
 }: ChromeProps) {
@@ -126,6 +139,38 @@ export function Chrome({
                   <p>Search</p>
                 </TooltipContent>
               </Tooltip>
+
+              <DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        aria-label="Export"
+                      >
+                        <Share className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p>Export</p>
+                  </TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent side="right" align="start">
+                  <DropdownMenuItem onClick={onExportHtml}>
+                    <FileCode className="mr-2 h-4 w-4" />
+                    <span>Export to HTML</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onExportPdf}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    <span>Export to PDF</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <div className="flex-1" />
               <Tooltip>
                 <TooltipTrigger asChild>

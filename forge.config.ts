@@ -11,7 +11,9 @@ import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
 import * as dotenv from "dotenv";
 
-dotenv.config({ override: true });
+if (!process.env.GITHUB_ACTIONS) {
+  dotenv.config({ override: true });
+}
 
 import { mainConfig } from "./webpack.main.config";
 import { rendererConfig } from "./webpack.renderer.config";
@@ -25,6 +27,8 @@ function getOsxNotarizeConfig():
       appleId?: string;
       appleIdPassword?: string;
       teamId?: string;
+      keychain?: string;
+      keychainProfile?: string;
     }
   | undefined {
   // Preferred for CI: App Store Connect API key (.p8) + notarytool
@@ -39,6 +43,11 @@ function getOsxNotarizeConfig():
       appleApiKeyId: process.env.APPLE_API_KEY_ID,
       appleApiIssuer: process.env.APPLE_API_ISSUER_ID,
       teamId: process.env.APPLE_TEAM_ID,
+      // Force-clear other methods to avoid conflicts
+      appleId: undefined,
+      appleIdPassword: undefined,
+      keychain: undefined,
+      keychainProfile: undefined,
     };
   }
 

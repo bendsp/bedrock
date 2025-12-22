@@ -328,23 +328,50 @@ export const insertHorizontalRuleCommand = (
 ): boolean => {
   const { from } = view.state.selection.main;
   const line = view.state.doc.lineAt(from);
+  const isLastLine = line.number === view.state.doc.lines;
 
-  // If we're on an empty line, just insert it.
-  // Otherwise, insert it on a new line.
+  let insert = "";
+  let fromPos = 0;
+  let toPos = 0;
+
+  // If we're on an empty line, check if the previous line is also blank.
   if (line.text.trim() === "") {
-    view.dispatch({
-      changes: { from: line.from, to: line.to, insert: "---" },
-      selection: { anchor: line.from + 3 },
-      scrollIntoView: true,
-    });
+    const isFirstLine = line.number === 1;
+    const prevLineBlank =
+      isFirstLine || view.state.doc.line(line.number - 1).text.trim() === "";
+
+    fromPos = line.from;
+    toPos = line.to;
+
+    if (prevLineBlank) {
+      insert = "---";
+    } else {
+      // Need a blank line before
+      insert = "\n---";
+    }
   } else {
-    // Insert on a new line after the current line
-    view.dispatch({
-      changes: { from: line.to, insert: "\n---\n" },
-      selection: { anchor: line.to + 5 }, // \n + --- + \n
-      scrollIntoView: true,
-    });
+    // Insert on a new line after the current line, ensuring a blank line before the rule
+    fromPos = line.to;
+    toPos = line.to;
+    insert = "\n\n---";
   }
+
+  // If it's the last line, we MUST add a newline to move the cursor to a new line after the rule
+  if (isLastLine) {
+    insert += "\n";
+  }
+
+  // The anchor should be at the start of the next line.
+  // If we added a newline (isLastLine), it's at the end of the insertion.
+  // If we didn't (not last line), we move past the existing newline.
+  const anchor = fromPos + insert.length + (isLastLine ? 0 : 1);
+
+  view.dispatch({
+    changes: { from: fromPos, to: toPos, insert },
+    selection: { anchor },
+    scrollIntoView: true,
+  });
+
   return true;
 };
 

@@ -64,7 +64,8 @@ const horizontalRuleMatch = (text: string): LineKind | null => {
 const classifyLines = (lines: string[]): LineKind[] => {
   const kinds: LineKind[] = [];
   let inFence = false;
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     if (inFence) {
       const fence = fenceMatch(line);
       if (fence) {
@@ -103,8 +104,14 @@ const classifyLines = (lines: string[]): LineKind[] => {
 
     const hr = horizontalRuleMatch(line);
     if (hr) {
-      kinds.push(hr);
-      continue;
+      const isFirstLine = i === 0;
+      const prevLine = isFirstLine ? null : lines[i - 1];
+      const isPrevBlank = isFirstLine || prevLine?.trim() === "";
+
+      if (isPrevBlank) {
+        kinds.push(hr);
+        continue;
+      }
     }
 
     kinds.push({ type: "paragraph" });

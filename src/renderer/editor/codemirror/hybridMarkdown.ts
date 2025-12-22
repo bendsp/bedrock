@@ -55,7 +55,7 @@ const fenceMatch = (text: string): LineKind | null => {
 };
 
 const horizontalRuleMatch = (text: string): LineKind | null => {
-  if (text.match(/^(?:-{3,}|\*{3,})$/)) {
+  if (text.match(/^(?:-{3,}|\*{3,}|_{3,})$/)) {
     return { type: "horizontalRule" };
   }
   return null;

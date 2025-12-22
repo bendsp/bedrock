@@ -103,11 +103,8 @@ export function EditorContextMenu({
           });
         }
       }
-
-      // Update active formats state for the context menu
-      updateActiveFormats();
     },
-    [getView, updateActiveFormats]
+    [getView]
   );
 
   const handleOpenChange = useCallback(

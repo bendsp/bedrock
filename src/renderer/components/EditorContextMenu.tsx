@@ -1,8 +1,9 @@
-import { cloneElement, useCallback, useMemo } from "react";
+import { cloneElement, useCallback, useMemo, useState } from "react";
 import type { HTMLAttributes, ReactElement, MouseEvent } from "react";
 import { EditorView } from "@codemirror/view";
 import {
   ContextMenu,
+  ContextMenuCheckboxItem,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
@@ -19,6 +20,7 @@ import type {
 } from "../commands/commandSystem";
 import { resolveCommandShortcutLabel } from "../commands/commandSystem";
 import type { UserSettings } from "../settings";
+import { getActiveFormats } from "../lib/getActiveFormats";
 
 export type EditorContextMenuProps = {
   getView: () => EditorView | null;
@@ -37,6 +39,18 @@ export function EditorContextMenu({
   settings,
   children,
 }: EditorContextMenuProps) {
+  const [activeFormats, setActiveFormats] = useState<{
+    bold: boolean;
+    italic: boolean;
+    strikethrough: boolean;
+    inlineCode: boolean;
+  }>({
+    bold: false,
+    italic: false,
+    strikethrough: false,
+    inlineCode: false,
+  });
+
   const shortcuts = useMemo(() => {
     const get = (id: CommandId) =>
       resolveCommandShortcutLabel(commandRegistry, id, settings) ?? "";
@@ -63,6 +77,13 @@ export function EditorContextMenu({
     [commands, getView]
   );
 
+  const updateActiveFormats = useCallback(() => {
+    const view = getView();
+    if (!view) return;
+
+    setActiveFormats(getActiveFormats(view));
+  }, [getView]);
+
   const handleContextMenu = useCallback(
     (event: MouseEvent<HTMLElement>) => {
       const view = getView();
@@ -73,21 +94,26 @@ export function EditorContextMenu({
       // If there's already a selection, preserve it. Otherwise, move the cursor
       // to the right-click position so formatting targets the expected word.
       const sel = view.state.selection.main;
-      if (sel.from !== sel.to) {
-        return;
+      if (sel.from === sel.to) {
+        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+        if (pos != null) {
+          view.dispatch({
+            selection: { anchor: pos },
+            scrollIntoView: false,
+          });
+        }
       }
-
-      const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
-      if (pos == null) {
-        return;
-      }
-
-      view.dispatch({
-        selection: { anchor: pos },
-        scrollIntoView: false,
-      });
     },
     [getView]
+  );
+
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (open) {
+        updateActiveFormats();
+      }
+    },
+    [updateActiveFormats]
   );
 
   const child = cloneElement(children, {
@@ -98,36 +124,42 @@ export function EditorContextMenu({
   } as HTMLAttributes<HTMLElement>);
 
   return (
-    <ContextMenu>
+    <ContextMenu onOpenChange={handleOpenChange}>
       <ContextMenuTrigger asChild>{child}</ContextMenuTrigger>
       <ContextMenuContent className="w-52">
         <ContextMenuSub>
           <ContextMenuSubTrigger inset>Format</ContextMenuSubTrigger>
           <ContextMenuSubContent>
-            <ContextMenuItem inset onSelect={() => runCommand("format.bold")}>
+            <ContextMenuCheckboxItem
+              checked={activeFormats.bold}
+              onSelect={() => runCommand("format.bold")}
+            >
               Bold
               <ContextMenuShortcut>{shortcuts.bold}</ContextMenuShortcut>
-            </ContextMenuItem>
-            <ContextMenuItem inset onSelect={() => runCommand("format.italic")}>
+            </ContextMenuCheckboxItem>
+            <ContextMenuCheckboxItem
+              checked={activeFormats.italic}
+              onSelect={() => runCommand("format.italic")}
+            >
               Italic
               <ContextMenuShortcut>{shortcuts.italic}</ContextMenuShortcut>
-            </ContextMenuItem>
-            <ContextMenuItem
-              inset
+            </ContextMenuCheckboxItem>
+            <ContextMenuCheckboxItem
+              checked={activeFormats.strikethrough}
               onSelect={() => runCommand("format.strikethrough")}
             >
               Strikethrough
               <ContextMenuShortcut>
                 {shortcuts.strikethrough}
               </ContextMenuShortcut>
-            </ContextMenuItem>
-            <ContextMenuItem
-              inset
+            </ContextMenuCheckboxItem>
+            <ContextMenuCheckboxItem
+              checked={activeFormats.inlineCode}
               onSelect={() => runCommand("format.inlineCode")}
             >
               Inline code
               <ContextMenuShortcut>{shortcuts.inlineCode}</ContextMenuShortcut>
-            </ContextMenuItem>
+            </ContextMenuCheckboxItem>
           </ContextMenuSubContent>
         </ContextMenuSub>
 
@@ -137,6 +169,12 @@ export function EditorContextMenu({
             <ContextMenuItem inset onSelect={() => runCommand("insert.link")}>
               Link
               <ContextMenuShortcut>{shortcuts.link}</ContextMenuShortcut>
+            </ContextMenuItem>
+            <ContextMenuItem
+              inset
+              onSelect={() => runCommand("insert.horizontalRule")}
+            >
+              Horizontal rule
             </ContextMenuItem>
           </ContextMenuSubContent>
         </ContextMenuSub>

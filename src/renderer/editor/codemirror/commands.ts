@@ -1,4 +1,6 @@
 import { KeyBinding } from "@codemirror/view";
+import { syntaxTree } from "@codemirror/language";
+import type { SyntaxNode } from "@lezer/common";
 
 export const createSnippetCommand =
   (snippet: string, cursorOffset: number) =>
@@ -16,6 +18,10 @@ type WrapSelectionOptions = {
   before: string;
   after: string;
   /**
+   * Optional node name to check for toggling (e.g. "StrongEmphasis").
+   */
+  nodeName?: string;
+  /**
    * Inserted when there's no selection. Defaults to `${before}${after}`.
    */
   emptySnippet?: string;
@@ -26,6 +32,29 @@ type WrapSelectionOptions = {
   emptyCursorOffset?: number;
 };
 
+const findNodeInRange = (
+  view: import("@codemirror/view").EditorView,
+  from: number,
+  to: number,
+  nodeName: string
+): SyntaxNode | null => {
+  const tree = syntaxTree(view.state);
+  // Check a bit inside the range to avoid boundary issues,
+  // but also handle empty selections.
+  const pos = from === to ? from : from + 1;
+  let node = tree.resolveInner(pos, 1);
+  while (node) {
+    if (node.name === nodeName) {
+      // Check if this node encompasses our selection/word range
+      if (node.from <= from && node.to >= to) {
+        return node;
+      }
+    }
+    node = node.parent;
+  }
+  return null;
+};
+
 /**
  * Wraps the current selection with a prefix/suffix. If there's no selection,
  * inserts a snippet and places the cursor inside it.
@@ -34,11 +63,41 @@ export const createWrapSelectionCommand =
   ({
     before,
     after,
+    nodeName,
     emptySnippet = `${before}${after}`,
     emptyCursorOffset = before.length,
   }: WrapSelectionOptions) =>
   (view: import("@codemirror/view").EditorView): boolean => {
-    const { from, to } = view.state.selection.main;
+    let { from, to } = view.state.selection.main;
+
+    // Toggle logic if nodeName is provided
+    if (nodeName) {
+      const node = findNodeInRange(view, from, to, nodeName);
+      if (node) {
+        // Find the markers. We assume they are at the very start and end of the node.
+        // For standard markdown, this is usually true.
+        const content = view.state.doc.sliceString(node.from, node.to);
+        // We need to determine how many chars to remove from start and end.
+        // If it's StrongEmphasis, it's usually 2. If Emphasis, it's 1.
+        // We can use before.length and after.length as a guide.
+        const markerBeforeLen = before.length;
+        const markerAfterLen = after.length;
+
+        const newText = content.slice(
+          markerBeforeLen,
+          content.length - markerAfterLen
+        );
+        view.dispatch({
+          changes: { from: node.from, to: node.to, insert: newText },
+          selection: {
+            anchor: node.from,
+            head: node.from + newText.length,
+          },
+          scrollIntoView: true,
+        });
+        return true;
+      }
+    }
 
     if (from === to) {
       view.dispatch({
@@ -49,7 +108,19 @@ export const createWrapSelectionCommand =
       return true;
     }
 
-    const selectedText = view.state.doc.sliceString(from, to);
+    let selectedText = view.state.doc.sliceString(from, to);
+
+    // Trim whitespace from the selection so that markers "stick" to the text.
+    const trimmedStart = selectedText.length - selectedText.trimStart().length;
+    const trimmedEnd = selectedText.length - selectedText.trimEnd().length;
+
+    // Only apply trimming if there's actual text remaining
+    if (trimmedStart + trimmedEnd < selectedText.length) {
+      from += trimmedStart;
+      to -= trimmedEnd;
+      selectedText = selectedText.trim();
+    }
+
     const insert = `${before}${selectedText}${after}`;
 
     view.dispatch({
@@ -119,15 +190,62 @@ export const createWrapSelectionOrWordCommand =
   ({
     before,
     after,
+    nodeName,
     emptySnippet = `${before}${after}`,
     emptyCursorOffset = before.length,
     wrapWordWhenEmpty = true,
   }: WrapSelectionOrWordOptions) =>
   (view: import("@codemirror/view").EditorView): boolean => {
-    const { from, to } = view.state.selection.main;
+    let { from, to } = view.state.selection.main;
+
+    // Toggle logic if nodeName is provided
+    if (nodeName) {
+      // First check if the selection is already within the node
+      let node = findNodeInRange(view, from, to, nodeName);
+
+      // If no selection and we should wrap word, check if the word is already within the node
+      if (!node && from === to && wrapWordWhenEmpty) {
+        const wordRange = getWordRangeAt(view, from);
+        if (wordRange) {
+          node = findNodeInRange(view, wordRange.from, wordRange.to, nodeName);
+        }
+      }
+
+      if (node) {
+        const content = view.state.doc.sliceString(node.from, node.to);
+        const markerBeforeLen = before.length;
+        const markerAfterLen = after.length;
+        const newText = content.slice(
+          markerBeforeLen,
+          content.length - markerAfterLen
+        );
+        view.dispatch({
+          changes: { from: node.from, to: node.to, insert: newText },
+          selection: {
+            anchor: node.from,
+            head: node.from + newText.length,
+          },
+          scrollIntoView: true,
+        });
+        return true;
+      }
+    }
 
     if (from !== to) {
-      const selectedText = view.state.doc.sliceString(from, to);
+      let selectedText = view.state.doc.sliceString(from, to);
+
+      // Trim whitespace from the selection so that markers "stick" to the text.
+      const trimmedStart =
+        selectedText.length - selectedText.trimStart().length;
+      const trimmedEnd = selectedText.length - selectedText.trimEnd().length;
+
+      // Only apply trimming if there's actual text remaining
+      if (trimmedStart + trimmedEnd < selectedText.length) {
+        from += trimmedStart;
+        to -= trimmedEnd;
+        selectedText = selectedText.trim();
+      }
+
       const insert = `${before}${selectedText}${after}`;
       view.dispatch({
         changes: { from, to, insert },
@@ -168,8 +286,8 @@ export const createWrapSelectionOrWordCommand =
 export const createMarkdownLinkCommand = (
   view: import("@codemirror/view").EditorView
 ): boolean => {
-  const { from, to } = view.state.selection.main;
-  const urlPlaceholder = "url";
+  let { from, to } = view.state.selection.main;
+  const urlPlaceholder = "https://";
 
   if (from === to) {
     const snippet = `[](${urlPlaceholder})`;
@@ -181,15 +299,79 @@ export const createMarkdownLinkCommand = (
     return true;
   }
 
-  const selectedText = view.state.doc.sliceString(from, to);
+  let selectedText = view.state.doc.sliceString(from, to);
+
+  // Trim whitespace from the selection so that markers "stick" to the text.
+  const trimmedStart = selectedText.length - selectedText.trimStart().length;
+  const trimmedEnd = selectedText.length - selectedText.trimEnd().length;
+
+  // Only apply trimming if there's actual text remaining
+  if (trimmedStart + trimmedEnd < selectedText.length) {
+    from += trimmedStart;
+    to -= trimmedEnd;
+    selectedText = selectedText.trim();
+  }
+
   const insert = `[${selectedText}](${urlPlaceholder})`;
   const urlStart = from + 1 + selectedText.length + 2; // "[" + text + "]("
 
   view.dispatch({
     changes: { from, to, insert },
-    selection: { anchor: urlStart, head: urlStart + urlPlaceholder.length },
+    selection: { anchor: urlStart + urlPlaceholder.length },
     scrollIntoView: true,
   });
+  return true;
+};
+
+export const insertHorizontalRuleCommand = (
+  view: import("@codemirror/view").EditorView
+): boolean => {
+  const { from } = view.state.selection.main;
+  const line = view.state.doc.lineAt(from);
+  const isLastLine = line.number === view.state.doc.lines;
+
+  let insert = "";
+  let fromPos = 0;
+  let toPos = 0;
+
+  // If we're on an empty line, check if the previous line is also blank.
+  if (line.text.trim() === "") {
+    const isFirstLine = line.number === 1;
+    const prevLineBlank =
+      isFirstLine || view.state.doc.line(line.number - 1).text.trim() === "";
+
+    fromPos = line.from;
+    toPos = line.to;
+
+    if (prevLineBlank) {
+      insert = "---";
+    } else {
+      // Need a blank line before
+      insert = "\n---";
+    }
+  } else {
+    // Insert on a new line after the current line, ensuring a blank line before the rule
+    fromPos = line.to;
+    toPos = line.to;
+    insert = "\n\n---";
+  }
+
+  // If it's the last line, we MUST add a newline to move the cursor to a new line after the rule
+  if (isLastLine) {
+    insert += "\n";
+  }
+
+  // The anchor should be at the start of the next line.
+  // If we added a newline (isLastLine), it's at the end of the insertion.
+  // If we didn't (not last line), we move past the existing newline.
+  const anchor = fromPos + insert.length + (isLastLine ? 0 : 1);
+
+  view.dispatch({
+    changes: { from: fromPos, to: toPos, insert },
+    selection: { anchor },
+    scrollIntoView: true,
+  });
+
   return true;
 };
 

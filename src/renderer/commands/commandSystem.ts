@@ -1,5 +1,5 @@
 import { undo, redo } from "@codemirror/commands";
-import { openSearchPanel } from "@codemirror/search";
+import { openSearchPanel, closeSearchPanel } from "@codemirror/search";
 import type { EditorView, KeyBinding } from "@codemirror/view";
 import {
   createMarkdownLinkCommand,
@@ -305,7 +305,14 @@ export const createCommandRegistry = (): CommandRegistry => {
       run: (ctx) => {
         const view = ctx.getEditorView();
         if (!view) return false;
-        openSearchPanel(view);
+
+        // Toggle logic: if the search panel is already visible in this view, close it.
+        const isPanelVisible = view.dom.querySelector(".cm-search-panel-container");
+        if (isPanelVisible) {
+          closeSearchPanel(view);
+        } else {
+          openSearchPanel(view);
+        }
         return true;
       },
     },

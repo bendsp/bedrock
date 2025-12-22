@@ -10,9 +10,9 @@ import type { SyntaxNode } from "@lezer/common";
 
 class HRWidget extends WidgetType {
   toDOM() {
-    const hr = document.createElement("hr");
-    hr.className = "cm-md-hr-widget";
-    return hr;
+    const span = document.createElement("span");
+    span.className = "cm-md-hr-widget";
+    return span;
   }
 
   ignoreEvent() {

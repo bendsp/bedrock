@@ -323,6 +323,31 @@ export const createMarkdownLinkCommand = (
   return true;
 };
 
+export const insertHorizontalRuleCommand = (
+  view: import("@codemirror/view").EditorView
+): boolean => {
+  const { from, to } = view.state.selection.main;
+  const line = view.state.doc.lineAt(from);
+
+  // If we're on an empty line, just insert it.
+  // Otherwise, insert it on a new line.
+  if (line.text.trim() === "") {
+    view.dispatch({
+      changes: { from: line.from, to: line.to, insert: "---" },
+      selection: { anchor: line.from + 3 },
+      scrollIntoView: true,
+    });
+  } else {
+    // Insert on a new line after the current line
+    view.dispatch({
+      changes: { from: line.to, insert: "\n---\n" },
+      selection: { anchor: line.to + 5 }, // \n + --- + \n
+      scrollIntoView: true,
+    });
+  }
+  return true;
+};
+
 export const snippetKeyBinding = (
   key: string,
   snippet: string,

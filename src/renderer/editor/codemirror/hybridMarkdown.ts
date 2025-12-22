@@ -1,7 +1,24 @@
 import { Extension, RangeSetBuilder } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
-import { Decoration, DecorationSet, ViewPlugin } from "@codemirror/view";
+import {
+  Decoration,
+  DecorationSet,
+  ViewPlugin,
+  WidgetType,
+} from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
+
+class HRWidget extends WidgetType {
+  toDOM() {
+    const hr = document.createElement("hr");
+    hr.className = "cm-md-hr-widget";
+    return hr;
+  }
+
+  ignoreEvent() {
+    return true;
+  }
+}
 
 type LineKind =
   | { type: "heading"; level: number; markerEnd: number }
@@ -9,6 +26,7 @@ type LineKind =
   | { type: "list"; markerEnd: number }
   | { type: "fenceDelimiter"; markerEnd: number }
   | { type: "fenceContent" }
+  | { type: "horizontalRule" }
   | { type: "paragraph" };
 
 const headingMatch = (text: string): LineKind | null => {
@@ -34,6 +52,13 @@ const fenceMatch = (text: string): LineKind | null => {
   const match = text.match(/^```/);
   if (!match) return null;
   return { type: "fenceDelimiter", markerEnd: match[0].length };
+};
+
+const horizontalRuleMatch = (text: string): LineKind | null => {
+  if (text.match(/^(?:---|\*\*\*)$/)) {
+    return { type: "horizontalRule" };
+  }
+  return null;
 };
 
 const classifyLines = (lines: string[]): LineKind[] => {
@@ -73,6 +98,12 @@ const classifyLines = (lines: string[]): LineKind[] => {
     const quote = blockquoteMatch(line);
     if (quote) {
       kinds.push(quote);
+      continue;
+    }
+
+    const hr = horizontalRuleMatch(line);
+    if (hr) {
+      kinds.push(hr);
       continue;
     }
 
@@ -211,6 +242,22 @@ export const hybridMarkdown = (): Extension => {
             }
             case "fenceContent": {
               addLineClass(lineNo, "cm-md-code-block");
+              break;
+            }
+            case "horizontalRule": {
+              const line = doc.line(lineNo);
+              if (!selectionTouches(line.from, line.to)) {
+                pushDeco(
+                  line.from,
+                  line.to,
+                  Decoration.replace({
+                    widget: new HRWidget(),
+                    inclusive: false,
+                  })
+                );
+              } else {
+                addLineClass(lineNo, "cm-md-hr-active");
+              }
               break;
             }
             default:

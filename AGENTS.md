@@ -107,3 +107,4 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
 - 2025-12-13: Refactored scaling to be custom again (separate from Electron zoom) and added a shadcn Slider-based UI scale control (63%–173%).
 - 2025-12-19: Removed legacy textarea/model editor stack and deprecated markdown-it/DOMPurify preview pipeline in favor of CodeMirror-first hybrid Markdown decorations.
 - 2025-12-20: Fixed double-triggering of global shortcuts (Open/Save/Settings) by respecting `event.defaultPrevented` in the global keydown listener.
+- 2025-12-21: Added support for Markdown horizontal rules (--- and \*\*\*) with hybrid decorations and context menu insert command.

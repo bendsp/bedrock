@@ -398,6 +398,19 @@ body {
   color: var(--code-text, #e6edf3);
 }
 
+.cm-md-hr-widget {
+  border: none;
+  border-top: 1px solid var(--blockquote-border, #3f4755);
+  margin-top: 0.2em;
+  margin-bottom: 0.7em;
+  pointer-events: none;
+}
+
+.cm-line.cm-md-hr-active {
+  color: var(--muted-text);
+  background: color-mix(in srgb, var(--ui-primary) 5%, transparent);
+}
+
 .cm-content .cm-md-inline-code {
   background: var(--code-inline-bg, #2c313a);
   padding: 0.15em 0.35em;

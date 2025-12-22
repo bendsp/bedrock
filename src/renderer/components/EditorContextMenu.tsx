@@ -215,6 +215,12 @@ export function EditorContextMenu({
               Link
               <ContextMenuShortcut>{shortcuts.link}</ContextMenuShortcut>
             </ContextMenuItem>
+            <ContextMenuItem
+              inset
+              onSelect={() => runCommand("insert.horizontalRule")}
+            >
+              Horizontal rule
+            </ContextMenuItem>
           </ContextMenuSubContent>
         </ContextMenuSub>
         <ContextMenuSeparator></ContextMenuSeparator>

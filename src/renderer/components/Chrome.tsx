@@ -3,6 +3,7 @@ import {
   FolderOpen,
   Save,
   SaveAll,
+  Search,
   Settings as SettingsIcon,
 } from "lucide-react";
 
@@ -19,6 +20,7 @@ export type ChromeProps = {
   onOpen: () => void;
   onSave: () => void;
   onSaveAs: () => void;
+  onSearch: () => void;
   onOpenSettings: () => void;
   children: React.ReactNode;
 };
@@ -28,6 +30,7 @@ export function Chrome({
   onOpen,
   onSave,
   onSaveAs,
+  onSearch,
   onOpenSettings,
   children,
 }: ChromeProps) {
@@ -103,6 +106,24 @@ export function Chrome({
                 </TooltipTrigger>
                 <TooltipContent side="right">
                   <p>Save as</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    aria-label="Search"
+                    onClick={onSearch}
+                  >
+                    <Search className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p>Search</p>
                 </TooltipContent>
               </Tooltip>
               <div className="flex-1" />

@@ -10,6 +10,7 @@ import { WebpackPlugin } from "@electron-forge/plugin-webpack";
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
 import * as dotenv from "dotenv";
+import { notarize } from "@electron/notarize";
 
 // Only load .env if we're not in CI to avoid conflicting with GitHub Secrets
 if (!process.env.GITHUB_ACTIONS) {
@@ -35,8 +36,8 @@ function getOsxNotarizeConfig() {
       "Forge: Configuring notarization via App Store Connect API Key"
     );
 
-    // CRITICAL: @electron/notarize will pick up APPLE_ID/APPLE_PASSWORD 
-    // or keychain profiles from the environment if they are set, 
+    // CRITICAL: @electron/notarize will pick up APPLE_ID/APPLE_PASSWORD
+    // or keychain profiles from the environment if they are set,
     // leading to a conflict error. We explicitly clear them here.
     delete process.env.APPLE_ID;
     delete process.env.APPLE_ID_PASSWORD;
@@ -49,7 +50,6 @@ function getOsxNotarizeConfig() {
       appleApiKey: APPLE_API_KEY,
       appleApiKeyId: APPLE_API_KEY_ID,
       appleApiIssuer: APPLE_API_ISSUER_ID,
-      teamId: APPLE_TEAM_ID,
     };
   }
 
@@ -95,6 +95,13 @@ const config: ForgeConfig = {
       {
         name: "Bedrock",
         icon: "./src/assets/icon.icns",
+        additionalDMGOptions: process.env.APPLE_IDENTITY
+          ? {
+              "code-sign": {
+                "signing-identity": process.env.APPLE_IDENTITY,
+              },
+            }
+          : undefined,
       },
       ["darwin"]
     ),
@@ -112,6 +119,32 @@ const config: ForgeConfig = {
       draft: true,
     }),
   ],
+  hooks: {
+    postMake: async (config, makeResults) => {
+      const notarizeConfig = getOsxNotarizeConfig();
+      if (process.platform !== "darwin" || !notarizeConfig) {
+        return makeResults;
+      }
+
+      for (const makeResult of makeResults) {
+        for (const artifact of makeResult.artifacts) {
+          if (artifact.endsWith(".dmg")) {
+            console.log(`Forge: Notarizing DMG artifact: ${artifact}`);
+            await notarize({
+              ...notarizeConfig,
+              appPath: artifact,
+            });
+            console.log(`Forge: Stapling DMG artifact: ${artifact}`);
+            const {
+              spawn,
+            } = require("./node_modules/@electron/notarize/lib/spawn");
+            await spawn("xcrun", ["stapler", "staple", artifact]);
+          }
+        }
+      }
+      return makeResults;
+    },
+  },
   plugins: [
     new AutoUnpackNativesPlugin({}),
     new WebpackPlugin({

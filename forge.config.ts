@@ -10,22 +10,80 @@ import { WebpackPlugin } from "@electron-forge/plugin-webpack";
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
 import * as dotenv from "dotenv";
+import { notarize } from "@electron/notarize";
 
-dotenv.config({ override: true });
+// Only load .env if we're not in CI to avoid conflicting with GitHub Secrets
+if (!process.env.GITHUB_ACTIONS) {
+  dotenv.config({ override: true });
+}
 
 import { mainConfig } from "./webpack.main.config";
 import { rendererConfig } from "./webpack.renderer.config";
+
+function getOsxNotarizeConfig() {
+  const {
+    APPLE_API_KEY,
+    APPLE_API_KEY_ID,
+    APPLE_API_ISSUER_ID,
+    APPLE_TEAM_ID,
+    APPLE_ID,
+    APPLE_PASSWORD,
+  } = process.env;
+
+  // Preferred for CI: App Store Connect API key (.p8) + notarytool
+  if (APPLE_API_KEY && APPLE_API_KEY_ID && APPLE_API_ISSUER_ID) {
+    console.log(
+      "Forge: Configuring notarization via App Store Connect API Key"
+    );
+
+    // CRITICAL: @electron/notarize will pick up APPLE_ID/APPLE_PASSWORD
+    // or keychain profiles from the environment if they are set,
+    // leading to a conflict error. We explicitly clear them here.
+    delete process.env.APPLE_ID;
+    delete process.env.APPLE_ID_PASSWORD;
+    delete process.env.APPLE_PASSWORD;
+    delete process.env.APPLE_NOTARYTOOL_KEYCHAIN_PROFILE;
+    delete process.env.APPLE_NOTARYTOOL_KEYCHAIN;
+
+    return {
+      tool: "notarytool" as const,
+      appleApiKey: APPLE_API_KEY,
+      appleApiKeyId: APPLE_API_KEY_ID,
+      appleApiIssuer: APPLE_API_ISSUER_ID,
+    };
+  }
+
+  // Local fallback: Apple ID + app-specific password
+  if (APPLE_ID && APPLE_PASSWORD) {
+    console.log("Forge: Configuring notarization via Apple ID / Password");
+
+    // Clear API Key variables to prevent conflict
+    delete process.env.APPLE_API_KEY;
+    delete process.env.APPLE_API_KEY_ID;
+    delete process.env.APPLE_API_ISSUER;
+
+    return {
+      tool: "notarytool" as const,
+      appleId: APPLE_ID,
+      appleIdPassword: APPLE_PASSWORD,
+      teamId: APPLE_TEAM_ID,
+    };
+  }
+
+  console.log(
+    "Forge: Notarization credentials not found, skipping notarization step"
+  );
+  return undefined;
+}
 
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     icon: "./src/assets/icon",
-    osxSign: {},
-    osxNotarize: {
-      appleId: process.env.APPLE_ID,
-      appleIdPassword: process.env.APPLE_PASSWORD,
-      teamId: process.env.APPLE_TEAM_ID,
-    },
+    osxSign: process.env.APPLE_IDENTITY
+      ? { identity: process.env.APPLE_IDENTITY }
+      : {},
+    osxNotarize: getOsxNotarizeConfig(),
   },
   rebuildConfig: {},
   makers: [
@@ -37,6 +95,13 @@ const config: ForgeConfig = {
       {
         name: "Bedrock",
         icon: "./src/assets/icon.icns",
+        additionalDMGOptions: process.env.APPLE_IDENTITY
+          ? {
+              "code-sign": {
+                "signing-identity": process.env.APPLE_IDENTITY,
+              },
+            }
+          : undefined,
       },
       ["darwin"]
     ),
@@ -54,6 +119,32 @@ const config: ForgeConfig = {
       draft: true,
     }),
   ],
+  hooks: {
+    postMake: async (config, makeResults) => {
+      const notarizeConfig = getOsxNotarizeConfig();
+      if (process.platform !== "darwin" || !notarizeConfig) {
+        return makeResults;
+      }
+
+      for (const makeResult of makeResults) {
+        for (const artifact of makeResult.artifacts) {
+          if (artifact.endsWith(".dmg")) {
+            console.log(`Forge: Notarizing DMG artifact: ${artifact}`);
+            await notarize({
+              ...notarizeConfig,
+              appPath: artifact,
+            });
+            console.log(`Forge: Stapling DMG artifact: ${artifact}`);
+            const {
+              spawn,
+            } = require("./node_modules/@electron/notarize/lib/spawn");
+            await spawn("xcrun", ["stapler", "staple", artifact]);
+          }
+        }
+      }
+      return makeResults;
+    },
+  },
   plugins: [
     new AutoUnpackNativesPlugin({}),
     new WebpackPlugin({

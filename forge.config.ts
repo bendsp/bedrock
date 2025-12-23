@@ -25,9 +25,11 @@ function getOsxNotarizeConfig() {
     APPLE_API_KEY_ID,
     APPLE_API_ISSUER_ID,
     APPLE_TEAM_ID,
+    APPLE_ID,
+    APPLE_PASSWORD,
   } = process.env;
 
-  // Modern path: App Store Connect API key (.p8) + notarytool
+  // Preferred for CI: App Store Connect API key (.p8) + notarytool
   if (APPLE_API_KEY && APPLE_API_KEY_ID && APPLE_API_ISSUER_ID) {
     console.log(
       "Forge: Configuring notarization via App Store Connect API Key"
@@ -37,6 +39,17 @@ function getOsxNotarizeConfig() {
       appleApiKey: APPLE_API_KEY,
       appleApiKeyId: APPLE_API_KEY_ID,
       appleApiIssuer: APPLE_API_ISSUER_ID,
+      teamId: APPLE_TEAM_ID,
+    };
+  }
+
+  // Local fallback: Apple ID + app-specific password
+  if (APPLE_ID && APPLE_PASSWORD) {
+    console.log("Forge: Configuring notarization via Apple ID / Password");
+    return {
+      tool: "notarytool" as const,
+      appleId: APPLE_ID,
+      appleIdPassword: APPLE_PASSWORD,
       teamId: APPLE_TEAM_ID,
     };
   }

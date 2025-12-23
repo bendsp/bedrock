@@ -121,12 +121,6 @@ jobs:
         env:
           APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
 
-      - name: Env Diagnostics
-        shell: bash
-        run: |
-          echo "Checking for potentially conflicting env vars (names only):"
-          env | grep -E "^(APPLE|MACOS)" | cut -d= -f1 | sort
-
       - name: Build macOS app (signed + notarized)
         run: npm run make:mac
         env:

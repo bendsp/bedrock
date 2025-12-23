@@ -373,6 +373,10 @@ body {
   transform: translateY(-50%);
 }
 
+.cm-line.cm-md-list-accent::before {
+  background: var(--ui-primary);
+}
+
 .cm-line.cm-md-quote {
   position: relative;
   padding-left: 1.1em;
@@ -424,6 +428,10 @@ body {
 
 .cm-content .cm-md-strong {
   font-weight: 700;
+}
+
+.cm-content .cm-md-strong-accent {
+  color: var(--ui-primary);
 }
 
 .cm-content .cm-md-em {

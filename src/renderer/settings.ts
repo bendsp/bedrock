@@ -26,6 +26,10 @@ export type UserSettings = {
   systemLightTheme: ThemeName;
   systemDarkTheme: ThemeName;
   renderMode: RenderMode;
+  markdown: {
+    boldEmphasis: boolean;
+    bulletEmphasis: boolean;
+  };
 };
 
 const STORAGE_KEY = "bedrock:settings";
@@ -54,6 +58,10 @@ export const defaultSettings: UserSettings = {
   systemLightTheme: "light",
   systemDarkTheme: "dark",
   renderMode: "hybrid",
+  markdown: {
+    boldEmphasis: false,
+    bulletEmphasis: false,
+  },
 };
 
 const normalizeKeyBindings = (
@@ -164,6 +172,18 @@ export const loadSettings = (): UserSettings => {
       parsed.renderMode === "raw" || parsed.renderMode === "hybrid"
         ? parsed.renderMode
         : defaultSettings.renderMode;
+
+    const markdown = {
+      boldEmphasis:
+        typeof parsed.markdown?.boldEmphasis === "boolean"
+          ? parsed.markdown.boldEmphasis
+          : defaultSettings.markdown.boldEmphasis,
+      bulletEmphasis:
+        typeof parsed.markdown?.bulletEmphasis === "boolean"
+          ? parsed.markdown.bulletEmphasis
+          : defaultSettings.markdown.bulletEmphasis,
+    };
+
     return {
       textSize,
       uiScale,
@@ -173,6 +193,7 @@ export const loadSettings = (): UserSettings => {
       systemLightTheme,
       systemDarkTheme,
       renderMode,
+      markdown,
     };
   } catch {
     return defaultSettings;

@@ -59,6 +59,7 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
       renderMode,
       theme,
       textSize,
+      markdownSettings: settings.markdown,
       keyBindings,
       placeholder,
       onDocChange: onChange,
@@ -107,10 +108,10 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
     }
     view.dispatch({
       effects: bundle.compartments.renderMode.reconfigure(
-        renderModeExtension(renderMode)
+        renderModeExtension(renderMode, settings.markdown)
       ),
     });
-  }, [renderMode]);
+  }, [renderMode, settings.markdown]);
 
   useEffect(() => {
     const view = viewRef.current;

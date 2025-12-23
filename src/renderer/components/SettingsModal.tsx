@@ -45,6 +45,7 @@ import {
   RotateCcw,
   Type,
   Wrench,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 
@@ -68,6 +69,7 @@ type SettingsModalProps = {
 type SettingsCategory =
   | "editor"
   | "appearance"
+  | "markdown"
   | "keybindings"
   | "developer"
   | "about";
@@ -265,6 +267,7 @@ const SettingsModal = ({
     }> = [
       { id: "editor", label: "Editor", icon: Type },
       { id: "appearance", label: "Appearance", icon: Palette },
+      { id: "markdown", label: "Markdown", icon: FileText },
       { id: "keybindings", label: "Keybindings", icon: Keyboard },
       { id: "developer", label: "Developer", icon: Wrench },
       { id: "about", label: "About", icon: Info },
@@ -576,6 +579,62 @@ const SettingsModal = ({
                         </Item>
                       </>
                     )}
+                  </ItemGroup>
+                ) : null}
+
+                {activeCategory === "markdown" ? (
+                  <ItemGroup className="rounded-md border border-border bg-background">
+                    <Item
+                      size="sm"
+                      className="rounded-none first:rounded-t-md last:rounded-b-md"
+                    >
+                      <ItemContent>
+                        <ItemTitle>Bold color emphasis</ItemTitle>
+                        <ItemDescription>
+                          Use the theme's accent color for bold text.
+                        </ItemDescription>
+                      </ItemContent>
+                      <ItemActions className="ml-auto">
+                        <Switch
+                          checked={settings.markdown.boldEmphasis}
+                          onCheckedChange={(checked) =>
+                            onChange({
+                              ...settings,
+                              markdown: {
+                                ...settings.markdown,
+                                boldEmphasis: checked,
+                              },
+                            })
+                          }
+                        />
+                      </ItemActions>
+                    </Item>
+                    <ItemSeparator />
+                    <Item
+                      size="sm"
+                      className="rounded-none first:rounded-t-md last:rounded-b-md"
+                    >
+                      <ItemContent>
+                        <ItemTitle>Bullet point color emphasis</ItemTitle>
+                        <ItemDescription>
+                          Use the theme's accent color for bullet point dots.
+                        </ItemDescription>
+                      </ItemContent>
+                      <ItemActions className="ml-auto">
+                        <Switch
+                          checked={settings.markdown.bulletEmphasis}
+                          onCheckedChange={(checked) =>
+                            onChange({
+                              ...settings,
+                              markdown: {
+                                ...settings.markdown,
+                                bulletEmphasis: checked,
+                              },
+                            })
+                          }
+                        />
+                      </ItemActions>
+                    </Item>
                   </ItemGroup>
                 ) : null}
 

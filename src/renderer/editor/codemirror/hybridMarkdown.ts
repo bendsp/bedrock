@@ -135,7 +135,10 @@ const quoteRunFor = (kinds: LineKind[], start: number): [number, number] => {
   return [start, end];
 };
 
-export const hybridMarkdown = (): Extension => {
+export const hybridMarkdown = (settings: {
+  boldEmphasis: boolean;
+  bulletEmphasis: boolean;
+}): Extension => {
   return ViewPlugin.fromClass(
     class {
       decorations: DecorationSet;
@@ -219,7 +222,10 @@ export const hybridMarkdown = (): Extension => {
             case "list": {
               const [start, end] = listRunFor(kinds, i);
               for (let ln = start + 1; ln <= end + 1; ln += 1) {
-                addLineClass(ln, "cm-md-list");
+                const listCls = settings.bulletEmphasis
+                  ? "cm-md-list cm-md-list-accent"
+                  : "cm-md-list";
+                addLineClass(ln, listCls);
                 const text = lines[ln - 1] ?? "";
                 const marker = listMatch(text);
                 if (marker && "markerEnd" in marker) {
@@ -353,7 +359,10 @@ export const hybridMarkdown = (): Extension => {
               switch (node.name) {
                 case "StrongEmphasis": {
                   const container = findOutermostStylingContainer(node.node);
-                  addInlineMark(container.from, container.to, "cm-md-strong");
+                  const strongCls = settings.boldEmphasis
+                    ? "cm-md-strong cm-md-strong-accent"
+                    : "cm-md-strong";
+                  addInlineMark(container.from, container.to, strongCls);
                   break;
                 }
                 case "Emphasis": {

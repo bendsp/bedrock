@@ -21,6 +21,10 @@ type ExtensionOptions = {
   renderMode: RenderMode;
   theme: ThemeName;
   textSize: number;
+  markdownSettings: {
+    boldEmphasis: boolean;
+    bulletEmphasis: boolean;
+  };
   keyBindings: import("@codemirror/view").KeyBinding[];
   placeholder?: string;
   onDocChange: (doc: string) => void;
@@ -39,9 +43,12 @@ export type ExtensionBundle = {
 export const buildBaseKeymap =
   (): import("@codemirror/view").KeyBinding[] => [...searchKeymap];
 
-export const renderModeExtension = (mode: RenderMode): Extension => {
+export const renderModeExtension = (
+  mode: RenderMode,
+  markdownSettings: { boldEmphasis: boolean; bulletEmphasis: boolean }
+): Extension => {
   if (mode === "hybrid") {
-    return hybridMarkdown();
+    return hybridMarkdown(markdownSettings);
   }
   return [];
 };
@@ -87,7 +94,9 @@ export const createCmExtensions = (
     linkClickHandler,
     keymapCompartment.of(keymapExtension(options.keyBindings, baseKeys)),
     themeCompartment.of(buildThemeExtension(options.theme, options.textSize)),
-    renderModeCompartment.of(renderModeExtension(options.renderMode)),
+    renderModeCompartment.of(
+      renderModeExtension(options.renderMode, options.markdownSettings)
+    ),
   ];
 
   if (options.placeholder) {

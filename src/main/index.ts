@@ -83,9 +83,18 @@ ipcMain.handle(
   "file:read",
   async (_event, filePath: string): Promise<OpenFileResult | null> => {
     try {
+      // Basic security check: only allow reading .md files.
+      if (!filePath.toLowerCase().endsWith(".md")) {
+        console.error(`Rejected attempt to read non-markdown file: ${filePath}`);
+        return null;
+      }
+
       const content = await fs.readFile(filePath, "utf-8");
       return { filePath, content };
-    } catch {
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "An unknown error occurred.";
+      console.error(`Unable to read file "${filePath}": ${message}`);
       return null;
     }
   }

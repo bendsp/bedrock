@@ -92,6 +92,7 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
 - `src/renderer/components/SearchPanel.tsx`: Shadcn-based search UI.
 - `src/renderer/editor/codemirror/*`: CodeMirror commands/extensions/theme/search.
 - `src/renderer/settings.ts`: persisted user settings.
+- `src/renderer/lib/export.ts`: markdown-it HTML conversion utilities.
 - `src/shared/types.ts`: shared IPC types + editor mode/cursor types.
 
 ---

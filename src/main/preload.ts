@@ -27,4 +27,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
   exportFile: (payload: ExportFilePayload): Promise<boolean> =>
     ipcRenderer.invoke("file:export", payload),
+  readFile: (filePath: string): Promise<OpenFileResult | null> =>
+    ipcRenderer.invoke("file:read", filePath),
 });

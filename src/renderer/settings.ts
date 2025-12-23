@@ -2,6 +2,7 @@ import { ThemeName, isThemeName } from "./theme";
 import { RenderMode } from "../shared/types";
 
 export type KeyBindingAction =
+  | "new"
   | "open"
   | "save"
   | "saveAs"
@@ -26,11 +27,14 @@ export type UserSettings = {
   systemLightTheme: ThemeName;
   systemDarkTheme: ThemeName;
   renderMode: RenderMode;
+  openLastFileOnStartup: boolean;
+  lastOpenedFilePath: string | null;
 };
 
 const STORAGE_KEY = "bedrock:settings";
 
 export const defaultKeyBindings: KeyBindings = {
+  new: "mod+n",
   open: "mod+o",
   save: "mod+s",
   saveAs: "mod+shift+s",
@@ -54,12 +58,18 @@ export const defaultSettings: UserSettings = {
   systemLightTheme: "light",
   systemDarkTheme: "dark",
   renderMode: "hybrid",
+  openLastFileOnStartup: true,
+  lastOpenedFilePath: null,
 };
 
 const normalizeKeyBindings = (
   stored: Partial<KeyBindings> | undefined
 ): KeyBindings => {
   return {
+    new:
+      stored?.new && typeof stored.new === "string"
+        ? stored.new
+        : defaultKeyBindings.new,
     open:
       stored?.open && typeof stored.open === "string"
         ? stored.open
@@ -164,6 +174,16 @@ export const loadSettings = (): UserSettings => {
       parsed.renderMode === "raw" || parsed.renderMode === "hybrid"
         ? parsed.renderMode
         : defaultSettings.renderMode;
+    const openLastFileOnStartup =
+      typeof parsed.openLastFileOnStartup === "boolean"
+        ? parsed.openLastFileOnStartup
+        : defaultSettings.openLastFileOnStartup;
+    const lastOpenedFilePath =
+      typeof parsed.lastOpenedFilePath === "string" ||
+      parsed.lastOpenedFilePath === null
+        ? parsed.lastOpenedFilePath
+        : defaultSettings.lastOpenedFilePath;
+
     return {
       textSize,
       uiScale,
@@ -173,6 +193,8 @@ export const loadSettings = (): UserSettings => {
       systemLightTheme,
       systemDarkTheme,
       renderMode,
+      openLastFileOnStartup,
+      lastOpenedFilePath,
     };
   } catch {
     return defaultSettings;

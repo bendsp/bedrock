@@ -443,6 +443,30 @@ const SettingsModal = ({
                         </div>
                       </ItemActions>
                     </Item>
+                    <ItemSeparator />
+                    <Item
+                      size="sm"
+                      className="rounded-none first:rounded-t-md last:rounded-b-md"
+                    >
+                      <ItemContent>
+                        <ItemTitle>Open last file on startup</ItemTitle>
+                        <ItemDescription>
+                          Automatically open the last used file when Bedrock
+                          starts.
+                        </ItemDescription>
+                      </ItemContent>
+                      <ItemActions className="ml-auto">
+                        <Switch
+                          checked={settings.openLastFileOnStartup}
+                          onCheckedChange={(checked) =>
+                            onChange({
+                              ...settings,
+                              openLastFileOnStartup: checked,
+                            })
+                          }
+                        />
+                      </ItemActions>
+                    </Item>
                   </ItemGroup>
                 ) : null}
 
@@ -583,6 +607,7 @@ const SettingsModal = ({
                   <ItemGroup className="rounded-md border border-border bg-background">
                     {(
                       [
+                        "new",
                         "open",
                         "save",
                         "saveAs",
@@ -608,7 +633,9 @@ const SettingsModal = ({
                             <ItemContent>
                               <ItemTitle>{keyBindingLabels[action]}</ItemTitle>
                               <ItemDescription>
-                                {action === "open"
+                                {action === "new"
+                                  ? "Create a new markdown file."
+                                  : action === "open"
                                   ? "Open a markdown file."
                                   : action === "save"
                                   ? "Save the current file."

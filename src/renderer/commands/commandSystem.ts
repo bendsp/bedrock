@@ -16,6 +16,7 @@ import type { KeyBindingAction, UserSettings } from "../settings";
 import type { ThemeName } from "../theme";
 
 export type CommandId =
+  | "file.new"
   | "file.open"
   | "file.save"
   | "file.saveAs"
@@ -34,6 +35,7 @@ export type CommandId =
   | "file.exportPdf";
 
 export type CommandArgs = {
+  "file.new": void;
   "file.open": void;
   "file.save": void;
   "file.saveAs": void;
@@ -101,6 +103,7 @@ export type CommandDefinition<ID extends CommandId = CommandId> = {
 
 export type CommandRunContext = {
   getEditorView: () => EditorView | null;
+  newFile: () => Promise<void>;
   openFile: () => Promise<void>;
   saveFile: () => Promise<void>;
   saveFileAs: () => Promise<void>;
@@ -163,6 +166,19 @@ const editorCommands = {
 
 export const createCommandRegistry = (): CommandRegistry => {
   const commands: CommandDefinition[] = [
+    {
+      id: "file.new",
+      title: "New",
+      category: "File",
+      description: "Create a new Markdown file.",
+      defaultBinding: "mod+n",
+      settingsKey: "new",
+      isGlobal: true,
+      run: async (ctx) => {
+        await ctx.newFile();
+        return true;
+      },
+    },
     {
       id: "file.open",
       title: "Open…",

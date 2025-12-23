@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import {
+  FilePlus,
   FolderOpen,
   Save,
   SaveAll,
@@ -26,6 +27,7 @@ import {
 
 export type ChromeProps = {
   title: string;
+  onNew: () => void;
   onOpen: () => void;
   onSave: () => void;
   onSaveAs: () => void;
@@ -38,6 +40,7 @@ export type ChromeProps = {
 
 export function Chrome({
   title,
+  onNew,
   onOpen,
   onSave,
   onSaveAs,
@@ -68,6 +71,24 @@ export function Chrome({
 
           <div className="flex-1 min-h-0 flex items-stretch gap-2">
             <aside className="w-8 shrink-0 bg-transparent text-sidebar-foreground flex flex-col items-center py-2 gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    aria-label="New"
+                    onClick={onNew}
+                  >
+                    <FilePlus className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p>New file</p>
+                </TooltipContent>
+              </Tooltip>
+
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button

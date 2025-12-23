@@ -2,6 +2,7 @@ import { ThemeName, isThemeName } from "./theme";
 import { RenderMode } from "../shared/types";
 
 export type KeyBindingAction =
+  | "new"
   | "open"
   | "save"
   | "saveAs"
@@ -33,6 +34,7 @@ export type UserSettings = {
 const STORAGE_KEY = "bedrock:settings";
 
 export const defaultKeyBindings: KeyBindings = {
+  new: "mod+n",
   open: "mod+o",
   save: "mod+s",
   saveAs: "mod+shift+s",
@@ -64,6 +66,10 @@ const normalizeKeyBindings = (
   stored: Partial<KeyBindings> | undefined
 ): KeyBindings => {
   return {
+    new:
+      stored?.new && typeof stored.new === "string"
+        ? stored.new
+        : defaultKeyBindings.new,
     open:
       stored?.open && typeof stored.open === "string"
         ? stored.open

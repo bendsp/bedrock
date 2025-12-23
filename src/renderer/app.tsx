@@ -198,6 +198,20 @@ const App = () => {
     focusEditor();
   }, [confirmDiscardIfNeeded, focusEditor]);
 
+  const handleNew = useCallback(async () => {
+    const proceed = await confirmDiscardIfNeeded("new");
+    if (!proceed) {
+      focusEditor();
+      return;
+    }
+
+    suppressDirtyRef.current = true;
+    setDoc("");
+    setFilePath(null);
+    setIsDirty(false);
+    focusEditor();
+  }, [confirmDiscardIfNeeded, focusEditor]);
+
   const handleSave = useCallback(async () => {
     const content = doc ?? "";
 
@@ -264,6 +278,7 @@ const App = () => {
   const commands = useMemo(() => {
     return createCommandRunner(commandRegistry, {
       getEditorView: () => editorViewRef.current,
+      newFile: handleNew,
       openFile: handleOpen,
       saveFile: handleSave,
       saveFileAs: handleSaveAs,
@@ -337,6 +352,7 @@ const App = () => {
     <>
       <Chrome
         title={displayLabel}
+        onNew={() => void commands.run("file.new")}
         onOpen={() => void commands.run("file.open")}
         onSave={() => void commands.run("file.save")}
         onSaveAs={() => void commands.run("file.saveAs")}

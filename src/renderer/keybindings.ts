@@ -164,6 +164,7 @@ export const bindingToCodeMirrorKey = (binding: string): string => {
 };
 
 export const keyBindingLabels: Record<KeyBindingAction, string> = {
+  new: "New file",
   open: "Open file",
   save: "Save file",
   saveAs: "Save as",
@@ -179,6 +180,7 @@ export const keyBindingLabels: Record<KeyBindingAction, string> = {
 };
 
 export const clampKeyBindings = (bindings: KeyBindings): KeyBindings => ({
+  new: normalizeBinding(bindings.new),
   open: normalizeBinding(bindings.open),
   save: normalizeBinding(bindings.save),
   saveAs: normalizeBinding(bindings.saveAs),

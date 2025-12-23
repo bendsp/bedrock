@@ -607,6 +607,7 @@ const SettingsModal = ({
                   <ItemGroup className="rounded-md border border-border bg-background">
                     {(
                       [
+                        "new",
                         "open",
                         "save",
                         "saveAs",
@@ -632,7 +633,9 @@ const SettingsModal = ({
                             <ItemContent>
                               <ItemTitle>{keyBindingLabels[action]}</ItemTitle>
                               <ItemDescription>
-                                {action === "open"
+                                {action === "new"
+                                  ? "Create a new markdown file."
+                                  : action === "open"
                                   ? "Open a markdown file."
                                   : action === "save"
                                   ? "Save the current file."

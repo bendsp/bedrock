@@ -249,7 +249,14 @@ const App = () => {
       },
       exportFile: async (format) => {
         const content = markdownToHtml(doc);
-        await window.electronAPI.exportFile({ content, format });
+        const defaultFileName = fileName.endsWith(".md")
+          ? fileName.slice(0, -3)
+          : fileName;
+        await window.electronAPI.exportFile({
+          content,
+          format,
+          defaultFileName,
+        });
       },
     });
   }, [

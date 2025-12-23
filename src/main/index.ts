@@ -161,18 +161,20 @@ ipcMain.handle(
   "file:export",
   async (event, args: ExportFilePayload): Promise<boolean> => {
     try {
-      const { content, format } = args;
+      const { content, format, defaultFileName } = args;
       const extension = format === "html" ? "html" : "pdf";
       const filters =
         format === "html"
           ? [{ name: "HTML Files", extensions: ["html"] }]
           : [{ name: "PDF Files", extensions: ["pdf"] }];
 
+      const baseName = defaultFileName || "Exported";
+
       const { canceled, filePath } = await dialog.showSaveDialog(
         BrowserWindow.fromWebContents(event.sender) ?? undefined,
         {
           filters,
-          defaultPath: `Exported.${extension}`,
+          defaultPath: `${baseName}.${extension}`,
         }
       );
 

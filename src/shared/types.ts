@@ -32,6 +32,7 @@ export type ExportFormat = "html" | "pdf";
 export interface ExportFilePayload {
   content: string;
   format: ExportFormat;
+  defaultFileName?: string;
 }
 
 export interface IElectronAPI {

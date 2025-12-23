@@ -95,6 +95,26 @@ const App = () => {
   useEffect(() => {
     const loaded = loadSettings();
     setSettings(loaded);
+
+    // Open last file on startup if enabled
+    if (loaded.openLastFileOnStartup && loaded.lastOpenedFilePath) {
+      const openLastFile = async () => {
+        try {
+          const result = await window.electronAPI.readFile(
+            loaded.lastOpenedFilePath!
+          );
+          if (result) {
+            suppressDirtyRef.current = true;
+            setDoc(result.content);
+            setFilePath(result.filePath);
+            setIsDirty(false);
+          }
+        } catch (error) {
+          console.error("Failed to open last file on startup:", error);
+        }
+      };
+      void openLastFile();
+    }
   }, []);
 
   useEffect(() => {
@@ -134,6 +154,15 @@ const App = () => {
   useEffect(() => {
     document.title = buildWindowTitle(fileName, isDirty);
   }, [fileName, isDirty]);
+
+  useEffect(() => {
+    if (filePath && filePath !== settings.lastOpenedFilePath) {
+      setSettings((prev) => ({
+        ...prev,
+        lastOpenedFilePath: filePath,
+      }));
+    }
+  }, [filePath, settings.lastOpenedFilePath]);
 
   const confirmDiscardIfNeeded = useCallback(
     async (action: "open" | "new"): Promise<boolean> => {

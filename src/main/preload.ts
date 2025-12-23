@@ -24,4 +24,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onFind: (callback: () => void): void => {
     ipcRenderer.on("editor:find", callback);
   },
+  readFile: (filePath: string): Promise<OpenFileResult | null> =>
+    ipcRenderer.invoke("file:read", filePath),
 });

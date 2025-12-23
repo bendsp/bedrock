@@ -26,6 +26,8 @@ export type UserSettings = {
   systemLightTheme: ThemeName;
   systemDarkTheme: ThemeName;
   renderMode: RenderMode;
+  openLastFileOnStartup: boolean;
+  lastOpenedFilePath: string | null;
 };
 
 const STORAGE_KEY = "bedrock:settings";
@@ -54,6 +56,8 @@ export const defaultSettings: UserSettings = {
   systemLightTheme: "light",
   systemDarkTheme: "dark",
   renderMode: "hybrid",
+  openLastFileOnStartup: true,
+  lastOpenedFilePath: null,
 };
 
 const normalizeKeyBindings = (
@@ -164,6 +168,15 @@ export const loadSettings = (): UserSettings => {
       parsed.renderMode === "raw" || parsed.renderMode === "hybrid"
         ? parsed.renderMode
         : defaultSettings.renderMode;
+    const openLastFileOnStartup =
+      typeof parsed.openLastFileOnStartup === "boolean"
+        ? parsed.openLastFileOnStartup
+        : defaultSettings.openLastFileOnStartup;
+    const lastOpenedFilePath =
+      typeof parsed.lastOpenedFilePath === "string"
+        ? parsed.lastOpenedFilePath
+        : defaultSettings.lastOpenedFilePath;
+
     return {
       textSize,
       uiScale,
@@ -173,6 +186,8 @@ export const loadSettings = (): UserSettings => {
       systemLightTheme,
       systemDarkTheme,
       renderMode,
+      openLastFileOnStartup,
+      lastOpenedFilePath,
     };
   } catch {
     return defaultSettings;

@@ -443,6 +443,30 @@ const SettingsModal = ({
                         </div>
                       </ItemActions>
                     </Item>
+                    <ItemSeparator />
+                    <Item
+                      size="sm"
+                      className="rounded-none first:rounded-t-md last:rounded-b-md"
+                    >
+                      <ItemContent>
+                        <ItemTitle>Open last file on startup</ItemTitle>
+                        <ItemDescription>
+                          Automatically open the last used file when Bedrock
+                          starts.
+                        </ItemDescription>
+                      </ItemContent>
+                      <ItemActions className="ml-auto">
+                        <Switch
+                          checked={settings.openLastFileOnStartup}
+                          onCheckedChange={(checked) =>
+                            onChange({
+                              ...settings,
+                              openLastFileOnStartup: checked,
+                            })
+                          }
+                        />
+                      </ItemActions>
+                    </Item>
                   </ItemGroup>
                 ) : null}
 

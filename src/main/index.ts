@@ -80,6 +80,18 @@ ipcMain.handle("file:open", async (): Promise<OpenFileResult | null> => {
 });
 
 ipcMain.handle(
+  "file:read",
+  async (_event, filePath: string): Promise<OpenFileResult | null> => {
+    try {
+      const content = await fs.readFile(filePath, "utf-8");
+      return { filePath, content };
+    } catch {
+      return null;
+    }
+  }
+);
+
+ipcMain.handle(
   "file:save",
   async (event, args: SaveFilePayload): Promise<SaveFileResult | null> => {
     try {

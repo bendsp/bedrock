@@ -54,6 +54,7 @@ const App = () => {
   const [isDirty, setIsDirty] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
+  const [isInitializing, setIsInitializing] = useState(true);
   const suppressDirtyRef = useRef(false);
   const editorViewRef = useRef<EditorView | null>(null);
   const commandRegistry = useMemo(() => createCommandRegistry(), []);
@@ -96,12 +97,12 @@ const App = () => {
     const loaded = loadSettings();
     setSettings(loaded);
 
-    // Open last file on startup if enabled
-    if (loaded.openLastFileOnStartup && loaded.lastOpenedFilePath) {
-      const openLastFile = async () => {
+    const initialize = async () => {
+      // Open last file on startup if enabled
+      if (loaded.openLastFileOnStartup && loaded.lastOpenedFilePath) {
         try {
           const result = await window.electronAPI.readFile(
-            loaded.lastOpenedFilePath!
+            loaded.lastOpenedFilePath
           );
           if (result) {
             suppressDirtyRef.current = true;
@@ -112,9 +113,11 @@ const App = () => {
         } catch (error) {
           console.error("Failed to open last file on startup:", error);
         }
-      };
-      void openLastFile();
-    }
+      }
+      setIsInitializing(false);
+    };
+
+    void initialize();
   }, []);
 
   useEffect(() => {
@@ -156,13 +159,22 @@ const App = () => {
   }, [fileName, isDirty]);
 
   useEffect(() => {
-    if (filePath && filePath !== settings.lastOpenedFilePath) {
-      setSettings((prev) => ({
-        ...prev,
-        lastOpenedFilePath: filePath,
-      }));
+    if (isInitializing) {
+      return;
     }
-  }, [filePath, settings.lastOpenedFilePath]);
+
+    if (filePath) {
+      setSettings((prev) => {
+        if (prev.lastOpenedFilePath === filePath) {
+          return prev;
+        }
+        return {
+          ...prev,
+          lastOpenedFilePath: filePath,
+        };
+      });
+    }
+  }, [filePath, isInitializing]);
 
   const confirmDiscardIfNeeded = useCallback(
     async (action: "open" | "new"): Promise<boolean> => {

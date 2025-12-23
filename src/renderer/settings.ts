@@ -179,7 +179,8 @@ export const loadSettings = (): UserSettings => {
         ? parsed.openLastFileOnStartup
         : defaultSettings.openLastFileOnStartup;
     const lastOpenedFilePath =
-      typeof parsed.lastOpenedFilePath === "string"
+      typeof parsed.lastOpenedFilePath === "string" ||
+      parsed.lastOpenedFilePath === null
         ? parsed.lastOpenedFilePath
         : defaultSettings.lastOpenedFilePath;
 

@@ -36,4 +36,5 @@ export interface IElectronAPI {
   getAppVersion: () => Promise<string>;
   openExternal: (url: string) => Promise<void>;
   onFind: (callback: () => void) => void;
+  readFile: (filePath: string) => Promise<OpenFileResult | null>;
 }

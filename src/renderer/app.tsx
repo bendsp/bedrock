@@ -54,6 +54,7 @@ const App = () => {
   const [isDirty, setIsDirty] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
+  const [isInitializing, setIsInitializing] = useState(true);
   const suppressDirtyRef = useRef(false);
   const editorViewRef = useRef<EditorView | null>(null);
   const commandRegistry = useMemo(() => createCommandRegistry(), []);
@@ -95,6 +96,28 @@ const App = () => {
   useEffect(() => {
     const loaded = loadSettings();
     setSettings(loaded);
+
+    const initialize = async () => {
+      // Open last file on startup if enabled
+      if (loaded.openLastFileOnStartup && loaded.lastOpenedFilePath) {
+        try {
+          const result = await window.electronAPI.readFile(
+            loaded.lastOpenedFilePath
+          );
+          if (result) {
+            suppressDirtyRef.current = true;
+            setDoc(result.content);
+            setFilePath(result.filePath);
+            setIsDirty(false);
+          }
+        } catch (error) {
+          console.error("Failed to open last file on startup:", error);
+        }
+      }
+      setIsInitializing(false);
+    };
+
+    void initialize();
   }, []);
 
   useEffect(() => {
@@ -135,6 +158,24 @@ const App = () => {
     document.title = buildWindowTitle(fileName, isDirty);
   }, [fileName, isDirty]);
 
+  useEffect(() => {
+    if (isInitializing) {
+      return;
+    }
+
+    if (filePath) {
+      setSettings((prev) => {
+        if (prev.lastOpenedFilePath === filePath) {
+          return prev;
+        }
+        return {
+          ...prev,
+          lastOpenedFilePath: filePath,
+        };
+      });
+    }
+  }, [filePath, isInitializing]);
+
   const confirmDiscardIfNeeded = useCallback(
     async (action: "open" | "new"): Promise<boolean> => {
       if (!isDirty) {
@@ -165,6 +206,20 @@ const App = () => {
     suppressDirtyRef.current = true;
     setDoc(result.content);
     setFilePath(result.filePath);
+    setIsDirty(false);
+    focusEditor();
+  }, [confirmDiscardIfNeeded, focusEditor]);
+
+  const handleNew = useCallback(async () => {
+    const proceed = await confirmDiscardIfNeeded("new");
+    if (!proceed) {
+      focusEditor();
+      return;
+    }
+
+    suppressDirtyRef.current = true;
+    setDoc("");
+    setFilePath(null);
     setIsDirty(false);
     focusEditor();
   }, [confirmDiscardIfNeeded, focusEditor]);
@@ -235,6 +290,7 @@ const App = () => {
   const commands = useMemo(() => {
     return createCommandRunner(commandRegistry, {
       getEditorView: () => editorViewRef.current,
+      newFile: handleNew,
       openFile: handleOpen,
       saveFile: handleSave,
       saveFileAs: handleSaveAs,
@@ -308,6 +364,7 @@ const App = () => {
     <>
       <Chrome
         title={displayLabel}
+        onNew={() => void commands.run("file.new")}
         onOpen={() => void commands.run("file.open")}
         onSave={() => void commands.run("file.save")}
         onSaveAs={() => void commands.run("file.saveAs")}

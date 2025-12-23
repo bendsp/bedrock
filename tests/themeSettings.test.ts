@@ -100,6 +100,38 @@ runTest("valid themes and followSystem load correctly", () => {
   assert.equal(settings.systemDarkTheme, "solarized");
 });
 
+runTest("startup settings load correctly", () => {
+  installStorage();
+  const payload = {
+    openLastFileOnStartup: false,
+    lastOpenedFilePath: "/path/to/file.md",
+  };
+  globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+
+  const settings = loadSettings();
+  assert.equal(settings.openLastFileOnStartup, false);
+  assert.equal(settings.lastOpenedFilePath, "/path/to/file.md");
+});
+
+runTest("startup settings fall back to defaults on invalid values", () => {
+  installStorage();
+  const payload = {
+    openLastFileOnStartup: "not-a-boolean",
+    lastOpenedFilePath: 123,
+  };
+  globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+
+  const settings = loadSettings();
+  assert.equal(
+    settings.openLastFileOnStartup,
+    defaultSettings.openLastFileOnStartup
+  );
+  assert.equal(
+    settings.lastOpenedFilePath,
+    defaultSettings.lastOpenedFilePath
+  );
+});
+
 runTest("clearSettingsStorage removes persisted data", () => {
   installStorage();
   globalThis.localStorage.setItem(

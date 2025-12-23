@@ -34,6 +34,16 @@ function getOsxNotarizeConfig() {
     console.log(
       "Forge: Configuring notarization via App Store Connect API Key"
     );
+
+    // CRITICAL: @electron/notarize will pick up APPLE_ID/APPLE_PASSWORD 
+    // or keychain profiles from the environment if they are set, 
+    // leading to a conflict error. We explicitly clear them here.
+    delete process.env.APPLE_ID;
+    delete process.env.APPLE_ID_PASSWORD;
+    delete process.env.APPLE_PASSWORD;
+    delete process.env.APPLE_NOTARYTOOL_KEYCHAIN_PROFILE;
+    delete process.env.APPLE_NOTARYTOOL_KEYCHAIN;
+
     return {
       tool: "notarytool" as const,
       appleApiKey: APPLE_API_KEY,
@@ -46,6 +56,12 @@ function getOsxNotarizeConfig() {
   // Local fallback: Apple ID + app-specific password
   if (APPLE_ID && APPLE_PASSWORD) {
     console.log("Forge: Configuring notarization via Apple ID / Password");
+
+    // Clear API Key variables to prevent conflict
+    delete process.env.APPLE_API_KEY;
+    delete process.env.APPLE_API_KEY_ID;
+    delete process.env.APPLE_API_ISSUER;
+
     return {
       tool: "notarytool" as const,
       appleId: APPLE_ID,

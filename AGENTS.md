@@ -19,6 +19,7 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
     - file open/save
     - discard-change confirmation
     - app version
+    - search signal (menu to renderer)
     - opening external links
     - opening DevTools
 - **Preload** (`src/main/preload.ts`)
@@ -88,9 +89,10 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
 - `src/renderer/renderer.ts`: renderer entrypoint.
 - `src/renderer/app.tsx`: React app root.
 - `src/renderer/components/CodeMirrorEditor.tsx`: CodeMirror mount + reconfigure.
-- `src/renderer/editor/codemirror/*`: CodeMirror commands/extensions/theme.
-- `src/renderer/lib/*`: shared renderer utilities (editor logic, etc).
+- `src/renderer/components/SearchPanel.tsx`: Shadcn-based search UI.
+- `src/renderer/editor/codemirror/*`: CodeMirror commands/extensions/theme/search.
 - `src/renderer/settings.ts`: persisted user settings.
+- `src/renderer/lib/export.ts`: markdown-it HTML conversion utilities.
 - `src/shared/types.ts`: shared IPC types + editor mode/cursor types.
 
 ---
@@ -108,6 +110,8 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
 - 2025-12-13: Refactored scaling to be custom again (separate from Electron zoom) and added a shadcn Slider-based UI scale control (63%–173%).
 - 2025-12-19: Removed legacy textarea/model editor stack and deprecated markdown-it/DOMPurify preview pipeline in favor of CodeMirror-first hybrid Markdown decorations.
 - 2025-12-20: Fixed double-triggering of global shortcuts (Open/Save/Settings) by respecting `event.defaultPrevented` in the global keydown listener.
+- 2025-12-22: Implemented global search functionality with a custom Shadcn `InputGroup` floating panel, integrated via CodeMirror 6's panel system and the main process menu.
+- 2025-12-22: Added toggle logic to the search command and synchronized the search shortcut with user settings.
 - 2025-12-21: Added support for Markdown horizontal rules (--- and ***) with hybrid decorations and context menu insert command.
 - 2025-12-22: Enforced blank line requirement before horizontal rules (--- and ***) for hybrid decorations and insertion command.
 - 2025-12-22: Updated release workflow to automatically set version from tags and push the bump back to main.

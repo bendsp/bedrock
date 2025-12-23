@@ -27,6 +27,14 @@ export interface DiscardPromptPayload {
   fileName?: string;
 }
 
+export type ExportFormat = "html" | "pdf";
+
+export interface ExportFilePayload {
+  content: string;
+  format: ExportFormat;
+  defaultFileName?: string;
+}
+
 export interface IElectronAPI {
   openFile: () => Promise<OpenFileResult | null>;
   saveFile: (payload: SaveFilePayload) => Promise<SaveFileResult | null>;
@@ -36,5 +44,6 @@ export interface IElectronAPI {
   getAppVersion: () => Promise<string>;
   openExternal: (url: string) => Promise<void>;
   onFind: (callback: () => void) => void;
+  exportFile: (payload: ExportFilePayload) => Promise<boolean>;
   readFile: (filePath: string) => Promise<OpenFileResult | null>;
 }

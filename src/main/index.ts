@@ -6,8 +6,11 @@ import {
   Menu,
   MenuItemConstructorOptions,
   shell,
+  screen,
 } from "electron";
 import { promises as fs } from "fs";
+import * as path from "path";
+import windowStateKeeper from "electron-window-state";
 import {
   DiscardAction,
   SaveFilePayload,
@@ -253,10 +256,17 @@ const installApplicationMenu = () => {
 };
 
 const createWindow = (): void => {
+  const mainWindowState = windowStateKeeper({
+    defaultWidth: 800,
+    defaultHeight: 600,
+  });
+
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    height: 600,
-    width: 800,
+    x: mainWindowState.x,
+    y: mainWindowState.y,
+    width: mainWindowState.width,
+    height: mainWindowState.height,
     ...(process.platform === "darwin"
       ? {
           titleBarStyle: "hiddenInset" as const,
@@ -267,6 +277,11 @@ const createWindow = (): void => {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
     },
   });
+
+  // Let us register listeners on the window, so we can update the state
+  // automatically (the listeners will be removed when the window is closed)
+  // and restore the maximized state of the window
+  mainWindowState.manage(mainWindow);
 
   if (process.platform !== "darwin") {
     // Keep shortcuts active but hide the menu bar.

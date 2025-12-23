@@ -85,6 +85,7 @@
     "clsx": "^2.1.1",
     "electron-squirrel-startup": "^1.0.1",
     "github-markdown-css": "^5.8.1",
+    "electron-window-state": "^5.0.3",
     "lucide-react": "^0.460.0",
     "markdown-it": "^14.1.0",
     "react": "^19.1.1",

@@ -6,8 +6,10 @@ import {
   Menu,
   MenuItemConstructorOptions,
   shell,
+  screen,
 } from "electron";
 import { promises as fs } from "fs";
+import windowStateKeeper from "electron-window-state";
 import * as path from "path";
 import {
   DiscardAction,
@@ -87,7 +89,9 @@ ipcMain.handle(
     try {
       // Basic security check: only allow reading .md files.
       if (!filePath.toLowerCase().endsWith(".md")) {
-        console.error(`Rejected attempt to read non-markdown file: ${filePath}`);
+        console.error(
+          `Rejected attempt to read non-markdown file: ${filePath}`
+        );
         return null;
       }
 
@@ -254,7 +258,9 @@ ipcMain.handle(
           },
         });
 
-        await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(fullHtml)}`);
+        await win.loadURL(
+          `data:text/html;charset=utf-8,${encodeURIComponent(fullHtml)}`
+        );
         const data = await win.webContents.printToPDF({
           printBackground: true,
           margins: {
@@ -262,7 +268,7 @@ ipcMain.handle(
             bottom: 0,
             left: 0,
             right: 0,
-          }
+          },
         });
         await fs.writeFile(filePath, data);
         win.destroy();
@@ -313,7 +319,9 @@ const installApplicationMenu = () => {
                 label: "Find",
                 accelerator: "CmdOrCtrl+F",
                 click: (menuItem, browserWindow) => {
-                  (browserWindow as BrowserWindow)?.webContents.send("editor:find");
+                  (browserWindow as BrowserWindow)?.webContents.send(
+                    "editor:find"
+                  );
                 },
               },
             ],
@@ -341,7 +349,9 @@ const installApplicationMenu = () => {
                 label: "Find",
                 accelerator: "CmdOrCtrl+F",
                 click: (menuItem, browserWindow) => {
-                  (browserWindow as BrowserWindow)?.webContents.send("editor:find");
+                  (browserWindow as BrowserWindow)?.webContents.send(
+                    "editor:find"
+                  );
                 },
               },
             ],
@@ -355,10 +365,17 @@ const installApplicationMenu = () => {
 };
 
 const createWindow = (): void => {
+  const mainWindowState = windowStateKeeper({
+    defaultWidth: 800,
+    defaultHeight: 600,
+  });
+
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    height: 600,
-    width: 800,
+    x: mainWindowState.x,
+    y: mainWindowState.y,
+    width: mainWindowState.width,
+    height: mainWindowState.height,
     ...(process.platform === "darwin"
       ? {
           titleBarStyle: "hiddenInset" as const,
@@ -369,6 +386,11 @@ const createWindow = (): void => {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
     },
   });
+
+  // Let us register listeners on the window, so we can update the state
+  // automatically (the listeners will be removed when the window is closed)
+  // and restore the maximized state of the window
+  mainWindowState.manage(mainWindow);
 
   if (process.platform !== "darwin") {
     // Keep shortcuts active but hide the menu bar.
@@ -426,7 +448,9 @@ app.on("ready", () => {
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
 app.on("window-all-closed", () => {
-  app.quit();
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
 });
 
 app.on("activate", () => {

@@ -9,16 +9,31 @@ Bedrock is a minimal Markdown-focused text editor built with **Electron + React 
 - **Hybrid Markdown mode** (renders structure while editing) + raw mode
 - **Customizable keybindings** (Settings)
 - **Themes + UI scaling**
+- **Electron E2E pipeline** with Playwright traces/screenshots for agent debugging
+- **Sentry-ready telemetry hooks** for main/renderer runtime failures
+- **Linear + GitHub helper scripts** for agent issue and PR workflows
 
 ### Development
 
-- **Install**: `npm install`
-- **Run (dev)**: `npm start`
-- **Lint**: `npm run lint`
-- **Tests**: `npm test`
+- **Install**: `pnpm install`
+- **Run (dev)**: `pnpm dev`
+- **Lint**: `pnpm lint`
+- **Typecheck**: `pnpm typecheck`
+- **Unit tests**: `pnpm test:unit`
+- **Electron E2E**: `pnpm test:e2e`
+- **Full local CI pass**: `pnpm test`
 - **Package/build**:
-  - `npm run package`
-  - `npm run build`
+  - `pnpm package`
+  - `pnpm build`
+
+### Agent pipeline
+
+- CI now runs `lint`, `typecheck`, `unit`, and real Electron `e2e` jobs
+- PR flow is optimized for draft PRs with artifact links and agent labels
+- Runtime telemetry can be enabled with `SENTRY_DSN`
+- Linear issue creation is available via `pnpm linear:create-issue`
+
+See [docs/agent-workflow.md](./docs/agent-workflow.md) for the full agent operating model.
 
 ### Architecture (high level)
 

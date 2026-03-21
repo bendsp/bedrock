@@ -9,6 +9,13 @@ This repo publishes release artifacts on tag push via `.github/workflows/release
 
 Releases are created as **drafts** and assets are uploaded to the GitHub Release for the tag.
 
+## Release flow
+
+- Version bumps are derived from the pushed tag
+- GitHub Actions writes the tag version back to `package.json` and `pnpm-lock.yaml`
+- Release jobs install with `pnpm install --frozen-lockfile`
+- Build commands use `pnpm build` / `pnpm make:mac`
+
 ## macOS signing + notarization (CI)
 
 macOS builds require **both**:

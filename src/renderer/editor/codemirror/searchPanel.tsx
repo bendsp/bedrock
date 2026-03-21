@@ -18,7 +18,7 @@ export const createReactSearchPanel = (view: EditorView): Panel => {
     mount() {
       // already mounted via createRoot
     },
-    update(update) {
+    update() {
        // React handles updates via internal state or if we passed props that changed.
        // Here we only pass 'view', which is stable.
        // However, if we needed to respond to view updates, we might pass them down.
@@ -32,4 +32,3 @@ export const createReactSearchPanel = (view: EditorView): Panel => {
     },
   };
 };
-

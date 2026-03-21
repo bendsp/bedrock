@@ -79,6 +79,14 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
 
 - Smoke test: launch, type, open/save, toggle settings, verify dirty-state prompts.
 - Formatting commands: bold/italic/link behave for both empty selection and selection.
+- Agent/local CI baseline: `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm test:e2e`.
+
+### Agent Truth Sources
+
+- **GitHub**: source of truth for code, draft PRs, CI runs, release artifacts.
+- **Linear**: source of truth for active planning and newly discovered work.
+- **Sentry**: source of truth for runtime failures in Electron main/renderer.
+- **Playwright artifacts**: source of truth for Electron UI regressions and reproduction evidence.
 
 ---
 
@@ -115,3 +123,6 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
 - 2025-12-21: Added support for Markdown horizontal rules (--- and ***) with hybrid decorations and context menu insert command.
 - 2025-12-22: Enforced blank line requirement before horizontal rules (--- and ***) for hybrid decorations and insertion command.
 - 2025-12-22: Updated release workflow to automatically set version from tags and push the bump back to main.
+- 2026-03-21: Migrated the repo from npm to pnpm, added pnpm build approvals, and switched GitHub release automation to pnpm installs/builds.
+- 2026-03-21: Added a Playwright-based Electron E2E harness with test-only dialog/user-data controls for reproducible agent testing.
+- 2026-03-21: Added Sentry-ready telemetry hooks for Electron main/renderer plus Linear/GitHub helper scripts for agent issue and repo bootstrap workflows.

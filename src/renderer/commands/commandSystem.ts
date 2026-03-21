@@ -1,7 +1,6 @@
 import { undo, redo } from "@codemirror/commands";
 import { openSearchPanel, closeSearchPanel } from "@codemirror/search";
 import type { EditorView, KeyBinding } from "@codemirror/view";
-import { markdownToHtml } from "../lib/export";
 import {
   createMarkdownLinkCommand,
   createWrapSelectionOrWordCommand,

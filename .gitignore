@@ -2,6 +2,7 @@
 logs
 *.log
 npm-debug.log*
+pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
@@ -90,6 +91,9 @@ typings/
 
 # Electron-Forge
 out/
+playwright-report/
+test-results/
+tests/e2e/artifacts/
 
 # Accidental artifacts (should not be committed)
 bedrock@*

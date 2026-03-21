@@ -27,6 +27,25 @@ export interface DiscardPromptPayload {
   fileName?: string;
 }
 
+export interface BedrockRuntimeInfo {
+  appVersion: string;
+  environment: string;
+  release: string;
+  sentryDsn: string | null;
+  telemetryEnabled: boolean;
+  e2eMode: boolean;
+}
+
+export interface BedrockTestConfig {
+  nextOpenPath?: string | null;
+  nextSavePath?: string | null;
+  discardResponse?: boolean | null;
+}
+
+export interface BedrockTestState extends BedrockTestConfig {
+  lastDiscardPrompt: DiscardPromptPayload | null;
+}
+
 export type ExportFormat = "html" | "pdf";
 
 export interface ExportFilePayload {
@@ -42,8 +61,14 @@ export interface IElectronAPI {
   notifyDirtyState: (isDirty: boolean) => void;
   openDevTools: () => void;
   getAppVersion: () => Promise<string>;
+  getRuntimeInfo: () => Promise<BedrockRuntimeInfo>;
   openExternal: (url: string) => Promise<void>;
-  onFind: (callback: () => void) => void;
+  onFind: (callback: () => void) => () => void;
   exportFile: (payload: ExportFilePayload) => Promise<boolean>;
   readFile: (filePath: string) => Promise<OpenFileResult | null>;
+  test?: {
+    configure: (config: BedrockTestConfig) => Promise<BedrockTestState | null>;
+    getState: () => Promise<BedrockTestState | null>;
+    reset: () => Promise<BedrockTestState | null>;
+  };
 }

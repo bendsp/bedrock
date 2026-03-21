@@ -1,4 +1,6 @@
 import type { ForgeConfig } from "@electron-forge/shared-types";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { MakerSquirrel } from "@electron-forge/maker-squirrel";
 import { MakerDMG } from "@electron-forge/maker-dmg";
 import { MakerZIP } from "@electron-forge/maker-zip";
@@ -19,6 +21,8 @@ if (!process.env.GITHUB_ACTIONS) {
 
 import { mainConfig } from "./webpack.main.config";
 import { rendererConfig } from "./webpack.renderer.config";
+
+const execFileAsync = promisify(execFile);
 
 function getOsxNotarizeConfig() {
   const {
@@ -135,10 +139,7 @@ const config: ForgeConfig = {
               appPath: artifact,
             });
             console.log(`Forge: Stapling DMG artifact: ${artifact}`);
-            const {
-              spawn,
-            } = require("./node_modules/@electron/notarize/lib/spawn");
-            await spawn("xcrun", ["stapler", "staple", artifact]);
+            await execFileAsync("xcrun", ["stapler", "staple", artifact]);
           }
         }
       }

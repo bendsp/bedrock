@@ -6,18 +6,25 @@ import {
   Menu,
   MenuItemConstructorOptions,
   shell,
-  screen,
 } from "electron";
 import { promises as fs } from "fs";
 import windowStateKeeper from "electron-window-state";
 import * as path from "path";
 import {
+  BedrockTestConfig,
+  BedrockTestState,
   DiscardAction,
   SaveFilePayload,
   OpenFileResult,
   SaveFileResult,
   ExportFilePayload,
 } from "../shared/types";
+import {
+  buildRuntimeInfo,
+  captureMainTelemetryException,
+  captureMainTelemetryMessage,
+  initializeMainTelemetry,
+} from "./observability";
 
 const MARKDOWN_DIALOG_FILTER = {
   name: "Markdown Files",
@@ -29,6 +36,67 @@ const ensureMarkdownExtension = (filePath: string): string => {
 };
 
 const windowDirtyState = new Map<number, boolean>();
+const runtimeInfo = initializeMainTelemetry();
+const isE2EMode = runtimeInfo.e2eMode;
+
+const testState: BedrockTestState = {
+  nextOpenPath: null,
+  nextSavePath: null,
+  discardResponse: null,
+  lastDiscardPrompt: null,
+};
+
+const applyTestConfig = (
+  config: BedrockTestConfig = {}
+): BedrockTestState | null => {
+  if (!isE2EMode) {
+    return null;
+  }
+
+  if ("nextOpenPath" in config) {
+    testState.nextOpenPath = config.nextOpenPath ?? null;
+  }
+  if ("nextSavePath" in config) {
+    testState.nextSavePath = config.nextSavePath ?? null;
+  }
+  if ("discardResponse" in config) {
+    testState.discardResponse = config.discardResponse ?? null;
+  }
+
+  return { ...testState };
+};
+
+const resetTestState = (): BedrockTestState | null => {
+  if (!isE2EMode) {
+    return null;
+  }
+
+  testState.nextOpenPath = null;
+  testState.nextSavePath = null;
+  testState.discardResponse = null;
+  testState.lastDiscardPrompt = null;
+  return { ...testState };
+};
+
+const resolveNextOpenPath = (): string | null => {
+  if (!isE2EMode || !testState.nextOpenPath) {
+    return null;
+  }
+
+  const filePath = path.resolve(testState.nextOpenPath);
+  testState.nextOpenPath = null;
+  return filePath;
+};
+
+const resolveNextSavePath = (): string | null => {
+  if (!isE2EMode || !testState.nextSavePath) {
+    return null;
+  }
+
+  const filePath = ensureMarkdownExtension(path.resolve(testState.nextSavePath));
+  testState.nextSavePath = null;
+  return filePath;
+};
 
 const getDiscardDescription = (action: DiscardAction): string => {
   if (action === "open") {
@@ -45,6 +113,11 @@ const confirmDiscardChanges = async (
   action: DiscardAction,
   fileName?: string
 ): Promise<boolean> => {
+  if (isE2EMode) {
+    testState.lastDiscardPrompt = { action, fileName };
+    return testState.discardResponse ?? false;
+  }
+
   const description = getDiscardDescription(action);
   const displayName = fileName ? `"${fileName}"` : "this document";
 
@@ -63,6 +136,12 @@ const confirmDiscardChanges = async (
 
 ipcMain.handle("file:open", async (): Promise<OpenFileResult | null> => {
   try {
+    const nextOpenPath = resolveNextOpenPath();
+    if (nextOpenPath) {
+      const content = await fs.readFile(nextOpenPath, "utf-8");
+      return { filePath: nextOpenPath, content };
+    }
+
     const { canceled, filePaths } = await dialog.showOpenDialog({
       filters: [MARKDOWN_DIALOG_FILTER],
       properties: ["openFile"],
@@ -78,6 +157,7 @@ ipcMain.handle("file:open", async (): Promise<OpenFileResult | null> => {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "An unknown error occurred.";
+    captureMainTelemetryException(error, { operation: "file:open" });
     dialog.showErrorBox("Unable to open file", message);
     return null;
   }
@@ -100,6 +180,10 @@ ipcMain.handle(
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "An unknown error occurred.";
+      captureMainTelemetryException(error, {
+        operation: "file:read",
+        filePath,
+      });
       console.error(`Unable to read file "${filePath}": ${message}`);
       return null;
     }
@@ -113,6 +197,10 @@ ipcMain.handle(
       let targetPath = args.filePath;
 
       if (!targetPath) {
+        const nextSavePath = resolveNextSavePath();
+        if (nextSavePath) {
+          targetPath = nextSavePath;
+        } else {
         const { canceled, filePath } = await dialog.showSaveDialog(
           BrowserWindow.fromWebContents(event.sender) ?? undefined,
           {
@@ -126,6 +214,7 @@ ipcMain.handle(
         }
 
         targetPath = ensureMarkdownExtension(filePath);
+        }
       }
 
       await fs.writeFile(targetPath, args.content, "utf-8");
@@ -133,6 +222,10 @@ ipcMain.handle(
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "An unknown error occurred.";
+      captureMainTelemetryException(error, {
+        operation: "file:save",
+        filePath: args.filePath,
+      });
       dialog.showErrorBox("Unable to save file", message);
       return null;
     }
@@ -167,6 +260,10 @@ ipcMain.handle("app:get-version", (): string => {
   return app.getVersion();
 });
 
+ipcMain.handle("app:get-runtime-info", () => {
+  return buildRuntimeInfo();
+});
+
 ipcMain.handle("shell:open-external", async (_event, rawUrl: string) => {
   if (typeof rawUrl !== "string") {
     return;
@@ -180,6 +277,18 @@ ipcMain.handle("shell:open-external", async (_event, rawUrl: string) => {
   } catch {
     // ignore invalid URLs
   }
+});
+
+ipcMain.handle("test:configure", (_event, config: BedrockTestConfig) => {
+  return applyTestConfig(config);
+});
+
+ipcMain.handle("test:get-state", () => {
+  return isE2EMode ? { ...testState } : null;
+});
+
+ipcMain.handle("test:reset-state", () => {
+  return resetTestState();
 });
 
 ipcMain.handle(
@@ -277,6 +386,10 @@ ipcMain.handle(
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "An unknown error occurred.";
+      captureMainTelemetryException(error, {
+        operation: "file:export",
+        format: args.format,
+      });
       dialog.showErrorBox("Unable to export file", message);
       return false;
     }
@@ -293,6 +406,18 @@ declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 if (require("electron-squirrel-startup")) {
   app.quit();
 }
+
+if (process.env.BEDROCK_USER_DATA_DIR) {
+  app.setPath("userData", path.resolve(process.env.BEDROCK_USER_DATA_DIR));
+}
+
+process.on("unhandledRejection", (reason) => {
+  captureMainTelemetryException(reason, { event: "unhandledRejection" });
+});
+
+process.on("uncaughtException", (error) => {
+  captureMainTelemetryException(error, { event: "uncaughtException" });
+});
 
 const installApplicationMenu = () => {
   const isMac = process.platform === "darwin";
@@ -407,6 +532,20 @@ const createWindow = (): void => {
 
   windowDirtyState.set(webContentsId, false);
 
+  mainWindow.webContents.on("render-process-gone", (_event, details) => {
+    captureMainTelemetryMessage("Renderer process terminated", {
+      reason: details.reason,
+      exitCode: details.exitCode,
+      webContentsId,
+    });
+  });
+
+  mainWindow.webContents.on("unresponsive", () => {
+    captureMainTelemetryMessage("Renderer process unresponsive", {
+      webContentsId,
+    });
+  });
+
   let forceClose = false;
 
   mainWindow.on("close", async (event) => {
@@ -451,6 +590,16 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("child-process-gone", (_event, details) => {
+  captureMainTelemetryMessage("Child process terminated", {
+    type: details.type,
+    reason: details.reason,
+    exitCode: details.exitCode,
+    serviceName: details.serviceName,
+    name: details.name,
+  });
 });
 
 app.on("activate", () => {

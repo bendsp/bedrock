@@ -23,6 +23,7 @@ import {
   buildRuntimeInfo,
   captureMainTelemetryException,
   captureMainTelemetryMessage,
+  flushMainTelemetry,
   initializeMainTelemetry,
 } from "./observability";
 
@@ -417,6 +418,9 @@ process.on("unhandledRejection", (reason) => {
 
 process.on("uncaughtException", (error) => {
   captureMainTelemetryException(error, { event: "uncaughtException" });
+  void flushMainTelemetry().finally(() => {
+    app.exit(1);
+  });
 });
 
 const installApplicationMenu = () => {

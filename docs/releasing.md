@@ -12,7 +12,7 @@ Releases are created as **drafts** and assets are uploaded to the GitHub Release
 ## Release flow
 
 - Version bumps are derived from the pushed tag
-- GitHub Actions writes the tag version back to `package.json` and `pnpm-lock.yaml`
+- GitHub Actions applies the tag version only in the release workspace; it does not push version-bump commits back to `main`
 - Release jobs install with `pnpm install --frozen-lockfile`
 - Build commands use `pnpm build` / `pnpm make:mac`
 

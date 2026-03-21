@@ -88,3 +88,12 @@ export const captureMainTelemetryException = (
     Sentry.captureException(error);
   });
 };
+
+export const flushMainTelemetry = async (timeout = 2_000): Promise<void> => {
+  const runtimeInfo = buildRuntimeInfo();
+  if (!runtimeInfo.telemetryEnabled || runtimeInfo.e2eMode) {
+    return;
+  }
+
+  await Sentry.flush(timeout);
+};

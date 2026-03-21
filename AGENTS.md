@@ -122,7 +122,8 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
 - 2025-12-22: Added toggle logic to the search command and synchronized the search shortcut with user settings.
 - 2025-12-21: Added support for Markdown horizontal rules (--- and ***) with hybrid decorations and context menu insert command.
 - 2025-12-22: Enforced blank line requirement before horizontal rules (--- and ***) for hybrid decorations and insertion command.
-- 2025-12-22: Updated release workflow to automatically set version from tags and push the bump back to main.
+- 2025-12-22: Updated release workflow to automatically set version from tags for release builds.
 - 2026-03-21: Migrated the repo from npm to pnpm, added pnpm build approvals, and switched GitHub release automation to pnpm installs/builds.
 - 2026-03-21: Added a Playwright-based Electron E2E harness with test-only dialog/user-data controls for reproducible agent testing.
 - 2026-03-21: Added Sentry-ready telemetry hooks for Electron main/renderer plus Linear/GitHub helper scripts for agent issue and repo bootstrap workflows.
+- 2026-03-22: Main-process uncaught exceptions now flush telemetry and exit, and release automation no longer pushes version-bump commits directly to protected `main`.

@@ -9,6 +9,7 @@ const fixturePath = path.join(__dirname, "fixtures", "open-source.md");
 const shortcutModifier = process.platform === "darwin" ? "Meta" : "Control";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const electronBinaryPath = require("electron") as string;
+const needsNoSandbox = Boolean(process.env.CI) && process.platform === "linux";
 
 const walk = async (dir: string): Promise<string[]> => {
   const entries = await fs.readdir(dir, { withFileTypes: true });
@@ -56,7 +57,7 @@ const launchBedrock = async (): Promise<{
   const userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), "bedrock-e2e-user-data-"));
   const app = await electron.launch({
     executablePath: electronBinaryPath,
-    args: [mainEntry],
+    args: [...(needsNoSandbox ? ["--no-sandbox"] : []), mainEntry],
     env: {
       ...process.env,
       BEDROCK_E2E: "1",

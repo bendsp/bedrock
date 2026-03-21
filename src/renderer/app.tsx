@@ -50,7 +50,6 @@ const buildWindowTitle = (fileName: string, isDirty: boolean): string => {
 
 const App = () => {
   const [doc, setDoc] = useState<string>("");
-  const [renderMode] = useState<RenderMode>("hybrid");
   const [filePath, setFilePath] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -136,6 +135,7 @@ const App = () => {
       ? settings.systemDarkTheme
       : settings.systemLightTheme
     : settings.theme;
+  const renderMode: RenderMode = settings.renderMode;
 
   useEffect(() => {
     document.documentElement.style.setProperty(
@@ -326,9 +326,10 @@ const App = () => {
   ]);
 
   useEffect(() => {
-    window.electronAPI.onFind(() => {
+    const unsubscribe = window.electronAPI.onFind(() => {
       void commands.run("editor.find");
     });
+    return unsubscribe;
   }, [commands]);
 
   useEffect(() => {

@@ -28,6 +28,7 @@ type PendingTableFocus = TableCommandContext & {
 };
 
 const TABLE_CELL_SELECTOR = '[data-bedrock-table-cell="true"]';
+const TABLE_EDITOR_SELECTOR = '[data-bedrock-table-editor="true"]';
 const pendingTableFocus = new WeakMap<EditorView, PendingTableFocus>();
 
 const normalizeCellText = (value: string): string => {
@@ -80,6 +81,10 @@ const isSeparatorCell = (value: string): boolean => {
 
 const isFenceDelimiter = (line: string): boolean => {
   return /^```/.test(line.trim());
+};
+
+const isPipeLikeTableRow = (line: string): boolean => {
+  return line.trim().includes("|");
 };
 
 const parseTableRange = (lines: string[]): MarkdownTable | null => {
@@ -147,8 +152,7 @@ export const findTableBlocks = (doc: Text): TableBlock[] => {
 
     for (let nextLine = lineNumber + 2; nextLine <= doc.lines; nextLine += 1) {
       const candidateLine = doc.line(nextLine);
-      const candidateRow = splitTableCells(candidateLine.text);
-      if (!candidateRow || candidateRow.length !== header.length) {
+      if (!isPipeLikeTableRow(candidateLine.text)) {
         break;
       }
 
@@ -158,6 +162,7 @@ export const findTableBlocks = (doc: Text): TableBlock[] => {
 
     const parsed = parseTableRange(tableLines);
     if (!parsed) {
+      lineNumber = endLine;
       continue;
     }
 
@@ -351,6 +356,12 @@ export const setPendingTableFocus = (
   pendingTableFocus.set(view, { ...context, cursor });
 };
 
+export const peekPendingTableFocus = (
+  view: EditorView
+): PendingTableFocus | null => {
+  return pendingTableFocus.get(view) ?? null;
+};
+
 export const restorePendingTableFocus = (view: EditorView): void => {
   const pending = pendingTableFocus.get(view);
   if (!pending) {
@@ -368,7 +379,7 @@ export const restorePendingTableFocus = (view: EditorView): void => {
       return;
     }
 
-    const selector = `${TABLE_CELL_SELECTOR}[data-table-from="${latest.tableFrom}"][data-table-section="${latest.section}"][data-table-row="${latest.row}"][data-table-column="${latest.column}"]`;
+    const selector = `${TABLE_EDITOR_SELECTOR}[data-table-from="${latest.tableFrom}"][data-table-section="${latest.section}"][data-table-row="${latest.row}"][data-table-column="${latest.column}"]`;
     const input = view.dom.querySelector<HTMLInputElement>(selector);
     if (!input) {
       return;

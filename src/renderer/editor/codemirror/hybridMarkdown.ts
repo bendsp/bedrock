@@ -8,9 +8,16 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
-import { setTableCellValueCommand } from "./commands";
+import {
+  commitFocusedTableCellEditor,
+  getFocusedTableCellEditor,
+  runFocusedTableCellFormatCommand,
+  setTableCellValueCommand,
+} from "./commands";
+import { markdownToInlineHtml } from "../../lib/export";
 import {
   findTableBlocks,
+  peekPendingTableFocus,
   restorePendingTableFocus,
   type TableBlock,
   type TableCellSection,
@@ -29,28 +36,45 @@ class HRWidget extends WidgetType {
   }
 }
 
-const moveTableFocus = (
-  root: ParentNode,
-  current: HTMLInputElement,
-  delta: number
-) => {
-  const inputs = Array.from(
-    root.querySelectorAll<HTMLInputElement>('[data-bedrock-table-cell="true"]')
-  );
-  const index = inputs.indexOf(current);
-  if (index === -1 || inputs.length === 0) {
-    return;
-  }
+const tableContextKey = (context: TableCommandContext): string => {
+  return `${context.section}:${context.row}:${context.column}`;
+};
 
-  const nextIndex = (index + delta + inputs.length) % inputs.length;
-  const next = inputs[nextIndex];
-  next?.focus();
-  const cursor = next?.value.length ?? 0;
-  try {
-    next?.setSelectionRange(cursor, cursor);
-  } catch {
-    // Inputs can still be focused without moving the caret explicitly.
-  }
+const isSameTableContext = (
+  left: TableCommandContext,
+  right: TableCommandContext
+): boolean => {
+  return (
+    left.tableFrom === right.tableFrom &&
+    left.tableTo === right.tableTo &&
+    left.section === right.section &&
+    left.row === right.row &&
+    left.column === right.column
+  );
+};
+
+const getTableContextsInOrder = (table: TableBlock): TableCommandContext[] => {
+  const contexts: TableCommandContext[] = table.header.map((_, column) => ({
+    tableFrom: table.from,
+    tableTo: table.to,
+    section: "header",
+    row: 0,
+    column,
+  }));
+
+  table.rows.forEach((row, rowIndex) => {
+    row.forEach((_, column) => {
+      contexts.push({
+        tableFrom: table.from,
+        tableTo: table.to,
+        section: "body",
+        row: rowIndex,
+        column,
+      });
+    });
+  });
+
+  return contexts;
 };
 
 class TableWidget extends WidgetType {
@@ -70,23 +94,77 @@ class TableWidget extends WidgetType {
     tableEl.className = "cm-md-table";
     wrapper.appendChild(tableEl);
 
-    const createInput = (
+    const pendingFocus = peekPendingTableFocus(view);
+    const orderedContexts = getTableContextsInOrder(this.table);
+    const orderedKeys = orderedContexts.map(tableContextKey);
+    const contextIndex = new Map(
+      orderedKeys.map((key, index) => [key, index] as const)
+    );
+
+    type CellController = {
+      context: TableCommandContext;
+      closeEditor: (nextValue?: string) => void;
+      openEditor: (cursor?: number) => HTMLInputElement;
+    };
+
+    const cellControllers = new Map<string, CellController>();
+
+    const getAdjacentContext = (
+      context: TableCommandContext,
+      delta: number
+    ): TableCommandContext => {
+      const key = tableContextKey(context);
+      const currentIndex = contextIndex.get(key) ?? 0;
+      const nextIndex =
+        (currentIndex + delta + orderedContexts.length) % orderedContexts.length;
+      return orderedContexts[nextIndex] ?? context;
+    };
+
+    const focusLocalEditor = (context: TableCommandContext, cursor?: number) => {
+      cellControllers.get(tableContextKey(context))?.openEditor(cursor);
+    };
+
+    const focusCell = (context: TableCommandContext, cursor?: number) => {
+      const activeInput = getFocusedTableCellEditor(view);
+      if (activeInput) {
+        const activeKey = activeInput.dataset.tableCellKey;
+        if (activeKey === tableContextKey(context)) {
+          activeInput.focus();
+          if (cursor != null) {
+            const nextCursor = Math.min(cursor, activeInput.value.length);
+            try {
+              activeInput.setSelectionRange(nextCursor, nextCursor);
+            } catch {
+              // Keep focus even if the caret cannot be moved explicitly.
+            }
+          }
+          return;
+        }
+
+        const activeController = activeKey
+          ? cellControllers.get(activeKey)
+          : null;
+        const originalValue = activeInput.dataset.originalValue ?? "";
+        if (activeInput.value !== originalValue) {
+          commitFocusedTableCellEditor(view, {
+            context,
+            cursor: cursor ?? activeInput.value.length,
+          });
+          return;
+        }
+
+        activeController?.closeEditor(activeInput.value);
+      }
+
+      focusLocalEditor(context, cursor);
+    };
+
+    const createCell = (
       value: string,
       section: TableCellSection,
       row: number,
       column: number
     ) => {
-      const input = document.createElement("input");
-      input.type = "text";
-      input.className = "cm-md-table-input";
-      input.value = value;
-      input.dataset.bedrockTableCell = "true";
-      input.dataset.tableFrom = String(this.table.from);
-      input.dataset.tableTo = String(this.table.to);
-      input.dataset.tableSection = section;
-      input.dataset.tableRow = String(row);
-      input.dataset.tableColumn = String(column);
-
       const context: TableCommandContext = {
         tableFrom: this.table.from,
         tableTo: this.table.to,
@@ -95,31 +173,188 @@ class TableWidget extends WidgetType {
         column,
       };
 
-      input.addEventListener("input", () => {
-        const cursor = input.selectionStart ?? input.value.length;
-        setTableCellValueCommand(view, context, input.value, cursor);
+      const key = tableContextKey(context);
+      const cell = document.createElement(
+        section === "header" ? "th" : "td"
+      ) as HTMLTableCellElement;
+      cell.className =
+        section === "header" ? "cm-md-table-header" : "cm-md-table-cell";
+      cell.dataset.bedrockTableCell = "true";
+      cell.dataset.tableFrom = String(this.table.from);
+      cell.dataset.tableTo = String(this.table.to);
+      cell.dataset.tableSection = section;
+      cell.dataset.tableRow = String(row);
+      cell.dataset.tableColumn = String(column);
+
+      const display = document.createElement("div");
+      display.className = "cm-md-table-cell-display";
+      if (section === "header") {
+        display.classList.add("cm-md-table-cell-display-header");
+      }
+
+      let currentValue = value;
+      let editor: HTMLInputElement | null = null;
+
+      const renderDisplay = (nextValue: string) => {
+        currentValue = nextValue;
+        display.innerHTML = nextValue ? markdownToInlineHtml(nextValue) : "";
+        display.classList.toggle("cm-md-table-cell-display-empty", nextValue === "");
+      };
+
+      const closeEditor = (nextValue = currentValue) => {
+        currentValue = nextValue;
+        editor = null;
+        cell.replaceChildren(display);
+        renderDisplay(nextValue);
+      };
+
+      const openEditor = (cursor = currentValue.length) => {
+        if (!editor) {
+          editor = document.createElement("input");
+          editor.type = "text";
+          editor.className = "cm-md-table-input";
+          editor.value = currentValue;
+          editor.dataset.bedrockTableEditor = "true";
+          editor.dataset.tableCellKey = key;
+          editor.dataset.originalValue = currentValue;
+          editor.dataset.tableFrom = String(this.table.from);
+          editor.dataset.tableTo = String(this.table.to);
+          editor.dataset.tableSection = section;
+          editor.dataset.tableRow = String(row);
+          editor.dataset.tableColumn = String(column);
+
+          const commitEditorValue = (
+            focus:
+              | {
+                  context: TableCommandContext;
+                  cursor: number;
+                }
+              | null,
+            unchanged: () => void
+          ) => {
+            if (!editor) {
+              return;
+            }
+
+            const nextValue = editor.value;
+            const nextCursor = editor.selectionStart ?? nextValue.length;
+            const originalValue = editor.dataset.originalValue ?? currentValue;
+            if (nextValue === originalValue) {
+              closeEditor(nextValue);
+              unchanged();
+              return;
+            }
+
+            setTableCellValueCommand(view, context, nextValue, nextCursor, focus);
+          };
+
+          editor.addEventListener("blur", () => {
+            commitEditorValue(null, () => undefined);
+          });
+
+          editor.addEventListener("keydown", (event) => {
+            const isPrimaryModifier =
+              (event.metaKey || event.ctrlKey) &&
+              !event.altKey;
+
+            if (isPrimaryModifier) {
+              if (event.key.toLowerCase() === "b") {
+                event.preventDefault();
+                runFocusedTableCellFormatCommand(view, "bold");
+                return;
+              }
+              if (event.key.toLowerCase() === "i") {
+                event.preventDefault();
+                runFocusedTableCellFormatCommand(view, "italic");
+                return;
+              }
+              if (event.key.toLowerCase() === "k") {
+                event.preventDefault();
+                runFocusedTableCellFormatCommand(view, "link");
+                return;
+              }
+              if (event.key === "`") {
+                event.preventDefault();
+                runFocusedTableCellFormatCommand(view, "inlineCode");
+                return;
+              }
+              if (event.key.toLowerCase() === "x" && event.shiftKey) {
+                event.preventDefault();
+                runFocusedTableCellFormatCommand(view, "strikethrough");
+                return;
+              }
+            }
+
+            if (event.key === "Tab") {
+              event.preventDefault();
+              const nextContext = getAdjacentContext(
+                context,
+                event.shiftKey ? -1 : 1
+              );
+              commitEditorValue(
+                {
+                  context: nextContext,
+                  cursor: 0,
+                },
+                () => focusLocalEditor(nextContext, 0)
+              );
+              return;
+            }
+
+            if (event.key === "Enter") {
+              event.preventDefault();
+              const nextCursor = editor?.selectionStart ?? editor?.value.length ?? 0;
+              commitEditorValue(
+                {
+                  context,
+                  cursor: nextCursor,
+                },
+                () => openEditor(nextCursor)
+              );
+            }
+          });
+        }
+
+        cell.replaceChildren(editor);
+        editor.focus();
+        const nextCursor = Math.min(cursor, editor.value.length);
+        try {
+          editor.setSelectionRange(nextCursor, nextCursor);
+        } catch {
+          // Keep focus even if the caret cannot be moved explicitly.
+        }
+
+        return editor;
+      };
+
+      renderDisplay(currentValue);
+      cell.appendChild(display);
+
+      cell.addEventListener("click", (event) => {
+        if (event.button !== 0) {
+          return;
+        }
+
+        focusCell(context);
       });
 
-      input.addEventListener("keydown", (event) => {
-        if (event.key === "Tab") {
-          event.preventDefault();
-          moveTableFocus(tableEl, input, event.shiftKey ? -1 : 1);
-        }
-        if (event.key === "Enter") {
-          event.preventDefault();
-        }
+      cellControllers.set(key, {
+        context,
+        closeEditor,
+        openEditor,
       });
 
-      return input;
+      if (pendingFocus && isSameTableContext(pendingFocus, context)) {
+        openEditor(pendingFocus.cursor);
+      }
+
+      return cell;
     };
 
     const thead = document.createElement("thead");
     const headerRow = document.createElement("tr");
     this.table.header.forEach((value, column) => {
-      const cell = document.createElement("th");
-      cell.className = "cm-md-table-header";
-      cell.appendChild(createInput(value, "header", 0, column));
-      headerRow.appendChild(cell);
+      headerRow.appendChild(createCell(value, "header", 0, column));
     });
     thead.appendChild(headerRow);
     tableEl.appendChild(thead);
@@ -128,10 +363,7 @@ class TableWidget extends WidgetType {
     this.table.rows.forEach((row, rowIndex) => {
       const bodyRow = document.createElement("tr");
       row.forEach((value, column) => {
-        const cell = document.createElement("td");
-        cell.className = "cm-md-table-cell";
-        cell.appendChild(createInput(value, "body", rowIndex, column));
-        bodyRow.appendChild(cell);
+        bodyRow.appendChild(createCell(value, "body", rowIndex, column));
       });
       tbody.appendChild(bodyRow);
     });

@@ -6,6 +6,7 @@ import {
   addTableRow,
   createDefaultMarkdownTable,
   findTableBlockAtRange,
+  getTableContextFromTarget,
   removeTableColumn,
   removeTableRow,
   serializeMarkdownTable,
@@ -14,6 +15,206 @@ import {
   type TableCommandContext,
   updateTableCell,
 } from "./tables";
+
+const TABLE_EDITOR_SELECTOR = '[data-bedrock-table-editor="true"]';
+
+type TextSelectionRange = {
+  start: number;
+  end: number;
+};
+
+type TextEditResult = {
+  value: string;
+  selectionStart: number;
+  selectionEnd: number;
+};
+
+type TableCellFormat = "bold" | "italic" | "strikethrough" | "inlineCode";
+
+const getWordRangeInText = (
+  value: string,
+  pos: number
+): TextSelectionRange | null => {
+  if (value.length === 0) {
+    return null;
+  }
+
+  let index = Math.max(0, Math.min(pos, value.length));
+  if ((index >= value.length || !isWordChar(value[index] ?? "")) && index > 0) {
+    if (isWordChar(value[index - 1] ?? "")) {
+      index -= 1;
+    }
+  }
+
+  if (index < 0 || index >= value.length || !isWordChar(value[index] ?? "")) {
+    return null;
+  }
+
+  let start = index;
+  let end = index + 1;
+  while (start > 0 && isWordChar(value[start - 1] ?? "")) {
+    start -= 1;
+  }
+  while (end < value.length && isWordChar(value[end] ?? "")) {
+    end += 1;
+  }
+
+  return { start, end };
+};
+
+const trimSelectionInText = (
+  value: string,
+  selectionStart: number,
+  selectionEnd: number
+): { text: string; start: number; end: number } => {
+  let start = selectionStart;
+  let end = selectionEnd;
+  let text = value.slice(start, end);
+
+  const trimmedStart = text.length - text.trimStart().length;
+  const trimmedEnd = text.length - text.trimEnd().length;
+
+  if (trimmedStart + trimmedEnd < text.length) {
+    start += trimmedStart;
+    end -= trimmedEnd;
+    text = text.trim();
+  }
+
+  return { text, start, end };
+};
+
+const toggleTextWrap = (
+  value: string,
+  selectionStart: number,
+  selectionEnd: number,
+  before: string,
+  after: string,
+  emptySnippet: string,
+  emptyCursorOffset: number
+): TextEditResult => {
+  if (selectionStart !== selectionEnd) {
+    const { text, start, end } = trimSelectionInText(
+      value,
+      selectionStart,
+      selectionEnd
+    );
+    const hasMarkers =
+      start >= before.length &&
+      value.slice(start - before.length, start) === before &&
+      value.slice(end, end + after.length) === after;
+
+    if (hasMarkers) {
+      const nextValue =
+        value.slice(0, start - before.length) +
+        text +
+        value.slice(end + after.length);
+      const anchor = start - before.length;
+      return {
+        value: nextValue,
+        selectionStart: anchor,
+        selectionEnd: anchor + text.length,
+      };
+    }
+
+    const insert = `${before}${text}${after}`;
+    return {
+      value: value.slice(0, start) + insert + value.slice(end),
+      selectionStart: start + before.length,
+      selectionEnd: start + before.length + text.length,
+    };
+  }
+
+  const wordRange = getWordRangeInText(value, selectionStart);
+  if (wordRange) {
+    const text = value.slice(wordRange.start, wordRange.end);
+    const hasMarkers =
+      wordRange.start >= before.length &&
+      value.slice(wordRange.start - before.length, wordRange.start) === before &&
+      value.slice(wordRange.end, wordRange.end + after.length) === after;
+
+    if (hasMarkers) {
+      const nextValue =
+        value.slice(0, wordRange.start - before.length) +
+        text +
+        value.slice(wordRange.end + after.length);
+      const anchor = wordRange.start - before.length;
+      return {
+        value: nextValue,
+        selectionStart: anchor,
+        selectionEnd: anchor + text.length,
+      };
+    }
+
+    const insert = `${before}${text}${after}`;
+    return {
+      value:
+        value.slice(0, wordRange.start) + insert + value.slice(wordRange.end),
+      selectionStart: wordRange.start + before.length,
+      selectionEnd: wordRange.start + before.length + text.length,
+    };
+  }
+
+  return {
+    value:
+      value.slice(0, selectionStart) +
+      emptySnippet +
+      value.slice(selectionEnd),
+    selectionStart: selectionStart + emptyCursorOffset,
+    selectionEnd: selectionStart + emptyCursorOffset,
+  };
+};
+
+export const formatTableCellText = (
+  format: TableCellFormat,
+  value: string,
+  selectionStart: number,
+  selectionEnd: number
+): TextEditResult => {
+  switch (format) {
+    case "bold":
+      return toggleTextWrap(value, selectionStart, selectionEnd, "**", "**", "****", 2);
+    case "italic":
+      return toggleTextWrap(value, selectionStart, selectionEnd, "*", "*", "**", 1);
+    case "strikethrough":
+      return toggleTextWrap(value, selectionStart, selectionEnd, "~~", "~~", "~~~~", 2);
+    case "inlineCode":
+      return toggleTextWrap(value, selectionStart, selectionEnd, "`", "`", "``", 1);
+  }
+};
+
+export const insertTableCellMarkdownLink = (
+  value: string,
+  selectionStart: number,
+  selectionEnd: number
+): TextEditResult => {
+  const urlPlaceholder = "https://";
+
+  if (selectionStart === selectionEnd) {
+    const snippet = `[](${urlPlaceholder})`;
+    return {
+      value:
+        value.slice(0, selectionStart) + snippet + value.slice(selectionEnd),
+      selectionStart: selectionStart + 1,
+      selectionEnd: selectionStart + 1,
+    };
+  }
+
+  const { text, start, end } = trimSelectionInText(
+    value,
+    selectionStart,
+    selectionEnd
+  );
+  const insert = `[${text}](${urlPlaceholder})`;
+  const nextValue = value.slice(0, start) + insert + value.slice(end);
+  const urlSelectionStart = start + 1 + text.length + 2;
+  const urlSelectionEnd = urlSelectionStart + urlPlaceholder.length;
+
+  return {
+    value: nextValue,
+    selectionStart: urlSelectionStart,
+    selectionEnd: urlSelectionEnd,
+  };
+};
 
 export const createSnippetCommand =
   (snippet: string, cursorOffset: number) =>
@@ -336,6 +537,53 @@ export const createMarkdownLinkCommand = (
   return true;
 };
 
+export const getFocusedTableCellEditor = (
+  view: import("@codemirror/view").EditorView
+): HTMLInputElement | null => {
+  const activeElement = view.dom.ownerDocument.activeElement;
+  if (
+    activeElement instanceof HTMLInputElement &&
+    activeElement.matches(TABLE_EDITOR_SELECTOR) &&
+    view.dom.contains(activeElement)
+  ) {
+    return activeElement;
+  }
+
+  return null;
+};
+
+const applyTextEditToInput = (
+  input: HTMLInputElement,
+  next: TextEditResult
+): boolean => {
+  input.value = next.value;
+  try {
+    input.setSelectionRange(next.selectionStart, next.selectionEnd);
+  } catch {
+    // Inputs can still be updated even if selection APIs are unavailable.
+  }
+  return true;
+};
+
+export const runFocusedTableCellFormatCommand = (
+  view: import("@codemirror/view").EditorView,
+  format: TableCellFormat | "link"
+): boolean => {
+  const input = getFocusedTableCellEditor(view);
+  if (!input) {
+    return false;
+  }
+
+  const selectionStart = input.selectionStart ?? input.value.length;
+  const selectionEnd = input.selectionEnd ?? selectionStart;
+  const next =
+    format === "link"
+      ? insertTableCellMarkdownLink(input.value, selectionStart, selectionEnd)
+      : formatTableCellText(format, input.value, selectionStart, selectionEnd);
+
+  return applyTextEditToInput(input, next);
+};
+
 export const insertHorizontalRuleCommand = (
   view: import("@codemirror/view").EditorView
 ): boolean => {
@@ -393,25 +641,73 @@ const replaceTableInView = (
   tableFrom: number,
   tableTo: number,
   nextTable: MarkdownTable,
-  focus: TableCommandContext,
-  cursor = 0
+  focus:
+    | {
+        context: TableCommandContext;
+        cursor: number;
+      }
+    | null = null
 ): boolean => {
   const insert = serializeMarkdownTable(nextTable);
-  setPendingTableFocus(
-    view,
-    {
-      ...focus,
-      tableFrom,
-      tableTo: tableFrom + insert.length,
-    },
-    cursor
-  );
+  if (focus) {
+    setPendingTableFocus(
+      view,
+      {
+        ...focus.context,
+        tableFrom,
+        tableTo: tableFrom + insert.length,
+      },
+      focus.cursor
+    );
+  }
   view.dispatch({
     changes: { from: tableFrom, to: tableTo, insert },
     selection: { anchor: tableFrom },
     scrollIntoView: true,
   });
   return true;
+};
+
+const replaceActiveTableCellValue = (
+  view: import("@codemirror/view").EditorView,
+  context: TableCommandContext,
+  value: string,
+  focus:
+    | {
+        context: TableCommandContext;
+        cursor: number;
+      }
+    | null
+): boolean => {
+  const table = findTableBlockAtRange(view.state.doc, context.tableFrom);
+  if (!table) {
+    return false;
+  }
+
+  const nextTable = updateTableCell(table, context, value);
+  return replaceTableInView(view, table.from, table.to, nextTable, focus);
+};
+
+export const commitFocusedTableCellEditor = (
+  view: import("@codemirror/view").EditorView,
+  focus:
+    | {
+        context: TableCommandContext;
+        cursor: number;
+      }
+    | null = null
+): boolean => {
+  const input = getFocusedTableCellEditor(view);
+  if (!input) {
+    return false;
+  }
+
+  const context = getTableContextFromTarget(input);
+  if (!context) {
+    return false;
+  }
+
+  return replaceActiveTableCellValue(view, context, input.value, focus);
 };
 
 export const insertTableCommand = (
@@ -450,15 +746,18 @@ export const setTableCellValueCommand = (
   view: import("@codemirror/view").EditorView,
   context: TableCommandContext,
   value: string,
-  cursor = value.length
+  cursor = value.length,
+  focus:
+    | {
+        context: TableCommandContext;
+        cursor: number;
+      }
+    | null = {
+        context,
+        cursor,
+      }
 ): boolean => {
-  const table = findTableBlockAtRange(view.state.doc, context.tableFrom);
-  if (!table) {
-    return false;
-  }
-
-  const nextTable = updateTableCell(table, context, value);
-  return replaceTableInView(view, table.from, table.to, nextTable, context, cursor);
+  return replaceActiveTableCellValue(view, context, value, focus);
 };
 
 export const addTableRowAboveCommand = (
@@ -480,8 +779,10 @@ export const addTableRowAboveCommand = (
     table.from,
     table.to,
     nextTable,
-    { ...context, row: context.row },
-    0
+    {
+      context: { ...context, row: context.row },
+      cursor: 0,
+    }
   );
 };
 
@@ -504,11 +805,13 @@ export const addTableRowBelowCommand = (
     table.to,
     nextTable,
     {
-      ...context,
-      section: "body",
-      row: nextRowIndex,
-    },
-    0
+      context: {
+        ...context,
+        section: "body",
+        row: nextRowIndex,
+      },
+      cursor: 0,
+    }
   );
 };
 
@@ -537,11 +840,13 @@ export const removeTableRowCommand = (
     table.to,
     nextTable,
     {
-      ...context,
-      section: nextTable.rows.length > 0 ? "body" : "header",
-      row: nextTable.rows.length > 0 ? nextRow : 0,
-    },
-    0
+      context: {
+        ...context,
+        section: nextTable.rows.length > 0 ? "body" : "header",
+        row: nextTable.rows.length > 0 ? nextRow : 0,
+      },
+      cursor: 0,
+    }
   );
 };
 
@@ -561,10 +866,12 @@ export const addTableColumnLeftCommand = (
     table.to,
     nextTable,
     {
-      ...context,
-      column: context.column,
-    },
-    0
+      context: {
+        ...context,
+        column: context.column,
+      },
+      cursor: 0,
+    }
   );
 };
 
@@ -584,10 +891,12 @@ export const addTableColumnRightCommand = (
     table.to,
     nextTable,
     {
-      ...context,
-      column: context.column + 1,
-    },
-    0
+      context: {
+        ...context,
+        column: context.column + 1,
+      },
+      cursor: 0,
+    }
   );
 };
 
@@ -616,10 +925,12 @@ export const removeTableColumnCommand = (
     table.to,
     nextTable,
     {
-      ...context,
-      column: nextColumn,
-    },
-    0
+      context: {
+        ...context,
+        column: nextColumn,
+      },
+      cursor: 0,
+    }
   );
 };
 

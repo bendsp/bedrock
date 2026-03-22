@@ -74,6 +74,21 @@ const launchBedrock = async (): Promise<{
   return { app, page, userDataDir };
 };
 
+const closeBedrock = async (app: ElectronApplication) => {
+  const process = app.process();
+  await Promise.race([
+    app.close().catch((): undefined => undefined),
+    new Promise<void>((resolve) => {
+      setTimeout(() => {
+        if (!process.killed) {
+          process.kill("SIGKILL");
+        }
+        void app.waitForEvent("close").catch((): undefined => undefined).finally(resolve);
+      }, 2000);
+    }),
+  ]);
+};
+
 const getEditorText = async (page: Page): Promise<string> => {
   return page.locator(".cm-content").innerText();
 };
@@ -174,7 +189,7 @@ test.describe("Bedrock Electron pipeline", () => {
         })
         .toBe(0);
     } finally {
-      await app.close().catch((): undefined => undefined);
+      await closeBedrock(app);
       await fs.rm(outputDir, { recursive: true, force: true });
       await fs.rm(userDataDir, { recursive: true, force: true });
     }
@@ -191,8 +206,10 @@ test.describe("Bedrock Electron pipeline", () => {
         [
           "| Column 1 | Column 2 | Column 3 |",
           "| --- | --- | --- |",
-          "| Alice | Engineer | Paris |",
-          "| Bob | Designer | Berlin |",
+          "| **Alice** | *Engineer* | [Paris](https://example.com) |",
+          "| Bob | `Designer` | Berlin |",
+          "",
+          "This is some text coming after",
         ].join("\n"),
         "utf8"
       );
@@ -203,8 +220,6 @@ test.describe("Bedrock Electron pipeline", () => {
       });
       const insertMenu = page.getByRole("menuitem", { name: "Insert" });
       await expect(insertMenu).toBeVisible();
-      await insertMenu.hover();
-      await expect(page.getByRole("menuitem", { name: "Table" })).toBeVisible();
       await page.keyboard.press("Escape");
 
       await configureTestHarness(page, { nextOpenPath: inputPath, discardResponse: true });
@@ -213,14 +228,42 @@ test.describe("Bedrock Electron pipeline", () => {
       const headerCell = page.locator(
         '[data-bedrock-table-cell="true"][data-table-section="header"][data-table-row="0"][data-table-column="0"]'
       );
-      const bodyCell = page.locator(
+      const firstBodyCell = page.locator(
         '[data-bedrock-table-cell="true"][data-table-section="body"][data-table-row="0"][data-table-column="0"]'
+      );
+      const secondRowFirstCell = page.locator(
+        '[data-bedrock-table-cell="true"][data-table-section="body"][data-table-row="1"][data-table-column="0"]'
+      );
+      const secondRowThirdCell = page.locator(
+        '[data-bedrock-table-cell="true"][data-table-section="body"][data-table-row="1"][data-table-column="2"]'
       );
 
       await expect(headerCell).toBeVisible();
-      await headerCell.fill("Name");
-      await bodyCell.fill("Alice Updated");
-      await bodyCell.press("Tab");
+      await expect(firstBodyCell.locator("strong")).toContainText("Alice");
+      await expect(
+        page.locator(
+          '[data-bedrock-table-cell="true"][data-table-section="body"][data-table-row="0"][data-table-column="1"] em'
+        )
+      ).toContainText("Engineer");
+      await expect(
+        page.locator(
+          '[data-bedrock-table-cell="true"][data-table-section="body"][data-table-row="1"][data-table-column="1"] code'
+        )
+      ).toContainText("Designer");
+      await expect(
+        page.locator(
+          '[data-bedrock-table-cell="true"][data-table-section="body"][data-table-row="0"][data-table-column="2"] a'
+        )
+      ).toContainText("Paris");
+      await expect(page.getByText("This is some text coming after")).toBeVisible();
+
+      await firstBodyCell.click();
+      const firstBodyEditor = page.locator(
+        '[data-bedrock-table-editor="true"][data-table-section="body"][data-table-row="0"][data-table-column="0"]'
+      );
+      await expect(firstBodyEditor).toHaveValue("**Alice**");
+      await firstBodyEditor.fill("**Alice Updated**");
+      await firstBodyEditor.press("Tab");
       await expect
         .poll(() =>
           page.evaluate(() => {
@@ -230,19 +273,32 @@ test.describe("Bedrock Electron pipeline", () => {
         )
         .toBe("1");
 
-      const secondBodyCell = page.locator(
-        '[data-bedrock-table-cell="true"][data-table-section="body"][data-table-row="0"][data-table-column="1"]'
+      const secondRowFirstEditor = page.locator(
+        '[data-bedrock-table-editor="true"][data-table-section="body"][data-table-row="1"][data-table-column="0"]'
       );
-      await secondBodyCell.fill("Engineer");
+      await secondRowFirstCell.click();
+      await secondRowFirstEditor.press(`${shortcutModifier}+A`);
+      await secondRowFirstEditor.press(`${shortcutModifier}+I`);
+      await page.getByText("This is some text coming after").click();
+      await expect(secondRowFirstCell.locator("em")).toContainText("Bob");
 
-      await bodyCell.click({ button: "right" });
+      await secondRowThirdCell.click();
+      const secondRowThirdEditor = page.locator(
+        '[data-bedrock-table-editor="true"][data-table-section="body"][data-table-row="1"][data-table-column="2"]'
+      );
+      await secondRowThirdEditor.press(`${shortcutModifier}+A`);
+      await secondRowThirdEditor.press(`${shortcutModifier}+B`);
+      await page.getByText("This is some text coming after").click();
+      await expect(secondRowThirdCell.locator("strong")).toContainText("Berlin");
+
+      await firstBodyCell.click({ button: "right" });
       const firstTableMenu = page.getByRole("menuitem", { name: "Table" });
       await expect(firstTableMenu).toBeVisible();
       await firstTableMenu.press("ArrowRight");
       await page.getByRole("menuitem", { name: "Add row below" }).click();
       await expect(page.locator('tbody tr')).toHaveCount(3);
 
-      await secondBodyCell.click({ button: "right" });
+      await firstBodyCell.click({ button: "right" });
       const secondTableMenu = page.getByRole("menuitem", { name: "Table" });
       await expect(secondTableMenu).toBeVisible();
       await secondTableMenu.press("ArrowRight");
@@ -267,17 +323,58 @@ test.describe("Bedrock Electron pipeline", () => {
         )
       ).toHaveCount(3);
 
+      await page.getByText("This is some text coming after").click();
+      await page.keyboard.type(" updated");
+      await expect.poll(() => getEditorText(page)).toContain("updated");
+
       await page.getByRole("button", { name: /^Save$/ }).click();
-      await expect.poll(() => fs.readFile(inputPath, "utf8")).toContain("| Name");
+      await expect.poll(() => fs.readFile(inputPath, "utf8")).toContain("**Alice Updated**");
+      await expect.poll(() => fs.readFile(inputPath, "utf8")).toContain("*Bob*");
+      await expect.poll(() => fs.readFile(inputPath, "utf8")).toContain("**Berlin**");
+      await expect.poll(() => fs.readFile(inputPath, "utf8")).toContain("updated");
 
       await updateStoredSettings(page, { renderMode: "raw" });
       await page.reload();
       await page.locator(".cm-editor").waitFor();
 
-      await expect.poll(() => getEditorText(page)).toContain("| Name");
+      await expect.poll(() => getEditorText(page)).toContain("**Alice Updated**");
+      await expect.poll(() => getEditorText(page)).toContain("**Berlin**");
       await expect(page.locator('[data-bedrock-table-cell="true"]')).toHaveCount(0);
     } finally {
-      await app.close().catch((): undefined => undefined);
+      await closeBedrock(app);
+      await fs.rm(outputDir, { recursive: true, force: true });
+      await fs.rm(userDataDir, { recursive: true, force: true });
+    }
+  });
+
+  test("falls back to raw Markdown when a contiguous table block becomes malformed", async () => {
+    const { app, page, userDataDir } = await launchBedrock();
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "bedrock-e2e-invalid-table-"));
+    const inputPath = path.join(outputDir, "invalid-table.md");
+
+    try {
+      await fs.writeFile(
+        inputPath,
+        [
+          "| Top 10 rizzlers | gyatt | Column 3 |",
+          "| --- | --- | --- |",
+          "| rizz ohio | | |",
+          "| | # swag | asd |Hello",
+          "This is some text coming after",
+        ].join("\n"),
+        "utf8"
+      );
+
+      await configureTestHarness(page, { nextOpenPath: inputPath, discardResponse: true });
+      await page.getByLabel("Open…").click();
+
+      await expect(page.locator('[data-bedrock-table-cell="true"]')).toHaveCount(0);
+      await expect.poll(() => getEditorText(page)).toContain("| | # swag | asd |Hello");
+      await expect.poll(() => getEditorText(page)).toContain(
+        "This is some text coming after"
+      );
+    } finally {
+      await closeBedrock(app);
       await fs.rm(outputDir, { recursive: true, force: true });
       await fs.rm(userDataDir, { recursive: true, force: true });
     }

@@ -3,11 +3,14 @@ import { Text } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import {
   addTableColumnRightCommand,
+  formatTableCellText,
   insertTableCommand,
+  insertTableCellMarkdownLink,
   removeTableColumnCommand,
   removeTableRowCommand,
   setTableCellValueCommand,
 } from "../src/renderer/editor/codemirror/commands";
+import { markdownToInlineHtml } from "../src/renderer/lib/export";
 import {
   createDefaultMarkdownTable,
   findTableBlocks,
@@ -89,6 +92,70 @@ runTest("table parsing unescapes literal pipes in cells", () => {
   );
 
   assert.deepEqual(parsed?.rows[0], ["left | right"]);
+});
+
+runTest("valid table blocks stop before plain text that follows", () => {
+  const text = [
+    "| Column 1 | Column 2 |",
+    "| --- | --- |",
+    "| Alice | Paris |",
+    "This line comes after",
+  ].join("\n");
+
+  const blocks = findTableBlocks(Text.of(text.split("\n")));
+
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0]?.endLine, 3);
+});
+
+runTest("malformed contiguous table candidates fall back entirely to raw Markdown", () => {
+  const text = [
+    "| Top 10 rizzlers | gyatt | Column 3 |",
+    "| --- | --- | --- |",
+    "| rizz ohio | | |",
+    "| | # swag | asd |Hello",
+    "This is some text coming after",
+  ].join("\n");
+
+  const blocks = findTableBlocks(Text.of(text.split("\n")));
+
+  assert.equal(blocks.length, 0);
+});
+
+runTest("inline Markdown cells round-trip through parse and serialization", () => {
+  const markdown = serializeMarkdownTable({
+    header: ["**Name**", "*Role*"],
+    rows: [["`Alice`", "[Paris](https://example.com)"]],
+  });
+
+  const parsed = parseMarkdownTable(markdown);
+
+  assert.deepEqual(parsed, {
+    header: ["**Name**", "*Role*"],
+    rows: [["`Alice`", "[Paris](https://example.com)"]],
+  });
+});
+
+runTest("inline Markdown renderer keeps block-style syntax literal inside cells", () => {
+  const html = markdownToInlineHtml("# swag");
+
+  assert.equal(html, "# swag");
+});
+
+runTest("table-cell format helper wraps the current word with Markdown markers", () => {
+  const next = formatTableCellText("bold", "hello world", 1, 1);
+
+  assert.equal(next.value, "**hello** world");
+  assert.equal(next.selectionStart, 2);
+  assert.equal(next.selectionEnd, 7);
+});
+
+runTest("table-cell link helper keeps raw Markdown markers in the editor value", () => {
+  const next = insertTableCellMarkdownLink("hello", 0, 5);
+
+  assert.equal(next.value, "[hello](https://)");
+  assert.equal(next.selectionStart, 8);
+  assert.equal(next.selectionEnd, 16);
 });
 
 runTest("insert table command inserts the default 3-column table", () => {

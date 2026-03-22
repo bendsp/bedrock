@@ -416,7 +416,8 @@ body {
 
 .cm-md-table-widget {
   display: block;
-  margin: 0.25em 0 0.6em;
+  margin: 0.25em 0 0.95em;
+  isolation: isolate;
 }
 
 .cm-md-table {
@@ -450,6 +451,61 @@ body {
 
 .cm-md-table-header {
   background: color-mix(in srgb, var(--header-bg, #21252b) 85%, transparent);
+}
+
+.cm-md-table-cell-display {
+  min-height: 2.25rem;
+  padding: 0.45rem 0.65rem;
+  color: var(--panel-text, #e6e9ef);
+  overflow-wrap: anywhere;
+}
+
+.cm-md-table-cell-display-header {
+  font-weight: 600;
+  color: var(--header-text, #d7dae0);
+}
+
+.cm-md-table-cell-display:hover {
+  background: color-mix(in srgb, var(--ui-primary, #4f8bff) 6%, transparent);
+}
+
+.cm-md-table-cell-display-empty::before {
+  content: "\00a0";
+}
+
+.cm-md-table-cell-display p {
+  margin: 0;
+}
+
+.cm-md-table-cell-display a,
+.cm-md-table-cell-display button {
+  pointer-events: none;
+}
+
+.cm-md-table-cell-display code {
+  background: var(--code-inline-bg, #2c313a);
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  font-family: "Fira Code", "Source Code Pro", Monaco, Consolas, monospace;
+  color: var(--code-text, #e6edf3);
+}
+
+.cm-md-table-cell-display strong {
+  font-weight: 700;
+}
+
+.cm-md-table-cell-display em {
+  font-style: italic;
+}
+
+.cm-md-table-cell-display s {
+  text-decoration: line-through;
+}
+
+.cm-md-table-cell-display a {
+  color: var(--muted-text);
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 
 .cm-md-table-input {

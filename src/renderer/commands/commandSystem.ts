@@ -6,12 +6,14 @@ import {
   addTableColumnRightCommand,
   addTableRowAboveCommand,
   addTableRowBelowCommand,
+  commitFocusedTableCellEditor,
   createMarkdownLinkCommand,
   createWrapSelectionOrWordCommand,
   insertHorizontalRuleCommand,
   insertTableCommand,
   removeTableColumnCommand,
   removeTableRowCommand,
+  runFocusedTableCellFormatCommand,
 } from "../editor/codemirror/commands";
 import type { TableCommandContext } from "../editor/codemirror/tables";
 import {
@@ -204,6 +206,10 @@ export const createCommandRegistry = (): CommandRegistry => {
       settingsKey: "new",
       isGlobal: true,
       run: async (ctx) => {
+        const view = ctx.getEditorView();
+        if (view) {
+          commitFocusedTableCellEditor(view, null);
+        }
         await ctx.newFile();
         return true;
       },
@@ -217,6 +223,10 @@ export const createCommandRegistry = (): CommandRegistry => {
       settingsKey: "open",
       isGlobal: true,
       run: async (ctx) => {
+        const view = ctx.getEditorView();
+        if (view) {
+          commitFocusedTableCellEditor(view, null);
+        }
         await ctx.openFile();
         return true;
       },
@@ -230,6 +240,10 @@ export const createCommandRegistry = (): CommandRegistry => {
       settingsKey: "save",
       isGlobal: true,
       run: async (ctx) => {
+        const view = ctx.getEditorView();
+        if (view) {
+          commitFocusedTableCellEditor(view, null);
+        }
         await ctx.saveFile();
         return true;
       },
@@ -243,6 +257,10 @@ export const createCommandRegistry = (): CommandRegistry => {
       settingsKey: "saveAs",
       isGlobal: true,
       run: async (ctx) => {
+        const view = ctx.getEditorView();
+        if (view) {
+          commitFocusedTableCellEditor(view, null);
+        }
         await ctx.saveFileAs();
         return true;
       },
@@ -270,7 +288,10 @@ export const createCommandRegistry = (): CommandRegistry => {
       requiresEditor: true,
       run: (ctx) => {
         const view = ctx.getEditorView();
-        return view ? editorCommands.bold(view) : false;
+        if (!view) {
+          return false;
+        }
+        return runFocusedTableCellFormatCommand(view, "bold") || editorCommands.bold(view);
       },
     },
     {
@@ -283,7 +304,12 @@ export const createCommandRegistry = (): CommandRegistry => {
       requiresEditor: true,
       run: (ctx) => {
         const view = ctx.getEditorView();
-        return view ? editorCommands.italic(view) : false;
+        if (!view) {
+          return false;
+        }
+        return (
+          runFocusedTableCellFormatCommand(view, "italic") || editorCommands.italic(view)
+        );
       },
     },
     {
@@ -296,7 +322,13 @@ export const createCommandRegistry = (): CommandRegistry => {
       requiresEditor: true,
       run: (ctx) => {
         const view = ctx.getEditorView();
-        return view ? editorCommands.strikethrough(view) : false;
+        if (!view) {
+          return false;
+        }
+        return (
+          runFocusedTableCellFormatCommand(view, "strikethrough") ||
+          editorCommands.strikethrough(view)
+        );
       },
     },
     {
@@ -309,7 +341,13 @@ export const createCommandRegistry = (): CommandRegistry => {
       requiresEditor: true,
       run: (ctx) => {
         const view = ctx.getEditorView();
-        return view ? editorCommands.inlineCode(view) : false;
+        if (!view) {
+          return false;
+        }
+        return (
+          runFocusedTableCellFormatCommand(view, "inlineCode") ||
+          editorCommands.inlineCode(view)
+        );
       },
     },
     {
@@ -322,7 +360,10 @@ export const createCommandRegistry = (): CommandRegistry => {
       requiresEditor: true,
       run: (ctx) => {
         const view = ctx.getEditorView();
-        return view ? editorCommands.link(view) : false;
+        if (!view) {
+          return false;
+        }
+        return runFocusedTableCellFormatCommand(view, "link") || editorCommands.link(view);
       },
     },
     {
@@ -355,6 +396,9 @@ export const createCommandRegistry = (): CommandRegistry => {
       requiresEditor: true,
       run: (ctx, args) => {
         const view = ctx.getEditorView();
+        if (view) {
+          commitFocusedTableCellEditor(view, null);
+        }
         return view ? editorCommands.addTableRowAbove(view, args) : false;
       },
     },
@@ -366,6 +410,9 @@ export const createCommandRegistry = (): CommandRegistry => {
       requiresEditor: true,
       run: (ctx, args) => {
         const view = ctx.getEditorView();
+        if (view) {
+          commitFocusedTableCellEditor(view, null);
+        }
         return view ? editorCommands.addTableRowBelow(view, args) : false;
       },
     },
@@ -377,6 +424,9 @@ export const createCommandRegistry = (): CommandRegistry => {
       requiresEditor: true,
       run: (ctx, args) => {
         const view = ctx.getEditorView();
+        if (view) {
+          commitFocusedTableCellEditor(view, null);
+        }
         return view ? editorCommands.removeTableRow(view, args) : false;
       },
     },
@@ -388,6 +438,9 @@ export const createCommandRegistry = (): CommandRegistry => {
       requiresEditor: true,
       run: (ctx, args) => {
         const view = ctx.getEditorView();
+        if (view) {
+          commitFocusedTableCellEditor(view, null);
+        }
         return view ? editorCommands.addTableColumnLeft(view, args) : false;
       },
     },
@@ -399,6 +452,9 @@ export const createCommandRegistry = (): CommandRegistry => {
       requiresEditor: true,
       run: (ctx, args) => {
         const view = ctx.getEditorView();
+        if (view) {
+          commitFocusedTableCellEditor(view, null);
+        }
         return view ? editorCommands.addTableColumnRight(view, args) : false;
       },
     },
@@ -410,6 +466,9 @@ export const createCommandRegistry = (): CommandRegistry => {
       requiresEditor: true,
       run: (ctx, args) => {
         const view = ctx.getEditorView();
+        if (view) {
+          commitFocusedTableCellEditor(view, null);
+        }
         return view ? editorCommands.removeTableColumn(view, args) : false;
       },
     },
@@ -469,6 +528,10 @@ export const createCommandRegistry = (): CommandRegistry => {
       category: "File",
       description: "Save the current file as a styled HTML document.",
       run: async (ctx) => {
+        const view = ctx.getEditorView();
+        if (view) {
+          commitFocusedTableCellEditor(view, null);
+        }
         await ctx.exportFile("html");
         return true;
       },
@@ -479,6 +542,10 @@ export const createCommandRegistry = (): CommandRegistry => {
       category: "File",
       description: "Save the current file as a PDF document.",
       run: async (ctx) => {
+        const view = ctx.getEditorView();
+        if (view) {
+          commitFocusedTableCellEditor(view, null);
+        }
         await ctx.exportFile("pdf");
         return true;
       },

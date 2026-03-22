@@ -97,6 +97,23 @@ const getTestState = async (page: Page) => {
   });
 };
 
+const updateStoredSettings = async (
+  page: Page,
+  update: Record<string, unknown>
+) => {
+  await page.evaluate((next) => {
+    const raw = localStorage.getItem("bedrock:settings");
+    const current = raw ? JSON.parse(raw) : {};
+    localStorage.setItem(
+      "bedrock:settings",
+      JSON.stringify({
+        ...current,
+        ...next,
+      })
+    );
+  }, update);
+};
+
 test.describe("Bedrock Electron pipeline", () => {
   test("launches, edits, searches, saves, opens fixtures, and handles dirty close prompts", async () => {
     const { app, page, userDataDir } = await launchBedrock();
@@ -156,6 +173,109 @@ test.describe("Bedrock Electron pipeline", () => {
           });
         })
         .toBe(0);
+    } finally {
+      await app.close().catch((): undefined => undefined);
+      await fs.rm(outputDir, { recursive: true, force: true });
+      await fs.rm(userDataDir, { recursive: true, force: true });
+    }
+  });
+
+  test("renders Markdown tables in hybrid mode and keeps raw Markdown available in raw mode", async () => {
+    const { app, page, userDataDir } = await launchBedrock();
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "bedrock-e2e-table-output-"));
+    const inputPath = path.join(outputDir, "table-source.md");
+
+    try {
+      await fs.writeFile(
+        inputPath,
+        [
+          "| Column 1 | Column 2 | Column 3 |",
+          "| --- | --- | --- |",
+          "| Alice | Engineer | Paris |",
+          "| Bob | Designer | Berlin |",
+        ].join("\n"),
+        "utf8"
+      );
+
+      await page.locator(".cm-editor").click({
+        button: "right",
+        position: { x: 80, y: 60 },
+      });
+      const insertMenu = page.getByRole("menuitem", { name: "Insert" });
+      await expect(insertMenu).toBeVisible();
+      await insertMenu.hover();
+      await expect(page.getByRole("menuitem", { name: "Table" })).toBeVisible();
+      await page.keyboard.press("Escape");
+
+      await configureTestHarness(page, { nextOpenPath: inputPath, discardResponse: true });
+      await page.getByLabel("Open…").click();
+
+      const headerCell = page.locator(
+        '[data-bedrock-table-cell="true"][data-table-section="header"][data-table-row="0"][data-table-column="0"]'
+      );
+      const bodyCell = page.locator(
+        '[data-bedrock-table-cell="true"][data-table-section="body"][data-table-row="0"][data-table-column="0"]'
+      );
+
+      await expect(headerCell).toBeVisible();
+      await headerCell.fill("Name");
+      await bodyCell.fill("Alice Updated");
+      await bodyCell.press("Tab");
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const active = document.activeElement as HTMLInputElement | null;
+            return active?.dataset.tableColumn ?? null;
+          })
+        )
+        .toBe("1");
+
+      const secondBodyCell = page.locator(
+        '[data-bedrock-table-cell="true"][data-table-section="body"][data-table-row="0"][data-table-column="1"]'
+      );
+      await secondBodyCell.fill("Engineer");
+
+      await bodyCell.click({ button: "right" });
+      const firstTableMenu = page.getByRole("menuitem", { name: "Table" });
+      await expect(firstTableMenu).toBeVisible();
+      await firstTableMenu.press("ArrowRight");
+      await page.getByRole("menuitem", { name: "Add row below" }).click();
+      await expect(page.locator('tbody tr')).toHaveCount(3);
+
+      await secondBodyCell.click({ button: "right" });
+      const secondTableMenu = page.getByRole("menuitem", { name: "Table" });
+      await expect(secondTableMenu).toBeVisible();
+      await secondTableMenu.press("ArrowRight");
+      await page.getByRole("menuitem", { name: "Add column right" }).click();
+      await expect(
+        page.locator(
+          'thead [data-bedrock-table-cell="true"][data-table-section="header"]'
+        )
+      ).toHaveCount(4);
+
+      const insertedColumnCell = page.locator(
+        '[data-bedrock-table-cell="true"][data-table-section="body"][data-table-row="0"][data-table-column="2"]'
+      );
+      await insertedColumnCell.click({ button: "right" });
+      const thirdTableMenu = page.getByRole("menuitem", { name: "Table" });
+      await expect(thirdTableMenu).toBeVisible();
+      await thirdTableMenu.press("ArrowRight");
+      await page.getByRole("menuitem", { name: "Remove column" }).click();
+      await expect(
+        page.locator(
+          'thead [data-bedrock-table-cell="true"][data-table-section="header"]'
+        )
+      ).toHaveCount(3);
+
+      await page.getByRole("button", { name: /^Save$/ }).click();
+      await expect.poll(() => fs.readFile(inputPath, "utf8")).toContain("| Name");
+
+      await updateStoredSettings(page, { renderMode: "raw" });
+      await page.reload();
+      await page.locator(".cm-editor").waitFor();
+
+      await expect.poll(() => getEditorText(page)).toContain("| Name");
+      await expect(page.locator('[data-bedrock-table-cell="true"]')).toHaveCount(0);
     } finally {
       await app.close().catch((): undefined => undefined);
       await fs.rm(outputDir, { recursive: true, force: true });

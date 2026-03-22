@@ -1,6 +1,19 @@
 import { KeyBinding } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import type { SyntaxNode } from "@lezer/common";
+import {
+  addTableColumn,
+  addTableRow,
+  createDefaultMarkdownTable,
+  findTableBlockAtRange,
+  removeTableColumn,
+  removeTableRow,
+  serializeMarkdownTable,
+  setPendingTableFocus,
+  type MarkdownTable,
+  type TableCommandContext,
+  updateTableCell,
+} from "./tables";
 
 export const createSnippetCommand =
   (snippet: string, cursorOffset: number) =>
@@ -373,6 +386,241 @@ export const insertHorizontalRuleCommand = (
   });
 
   return true;
+};
+
+const replaceTableInView = (
+  view: import("@codemirror/view").EditorView,
+  tableFrom: number,
+  tableTo: number,
+  nextTable: MarkdownTable,
+  focus: TableCommandContext,
+  cursor = 0
+): boolean => {
+  const insert = serializeMarkdownTable(nextTable);
+  setPendingTableFocus(
+    view,
+    {
+      ...focus,
+      tableFrom,
+      tableTo: tableFrom + insert.length,
+    },
+    cursor
+  );
+  view.dispatch({
+    changes: { from: tableFrom, to: tableTo, insert },
+    selection: { anchor: tableFrom },
+    scrollIntoView: true,
+  });
+  return true;
+};
+
+export const insertTableCommand = (
+  view: import("@codemirror/view").EditorView
+): boolean => {
+  const table = createDefaultMarkdownTable();
+  const markdown = serializeMarkdownTable(table);
+  const { from, to } = view.state.selection.main;
+  const line = view.state.doc.lineAt(from);
+
+  let insert = markdown;
+  let insertFrom = from;
+  let insertTo = to;
+
+  if (from === to) {
+    if (line.text.trim() === "") {
+      insertFrom = line.from;
+      insertTo = line.to;
+    } else {
+      insertFrom = line.to;
+      insertTo = line.to;
+      insert = `\n\n${markdown}`;
+    }
+  }
+
+  view.dispatch({
+    changes: { from: insertFrom, to: insertTo, insert },
+    selection: { anchor: insertFrom },
+    scrollIntoView: true,
+  });
+
+  return true;
+};
+
+export const setTableCellValueCommand = (
+  view: import("@codemirror/view").EditorView,
+  context: TableCommandContext,
+  value: string,
+  cursor = value.length
+): boolean => {
+  const table = findTableBlockAtRange(view.state.doc, context.tableFrom);
+  if (!table) {
+    return false;
+  }
+
+  const nextTable = updateTableCell(table, context, value);
+  return replaceTableInView(view, table.from, table.to, nextTable, context, cursor);
+};
+
+export const addTableRowAboveCommand = (
+  view: import("@codemirror/view").EditorView,
+  context: TableCommandContext
+): boolean => {
+  if (context.section !== "body") {
+    return false;
+  }
+
+  const table = findTableBlockAtRange(view.state.doc, context.tableFrom);
+  if (!table) {
+    return false;
+  }
+
+  const nextTable = addTableRow(table, context.row);
+  return replaceTableInView(
+    view,
+    table.from,
+    table.to,
+    nextTable,
+    { ...context, row: context.row },
+    0
+  );
+};
+
+export const addTableRowBelowCommand = (
+  view: import("@codemirror/view").EditorView,
+  context: TableCommandContext
+): boolean => {
+  const table = findTableBlockAtRange(view.state.doc, context.tableFrom);
+  if (!table) {
+    return false;
+  }
+
+  const nextRowIndex =
+    context.section === "header" ? 0 : Math.min(context.row + 1, table.rows.length);
+  const nextTable = addTableRow(table, nextRowIndex);
+
+  return replaceTableInView(
+    view,
+    table.from,
+    table.to,
+    nextTable,
+    {
+      ...context,
+      section: "body",
+      row: nextRowIndex,
+    },
+    0
+  );
+};
+
+export const removeTableRowCommand = (
+  view: import("@codemirror/view").EditorView,
+  context: TableCommandContext
+): boolean => {
+  if (context.section !== "body") {
+    return false;
+  }
+
+  const table = findTableBlockAtRange(view.state.doc, context.tableFrom);
+  if (!table) {
+    return false;
+  }
+
+  const nextTable = removeTableRow(table, context.row);
+  if (!nextTable) {
+    return false;
+  }
+
+  const nextRow = Math.max(0, Math.min(context.row, nextTable.rows.length - 1));
+  return replaceTableInView(
+    view,
+    table.from,
+    table.to,
+    nextTable,
+    {
+      ...context,
+      section: nextTable.rows.length > 0 ? "body" : "header",
+      row: nextTable.rows.length > 0 ? nextRow : 0,
+    },
+    0
+  );
+};
+
+export const addTableColumnLeftCommand = (
+  view: import("@codemirror/view").EditorView,
+  context: TableCommandContext
+): boolean => {
+  const table = findTableBlockAtRange(view.state.doc, context.tableFrom);
+  if (!table) {
+    return false;
+  }
+
+  const nextTable = addTableColumn(table, context.column);
+  return replaceTableInView(
+    view,
+    table.from,
+    table.to,
+    nextTable,
+    {
+      ...context,
+      column: context.column,
+    },
+    0
+  );
+};
+
+export const addTableColumnRightCommand = (
+  view: import("@codemirror/view").EditorView,
+  context: TableCommandContext
+): boolean => {
+  const table = findTableBlockAtRange(view.state.doc, context.tableFrom);
+  if (!table) {
+    return false;
+  }
+
+  const nextTable = addTableColumn(table, context.column + 1);
+  return replaceTableInView(
+    view,
+    table.from,
+    table.to,
+    nextTable,
+    {
+      ...context,
+      column: context.column + 1,
+    },
+    0
+  );
+};
+
+export const removeTableColumnCommand = (
+  view: import("@codemirror/view").EditorView,
+  context: TableCommandContext
+): boolean => {
+  const table = findTableBlockAtRange(view.state.doc, context.tableFrom);
+  if (!table) {
+    return false;
+  }
+
+  const nextTable = removeTableColumn(table, context.column);
+  if (!nextTable) {
+    return false;
+  }
+
+  const nextColumn = Math.max(
+    0,
+    Math.min(context.column, nextTable.header.length - 1)
+  );
+
+  return replaceTableInView(
+    view,
+    table.from,
+    table.to,
+    nextTable,
+    {
+      ...context,
+      column: nextColumn,
+    },
+    0
+  );
 };
 
 export const snippetKeyBinding = (

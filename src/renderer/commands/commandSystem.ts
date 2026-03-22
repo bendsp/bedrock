@@ -2,10 +2,18 @@ import { undo, redo } from "@codemirror/commands";
 import { openSearchPanel, closeSearchPanel } from "@codemirror/search";
 import type { EditorView, KeyBinding } from "@codemirror/view";
 import {
+  addTableColumnLeftCommand,
+  addTableColumnRightCommand,
+  addTableRowAboveCommand,
+  addTableRowBelowCommand,
   createMarkdownLinkCommand,
   createWrapSelectionOrWordCommand,
   insertHorizontalRuleCommand,
+  insertTableCommand,
+  removeTableColumnCommand,
+  removeTableRowCommand,
 } from "../editor/codemirror/commands";
+import type { TableCommandContext } from "../editor/codemirror/tables";
 import {
   bindingToCodeMirrorKey,
   formatBindingShortcut,
@@ -26,6 +34,13 @@ export type CommandId =
   | "format.inlineCode"
   | "insert.link"
   | "insert.horizontalRule"
+  | "insert.table"
+  | "table.addRowAbove"
+  | "table.addRowBelow"
+  | "table.removeRow"
+  | "table.addColumnLeft"
+  | "table.addColumnRight"
+  | "table.removeColumn"
   | "theme.set"
   | "editor.undo"
   | "editor.redo"
@@ -45,6 +60,13 @@ export type CommandArgs = {
   "format.inlineCode": void;
   "insert.link": void;
   "insert.horizontalRule": void;
+  "insert.table": void;
+  "table.addRowAbove": TableCommandContext;
+  "table.addRowBelow": TableCommandContext;
+  "table.removeRow": TableCommandContext;
+  "table.addColumnLeft": TableCommandContext;
+  "table.addColumnRight": TableCommandContext;
+  "table.removeColumn": TableCommandContext;
   "theme.set": { theme: ThemeName };
   "editor.undo": void;
   "editor.redo": void;
@@ -58,6 +80,7 @@ export type CommandCategory =
   | "App"
   | "Format"
   | "Insert"
+  | "Table"
   | "Theme"
   | "Edit";
 
@@ -161,6 +184,13 @@ const editorCommands = {
   }),
   link: createMarkdownLinkCommand,
   horizontalRule: insertHorizontalRuleCommand,
+  table: insertTableCommand,
+  addTableRowAbove: addTableRowAboveCommand,
+  addTableRowBelow: addTableRowBelowCommand,
+  removeTableRow: removeTableRowCommand,
+  addTableColumnLeft: addTableColumnLeftCommand,
+  addTableColumnRight: addTableColumnRightCommand,
+  removeTableColumn: removeTableColumnCommand,
 } as const;
 
 export const createCommandRegistry = (): CommandRegistry => {
@@ -304,6 +334,83 @@ export const createCommandRegistry = (): CommandRegistry => {
       run: (ctx) => {
         const view = ctx.getEditorView();
         return view ? editorCommands.horizontalRule(view) : false;
+      },
+    },
+    {
+      id: "insert.table",
+      title: "Insert table",
+      category: "Insert",
+      description: "Insert a default Markdown table.",
+      requiresEditor: true,
+      run: (ctx) => {
+        const view = ctx.getEditorView();
+        return view ? editorCommands.table(view) : false;
+      },
+    },
+    {
+      id: "table.addRowAbove",
+      title: "Add row above",
+      category: "Table",
+      description: "Insert a row above the current table row.",
+      requiresEditor: true,
+      run: (ctx, args) => {
+        const view = ctx.getEditorView();
+        return view ? editorCommands.addTableRowAbove(view, args) : false;
+      },
+    },
+    {
+      id: "table.addRowBelow",
+      title: "Add row below",
+      category: "Table",
+      description: "Insert a row below the current table row.",
+      requiresEditor: true,
+      run: (ctx, args) => {
+        const view = ctx.getEditorView();
+        return view ? editorCommands.addTableRowBelow(view, args) : false;
+      },
+    },
+    {
+      id: "table.removeRow",
+      title: "Remove row",
+      category: "Table",
+      description: "Remove the current table row.",
+      requiresEditor: true,
+      run: (ctx, args) => {
+        const view = ctx.getEditorView();
+        return view ? editorCommands.removeTableRow(view, args) : false;
+      },
+    },
+    {
+      id: "table.addColumnLeft",
+      title: "Add column left",
+      category: "Table",
+      description: "Insert a column to the left of the current cell.",
+      requiresEditor: true,
+      run: (ctx, args) => {
+        const view = ctx.getEditorView();
+        return view ? editorCommands.addTableColumnLeft(view, args) : false;
+      },
+    },
+    {
+      id: "table.addColumnRight",
+      title: "Add column right",
+      category: "Table",
+      description: "Insert a column to the right of the current cell.",
+      requiresEditor: true,
+      run: (ctx, args) => {
+        const view = ctx.getEditorView();
+        return view ? editorCommands.addTableColumnRight(view, args) : false;
+      },
+    },
+    {
+      id: "table.removeColumn",
+      title: "Remove column",
+      category: "Table",
+      description: "Remove the current table column.",
+      requiresEditor: true,
+      run: (ctx, args) => {
+        const view = ctx.getEditorView();
+        return view ? editorCommands.removeTableColumn(view, args) : false;
       },
     },
     {

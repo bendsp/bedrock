@@ -127,3 +127,4 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
 - 2026-03-21: Added a Playwright-based Electron E2E harness with test-only dialog/user-data controls for reproducible agent testing.
 - 2026-03-21: Added Sentry-ready telemetry hooks for Electron main/renderer plus Linear/GitHub helper scripts for agent issue and repo bootstrap workflows.
 - 2026-03-22: Main-process uncaught exceptions now flush telemetry and exit, and release automation no longer pushes version-bump commits directly to protected `main`.
+- 2026-03-22: Added Obsidian-style Markdown tables in hybrid mode with rendered table widgets, direct cell editing, context-menu row/column actions, and raw-mode Markdown fallback.

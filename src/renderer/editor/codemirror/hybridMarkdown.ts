@@ -1,18 +1,143 @@
-import { Extension, RangeSetBuilder } from "@codemirror/state";
+import { Extension, RangeSetBuilder, StateField } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import {
   Decoration,
   DecorationSet,
+  EditorView,
   ViewPlugin,
   WidgetType,
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
+import { setTableCellValueCommand } from "./commands";
+import {
+  findTableBlocks,
+  restorePendingTableFocus,
+  type TableBlock,
+  type TableCellSection,
+  type TableCommandContext,
+} from "./tables";
 
 class HRWidget extends WidgetType {
   toDOM() {
     const span = document.createElement("span");
     span.className = "cm-md-hr-widget";
     return span;
+  }
+
+  ignoreEvent() {
+    return true;
+  }
+}
+
+const moveTableFocus = (
+  root: ParentNode,
+  current: HTMLInputElement,
+  delta: number
+) => {
+  const inputs = Array.from(
+    root.querySelectorAll<HTMLInputElement>('[data-bedrock-table-cell="true"]')
+  );
+  const index = inputs.indexOf(current);
+  if (index === -1 || inputs.length === 0) {
+    return;
+  }
+
+  const nextIndex = (index + delta + inputs.length) % inputs.length;
+  const next = inputs[nextIndex];
+  next?.focus();
+  const cursor = next?.value.length ?? 0;
+  try {
+    next?.setSelectionRange(cursor, cursor);
+  } catch {
+    // Inputs can still be focused without moving the caret explicitly.
+  }
+};
+
+class TableWidget extends WidgetType {
+  constructor(private readonly table: TableBlock) {
+    super();
+  }
+
+  eq(other: TableWidget): boolean {
+    return JSON.stringify(this.table) === JSON.stringify(other.table);
+  }
+
+  toDOM(view: import("@codemirror/view").EditorView) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "cm-md-table-widget";
+
+    const tableEl = document.createElement("table");
+    tableEl.className = "cm-md-table";
+    wrapper.appendChild(tableEl);
+
+    const createInput = (
+      value: string,
+      section: TableCellSection,
+      row: number,
+      column: number
+    ) => {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "cm-md-table-input";
+      input.value = value;
+      input.dataset.bedrockTableCell = "true";
+      input.dataset.tableFrom = String(this.table.from);
+      input.dataset.tableTo = String(this.table.to);
+      input.dataset.tableSection = section;
+      input.dataset.tableRow = String(row);
+      input.dataset.tableColumn = String(column);
+
+      const context: TableCommandContext = {
+        tableFrom: this.table.from,
+        tableTo: this.table.to,
+        section,
+        row,
+        column,
+      };
+
+      input.addEventListener("input", () => {
+        const cursor = input.selectionStart ?? input.value.length;
+        setTableCellValueCommand(view, context, input.value, cursor);
+      });
+
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Tab") {
+          event.preventDefault();
+          moveTableFocus(tableEl, input, event.shiftKey ? -1 : 1);
+        }
+        if (event.key === "Enter") {
+          event.preventDefault();
+        }
+      });
+
+      return input;
+    };
+
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    this.table.header.forEach((value, column) => {
+      const cell = document.createElement("th");
+      cell.className = "cm-md-table-header";
+      cell.appendChild(createInput(value, "header", 0, column));
+      headerRow.appendChild(cell);
+    });
+    thead.appendChild(headerRow);
+    tableEl.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    this.table.rows.forEach((row, rowIndex) => {
+      const bodyRow = document.createElement("tr");
+      row.forEach((value, column) => {
+        const cell = document.createElement("td");
+        cell.className = "cm-md-table-cell";
+        cell.appendChild(createInput(value, "body", rowIndex, column));
+        bodyRow.appendChild(cell);
+      });
+      tbody.appendChild(bodyRow);
+    });
+    tableEl.appendChild(tbody);
+
+    return wrapper;
   }
 
   ignoreEvent() {
@@ -136,7 +261,38 @@ const quoteRunFor = (kinds: LineKind[], start: number): [number, number] => {
 };
 
 export const hybridMarkdown = (): Extension => {
-  return ViewPlugin.fromClass(
+  const buildTableDecorations = (
+    doc: import("@codemirror/state").Text
+  ): DecorationSet => {
+    const builder = new RangeSetBuilder<Decoration>();
+    for (const tableBlock of findTableBlocks(doc)) {
+      builder.add(
+        tableBlock.from,
+        tableBlock.to,
+        Decoration.replace({
+          widget: new TableWidget(tableBlock),
+          block: true,
+          inclusive: false,
+        })
+      );
+    }
+    return builder.finish();
+  };
+
+  const tableWidgetField = StateField.define<DecorationSet>({
+    create(state) {
+      return buildTableDecorations(state.doc);
+    },
+    update(decorations, transaction) {
+      if (!transaction.docChanged) {
+        return decorations;
+      }
+      return buildTableDecorations(transaction.state.doc);
+    },
+    provide: (field) => EditorView.decorations.from(field),
+  });
+
+  const inlinePlugin = ViewPlugin.fromClass(
     class {
       decorations: DecorationSet;
 
@@ -186,6 +342,13 @@ export const hybridMarkdown = (): Extension => {
           lines.push(doc.line(i).text);
         }
         const kinds = classifyLines(lines);
+        const tableBlocks = findTableBlocks(doc);
+        const tableStarts = new Map(
+          tableBlocks.map((table) => [table.startLine, table] as const)
+        );
+        const isTableRange = (from: number, to: number) => {
+          return tableBlocks.some((table) => from < table.to && to > table.from);
+        };
 
         const addLineClass = (lineNumber: number, cls: string) => {
           const line = doc.line(lineNumber);
@@ -205,6 +368,12 @@ export const hybridMarkdown = (): Extension => {
 
         for (let i = 0; i < kinds.length; i += 1) {
           const lineNo = i + 1;
+          const tableBlock = tableStarts.get(lineNo);
+          if (tableBlock) {
+            i = tableBlock.endLine - 1;
+            continue;
+          }
+
           const kind = kinds[i];
 
           switch (kind.type) {
@@ -350,6 +519,9 @@ export const hybridMarkdown = (): Extension => {
             from: range.from,
             to: range.to,
             enter: (node) => {
+              if (isTableRange(node.from, node.to)) {
+                return;
+              }
               switch (node.name) {
                 case "StrongEmphasis": {
                   const container = findOutermostStylingContainer(node.node);
@@ -411,11 +583,15 @@ export const hybridMarkdown = (): Extension => {
           builder.add(entry.from, entry.to, entry.deco);
         }
 
-        return builder.finish();
+        const result = builder.finish();
+        restorePendingTableFocus(view);
+        return result;
       }
     },
     {
       decorations: (value) => value.decorations,
     }
   );
+
+  return [tableWidgetField, inlinePlugin];
 };

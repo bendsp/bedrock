@@ -19,6 +19,10 @@ import type {
   CommandRunner,
 } from "../commands/commandSystem";
 import { resolveCommandShortcutLabel } from "../commands/commandSystem";
+import {
+  getTableContextFromTarget,
+  type TableCommandContext,
+} from "../editor/codemirror/tables";
 import type { UserSettings } from "../settings";
 import { getActiveFormats } from "../lib/getActiveFormats";
 
@@ -39,6 +43,12 @@ export function EditorContextMenu({
   settings,
   children,
 }: EditorContextMenuProps) {
+  const [tableContext, setTableContext] = useState<
+    (TableCommandContext & {
+      bodyRowCount: number;
+      columnCount: number;
+    }) | null
+  >(null);
   const [activeFormats, setActiveFormats] = useState<{
     bold: boolean;
     italic: boolean;
@@ -61,6 +71,7 @@ export function EditorContextMenu({
       strikethrough: get("format.strikethrough"),
       inlineCode: get("format.inlineCode"),
       link: get("insert.link"),
+      table: get("insert.table"),
       settings: get("app.openSettings"),
     };
   }, [commandRegistry, settings]);
@@ -77,6 +88,26 @@ export function EditorContextMenu({
     [commands, getView]
   );
 
+  const runTableCommand = useCallback(
+    (
+      id:
+        | "table.addRowAbove"
+        | "table.addRowBelow"
+        | "table.removeRow"
+        | "table.addColumnLeft"
+        | "table.addColumnRight"
+        | "table.removeColumn"
+    ) => {
+      const view = getView();
+      if (!view || !tableContext) {
+        return;
+      }
+      view.focus();
+      void commands.runWithView(id, view, tableContext);
+    },
+    [commands, getView, tableContext]
+  );
+
   const updateActiveFormats = useCallback(() => {
     const view = getView();
     if (!view) return;
@@ -90,6 +121,28 @@ export function EditorContextMenu({
       if (!view) {
         return;
       }
+
+      const nextTableContext = getTableContextFromTarget(event.target);
+      if (nextTableContext) {
+        const tableElement =
+          event.target instanceof Element
+            ? event.target.closest(".cm-md-table")
+            : null;
+        const columnCount =
+          tableElement?.querySelectorAll(
+            'thead [data-bedrock-table-cell="true"]'
+          ).length ?? 0;
+        const bodyRowCount =
+          tableElement?.querySelectorAll("tbody tr").length ?? 0;
+        setTableContext({
+          ...nextTableContext,
+          bodyRowCount,
+          columnCount,
+        });
+        return;
+      }
+
+      setTableContext(null);
 
       // If there's already a selection, preserve it. Otherwise, move the cursor
       // to the right-click position so formatting targets the expected word.
@@ -111,10 +164,15 @@ export function EditorContextMenu({
     (open: boolean) => {
       if (open) {
         updateActiveFormats();
+      } else {
+        setTableContext(null);
       }
     },
     [updateActiveFormats]
   );
+
+  const isHeaderCell = tableContext?.section === "header";
+  const canRemoveColumn = (tableContext?.columnCount ?? 0) > 1;
 
   const child = cloneElement(children, {
     onContextMenu: (event: MouseEvent<HTMLElement>) => {
@@ -170,6 +228,10 @@ export function EditorContextMenu({
               Link
               <ContextMenuShortcut>{shortcuts.link}</ContextMenuShortcut>
             </ContextMenuItem>
+            <ContextMenuItem inset onSelect={() => runCommand("insert.table")}>
+              Table
+              <ContextMenuShortcut>{shortcuts.table}</ContextMenuShortcut>
+            </ContextMenuItem>
             <ContextMenuItem
               inset
               onSelect={() => runCommand("insert.horizontalRule")}
@@ -178,6 +240,54 @@ export function EditorContextMenu({
             </ContextMenuItem>
           </ContextMenuSubContent>
         </ContextMenuSub>
+        {tableContext ? (
+          <ContextMenuSub>
+            <ContextMenuSubTrigger inset>Table</ContextMenuSubTrigger>
+            <ContextMenuSubContent>
+              {!isHeaderCell ? (
+                <ContextMenuItem
+                  inset
+                  onSelect={() => runTableCommand("table.addRowAbove")}
+                >
+                  Add row above
+                </ContextMenuItem>
+              ) : null}
+              <ContextMenuItem
+                inset
+                onSelect={() => runTableCommand("table.addRowBelow")}
+              >
+                Add row below
+              </ContextMenuItem>
+              <ContextMenuItem
+                inset
+                disabled={isHeaderCell}
+                onSelect={() => runTableCommand("table.removeRow")}
+              >
+                Remove row
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                inset
+                onSelect={() => runTableCommand("table.addColumnLeft")}
+              >
+                Add column left
+              </ContextMenuItem>
+              <ContextMenuItem
+                inset
+                onSelect={() => runTableCommand("table.addColumnRight")}
+              >
+                Add column right
+              </ContextMenuItem>
+              <ContextMenuItem
+                inset
+                disabled={!canRemoveColumn}
+                onSelect={() => runTableCommand("table.removeColumn")}
+              >
+                Remove column
+              </ContextMenuItem>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        ) : null}
         <ContextMenuSeparator></ContextMenuSeparator>
         <ContextMenuItem inset onSelect={() => runCommand("app.openSettings")}>
           Settings

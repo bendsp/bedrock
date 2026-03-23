@@ -41,8 +41,16 @@ body {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
+  font-family: var(
+    --app-font-family,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif
+  );
 }
 
 .bed-drag-region {
@@ -58,6 +66,10 @@ body {
 }
 
 :root {
+  --app-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  --editor-font-family: "Inter", system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --ui-font-size: 15px;
   --bg-body: #282c34;
   --text-body: #abb2bf;
@@ -130,6 +142,16 @@ body {
   padding: 20px 24px;
   box-sizing: border-box;
   overflow-y: auto;
+  font-family: var(
+    --app-font-family,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif
+  );
 }
 
 .inline-editor {
@@ -305,8 +327,18 @@ body {
 
 .cm-editor .cm-content {
   min-height: 100%;
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  font-family: var(
+    --editor-font-family,
+    "Inter",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif
+  );
 }
 
 .cm-editor .cm-line {
@@ -508,30 +540,31 @@ body {
   text-underline-offset: 4px;
 }
 
-.cm-md-table-input {
-  width: 100%;
+.cm-md-table-editor {
   min-height: 2.25rem;
-  border: none;
   background: transparent;
-  color: var(--panel-text, #e6e9ef);
-  font: inherit;
-  padding: 0.45rem 0.65rem;
-  outline: none;
 }
 
-.cm-md-table-header .cm-md-table-input {
-  font-weight: 600;
-  color: var(--header-text, #d7dae0);
-}
-
-.cm-md-table-input:hover {
+.cm-md-table-editor:hover {
   background: color-mix(in srgb, var(--ui-primary, #4f8bff) 6%, transparent);
 }
 
-.cm-md-table-input:focus {
+.cm-md-table-editor.cm-focused {
   background: color-mix(in srgb, var(--ui-primary, #4f8bff) 8%, transparent);
   box-shadow: inset 0 0 0 1px
     color-mix(in srgb, var(--ui-primary-border, #75a7ff) 80%, transparent);
+}
+
+.cm-md-table-editor .cm-content {
+  padding: 0.45rem 0.65rem;
+}
+
+.cm-md-table-gap {
+  display: block;
+  width: 100%;
+  min-height: 1.1rem;
+  cursor: text;
+  user-select: none;
 }
 
 .cm-content .cm-md-inline-code {

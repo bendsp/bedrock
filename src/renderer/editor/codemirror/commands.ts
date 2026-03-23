@@ -1,4 +1,4 @@
-import { KeyBinding } from "@codemirror/view";
+import { EditorView, KeyBinding } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import type { SyntaxNode } from "@lezer/common";
 import {
@@ -7,6 +7,7 @@ import {
   createDefaultMarkdownTable,
   findTableBlockAtRange,
   getTableContextFromTarget,
+  normalizeTableWrite,
   removeTableColumn,
   removeTableRow,
   serializeMarkdownTable,
@@ -537,31 +538,43 @@ export const createMarkdownLinkCommand = (
   return true;
 };
 
-export const getFocusedTableCellEditor = (
+const getTableCellEditorRoot = (
   view: import("@codemirror/view").EditorView
-): HTMLInputElement | null => {
+): HTMLElement | null => {
   const activeElement = view.dom.ownerDocument.activeElement;
   if (
-    activeElement instanceof HTMLInputElement &&
-    activeElement.matches(TABLE_EDITOR_SELECTOR) &&
+    activeElement instanceof Element &&
     view.dom.contains(activeElement)
   ) {
-    return activeElement;
+    return activeElement.closest<HTMLElement>(TABLE_EDITOR_SELECTOR);
   }
 
   return null;
 };
 
-const applyTextEditToInput = (
-  input: HTMLInputElement,
+export const getFocusedTableCellEditor = (
+  view: import("@codemirror/view").EditorView
+): EditorView | null => {
+  const root = getTableCellEditorRoot(view);
+  return root ? EditorView.findFromDOM(root) : null;
+};
+
+const applyTextEditToEditor = (
+  editor: EditorView,
   next: TextEditResult
 ): boolean => {
-  input.value = next.value;
-  try {
-    input.setSelectionRange(next.selectionStart, next.selectionEnd);
-  } catch {
-    // Inputs can still be updated even if selection APIs are unavailable.
-  }
+  editor.dispatch({
+    changes: {
+      from: 0,
+      to: editor.state.doc.length,
+      insert: next.value,
+    },
+    selection: {
+      anchor: next.selectionStart,
+      head: next.selectionEnd,
+    },
+    scrollIntoView: true,
+  });
   return true;
 };
 
@@ -569,19 +582,21 @@ export const runFocusedTableCellFormatCommand = (
   view: import("@codemirror/view").EditorView,
   format: TableCellFormat | "link"
 ): boolean => {
-  const input = getFocusedTableCellEditor(view);
-  if (!input) {
+  const editor = getFocusedTableCellEditor(view);
+  if (!editor) {
     return false;
   }
 
-  const selectionStart = input.selectionStart ?? input.value.length;
-  const selectionEnd = input.selectionEnd ?? selectionStart;
+  const selection = editor.state.selection.main;
+  const selectionStart = selection.from;
+  const selectionEnd = selection.to;
+  const value = editor.state.doc.toString();
   const next =
     format === "link"
-      ? insertTableCellMarkdownLink(input.value, selectionStart, selectionEnd)
-      : formatTableCellText(format, input.value, selectionStart, selectionEnd);
+      ? insertTableCellMarkdownLink(value, selectionStart, selectionEnd)
+      : formatTableCellText(format, value, selectionStart, selectionEnd);
 
-  return applyTextEditToInput(input, next);
+  return applyTextEditToEditor(editor, next);
 };
 
 export const insertHorizontalRuleCommand = (
@@ -648,20 +663,25 @@ const replaceTableInView = (
       }
     | null = null
 ): boolean => {
-  const insert = serializeMarkdownTable(nextTable);
+  const markdown = serializeMarkdownTable(nextTable);
+  const normalized = normalizeTableWrite(view.state.doc, tableFrom, tableTo, markdown);
   if (focus) {
     setPendingTableFocus(
       view,
       {
         ...focus.context,
         tableFrom,
-        tableTo: tableFrom + insert.length,
+        tableTo: normalized.tableTo,
       },
       focus.cursor
     );
   }
   view.dispatch({
-    changes: { from: tableFrom, to: tableTo, insert },
+    changes: {
+      from: normalized.replaceFrom,
+      to: normalized.replaceTo,
+      insert: normalized.insert,
+    },
     selection: { anchor: tableFrom },
     scrollIntoView: true,
   });
@@ -697,17 +717,23 @@ export const commitFocusedTableCellEditor = (
       }
     | null = null
 ): boolean => {
-  const input = getFocusedTableCellEditor(view);
-  if (!input) {
+  const editor = getFocusedTableCellEditor(view);
+  const editorRoot = getTableCellEditorRoot(view);
+  if (!editor || !editorRoot) {
     return false;
   }
 
-  const context = getTableContextFromTarget(input);
+  const context = getTableContextFromTarget(editorRoot);
   if (!context) {
     return false;
   }
 
-  return replaceActiveTableCellValue(view, context, input.value, focus);
+  return replaceActiveTableCellValue(
+    view,
+    context,
+    editor.state.doc.toString(),
+    focus
+  );
 };
 
 export const insertTableCommand = (
@@ -732,6 +758,8 @@ export const insertTableCommand = (
       insert = `\n\n${markdown}`;
     }
   }
+
+  insert = `${insert}\n\n`;
 
   view.dispatch({
     changes: { from: insertFrom, to: insertTo, insert },
@@ -758,6 +786,45 @@ export const setTableCellValueCommand = (
       }
 ): boolean => {
   return replaceActiveTableCellValue(view, context, value, focus);
+};
+
+export const moveCursorBelowTableCommand = (
+  view: import("@codemirror/view").EditorView,
+  tableFrom: number
+): boolean => {
+  const table = findTableBlockAtRange(view.state.doc, tableFrom);
+  if (!table) {
+    return false;
+  }
+
+  const normalized = normalizeTableWrite(
+    view.state.doc,
+    table.from,
+    table.to,
+    serializeMarkdownTable(table)
+  );
+  const hasNormalizedWrite =
+    normalized.replaceTo !== table.to ||
+    view.state.doc.sliceString(table.from, normalized.replaceTo) !== normalized.insert;
+
+  if (!hasNormalizedWrite) {
+    view.dispatch({
+      selection: { anchor: normalized.afterTableAnchor },
+      scrollIntoView: true,
+    });
+    return true;
+  }
+
+  view.dispatch({
+    changes: {
+      from: normalized.replaceFrom,
+      to: normalized.replaceTo,
+      insert: normalized.insert,
+    },
+    selection: { anchor: normalized.afterTableAnchor },
+    scrollIntoView: true,
+  });
+  return true;
 };
 
 export const addTableRowAboveCommand = (

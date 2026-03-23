@@ -18,7 +18,83 @@ export type KeyBindingAction =
 
 export type KeyBindings = Record<KeyBindingAction, string>;
 
+export type FontFamilyOption =
+  | "bedrock"
+  | "system"
+  | "inter"
+  | "satoshi"
+  | "serif";
+
+type FontFamilyStacks = {
+  appFontFamily: string;
+  editorFontFamily: string;
+};
+
+const SYSTEM_SANS_STACK =
+  'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+const LEGACY_APP_SANS_STACK =
+  '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+const INTER_STACK =
+  '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+const SATOSHI_STACK =
+  '"Satoshi", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+const SERIF_STACK =
+  'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif';
+
+export const fontFamilyOptions: FontFamilyOption[] = [
+  "bedrock",
+  "system",
+  "inter",
+  "satoshi",
+  "serif",
+];
+
+export const fontFamilyDisplayName: Record<FontFamilyOption, string> = {
+  bedrock: "Bedrock",
+  system: "System Sans",
+  inter: "Inter",
+  satoshi: "Satoshi",
+  serif: "Serif",
+};
+
+const fontFamilyStacks: Record<FontFamilyOption, FontFamilyStacks> = {
+  bedrock: {
+    appFontFamily: LEGACY_APP_SANS_STACK,
+    editorFontFamily: INTER_STACK,
+  },
+  system: {
+    appFontFamily: SYSTEM_SANS_STACK,
+    editorFontFamily: SYSTEM_SANS_STACK,
+  },
+  inter: {
+    appFontFamily: INTER_STACK,
+    editorFontFamily: INTER_STACK,
+  },
+  satoshi: {
+    appFontFamily: SATOSHI_STACK,
+    editorFontFamily: SATOSHI_STACK,
+  },
+  serif: {
+    appFontFamily: SERIF_STACK,
+    editorFontFamily: SERIF_STACK,
+  },
+};
+
+export const isFontFamilyOption = (
+  value: string
+): value is FontFamilyOption =>
+  fontFamilyOptions.includes(value as FontFamilyOption);
+
+export const resolveFontFamily = (
+  fontFamily: FontFamilyOption
+): FontFamilyStacks => fontFamilyStacks[fontFamily] ?? fontFamilyStacks.bedrock;
+
 export type UserSettings = {
+  fontFamily: FontFamilyOption;
   textSize: number;
   uiScale: number; // percentage; custom UI scaling (separate from Electron zoom)
   keyBindings: KeyBindings;
@@ -50,6 +126,7 @@ export const defaultKeyBindings: KeyBindings = {
 };
 
 export const defaultSettings: UserSettings = {
+  fontFamily: "bedrock",
   textSize: 16,
   uiScale: 100,
   keyBindings: defaultKeyBindings,
@@ -150,6 +227,12 @@ export const loadSettings = (): UserSettings => {
       typeof uiScaleRaw === "number" && uiScaleRaw >= 63 && uiScaleRaw <= 173
         ? uiScaleRaw
         : defaultSettings.uiScale;
+    const fontFamily =
+      parsed.fontFamily &&
+      typeof parsed.fontFamily === "string" &&
+      isFontFamilyOption(parsed.fontFamily)
+        ? parsed.fontFamily
+        : defaultSettings.fontFamily;
     const keyBindings = normalizeKeyBindings(parsed.keyBindings);
     const theme =
       parsed.theme &&
@@ -185,6 +268,7 @@ export const loadSettings = (): UserSettings => {
         : defaultSettings.lastOpenedFilePath;
 
     return {
+      fontFamily,
       textSize,
       uiScale,
       keyBindings,

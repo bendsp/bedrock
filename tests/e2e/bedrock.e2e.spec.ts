@@ -261,14 +261,19 @@ test.describe("Bedrock Electron pipeline", () => {
       const firstBodyEditor = page.locator(
         '[data-bedrock-table-editor="true"][data-table-section="body"][data-table-row="0"][data-table-column="0"]'
       );
-      await expect(firstBodyEditor).toHaveValue("**Alice**");
-      await firstBodyEditor.fill("**Alice Updated**");
-      await firstBodyEditor.press("Tab");
+      await expect(firstBodyEditor).toBeVisible();
+      await page.keyboard.press(`${shortcutModifier}+A`);
+      await page.keyboard.type("**Alice Updated**");
+      await page.keyboard.press("Tab");
       await expect
         .poll(() =>
           page.evaluate(() => {
-            const active = document.activeElement as HTMLInputElement | null;
-            return active?.dataset.tableColumn ?? null;
+            const active = document.activeElement as Element | null;
+            return (
+              active
+                ?.closest('[data-bedrock-table-editor="true"]')
+                ?.getAttribute("data-table-column") ?? null
+            );
           })
         )
         .toBe("1");
@@ -277,8 +282,9 @@ test.describe("Bedrock Electron pipeline", () => {
         '[data-bedrock-table-editor="true"][data-table-section="body"][data-table-row="1"][data-table-column="0"]'
       );
       await secondRowFirstCell.click();
-      await secondRowFirstEditor.press(`${shortcutModifier}+A`);
-      await secondRowFirstEditor.press(`${shortcutModifier}+I`);
+      await page.keyboard.press(`${shortcutModifier}+A`);
+      await page.keyboard.press(`${shortcutModifier}+I`);
+      await expect(secondRowFirstEditor).toContainText("*Bob*");
       await page.getByText("This is some text coming after").click();
       await expect(secondRowFirstCell.locator("em")).toContainText("Bob");
 
@@ -286,8 +292,9 @@ test.describe("Bedrock Electron pipeline", () => {
       const secondRowThirdEditor = page.locator(
         '[data-bedrock-table-editor="true"][data-table-section="body"][data-table-row="1"][data-table-column="2"]'
       );
-      await secondRowThirdEditor.press(`${shortcutModifier}+A`);
-      await secondRowThirdEditor.press(`${shortcutModifier}+B`);
+      await page.keyboard.press(`${shortcutModifier}+A`);
+      await page.keyboard.press(`${shortcutModifier}+B`);
+      await expect(secondRowThirdEditor).toContainText("**Berlin**");
       await page.getByText("This is some text coming after").click();
       await expect(secondRowThirdCell.locator("strong")).toContainText("Berlin");
 
@@ -340,6 +347,42 @@ test.describe("Bedrock Electron pipeline", () => {
       await expect.poll(() => getEditorText(page)).toContain("**Alice Updated**");
       await expect.poll(() => getEditorText(page)).toContain("**Berlin**");
       await expect(page.locator('[data-bedrock-table-cell="true"]')).toHaveCount(0);
+    } finally {
+      await closeBedrock(app);
+      await fs.rm(outputDir, { recursive: true, force: true });
+      await fs.rm(userDataDir, { recursive: true, force: true });
+    }
+  });
+
+  test("typing below a table inserts a safe blank-line boundary instead of corrupting the last row", async () => {
+    const { app, page, userDataDir } = await launchBedrock();
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "bedrock-e2e-table-gap-"));
+    const inputPath = path.join(outputDir, "table-gap.md");
+
+    try {
+      await fs.writeFile(
+        inputPath,
+        [
+          "| Column 1 | Column 2 |",
+          "| --- | --- |",
+          "| Alice | Paris |",
+          "This is some text coming after",
+        ].join("\n"),
+        "utf8"
+      );
+
+      await configureTestHarness(page, { nextOpenPath: inputPath, discardResponse: true });
+      await page.getByLabel("Open…").click();
+
+      await expect(page.locator('[data-bedrock-table-cell="true"]')).toHaveCount(4);
+      await page.locator(".cm-md-table-gap").click();
+      await page.keyboard.type("hello ");
+
+      await page.getByRole("button", { name: /^Save$/ }).click();
+      await expect.poll(() => fs.readFile(inputPath, "utf8")).toContain("\n\nhello This is");
+      await expect.poll(() => fs.readFile(inputPath, "utf8")).not.toContain(
+        "| Alice | Paris |hello"
+      );
     } finally {
       await closeBedrock(app);
       await fs.rm(outputDir, { recursive: true, force: true });

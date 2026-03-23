@@ -1,5 +1,7 @@
-import { Extension, RangeSetBuilder, StateField } from "@codemirror/state";
+import { EditorState, Extension, RangeSetBuilder, StateField } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
+import { markdown } from "@codemirror/lang-markdown";
+import { GFM } from "@lezer/markdown";
 import {
   Decoration,
   DecorationSet,
@@ -11,6 +13,7 @@ import type { SyntaxNode } from "@lezer/common";
 import {
   commitFocusedTableCellEditor,
   getFocusedTableCellEditor,
+  moveCursorBelowTableCommand,
   runFocusedTableCellFormatCommand,
   setTableCellValueCommand,
 } from "./commands";
@@ -39,6 +42,12 @@ class HRWidget extends WidgetType {
 const tableContextKey = (context: TableCommandContext): string => {
   return `${context.section}:${context.row}:${context.column}`;
 };
+const TABLE_EDITOR_SELECTOR = '[data-bedrock-table-editor="true"]';
+
+const scheduleAnimationFrame =
+  globalThis.requestAnimationFrame ??
+  ((callback: FrameRequestCallback) =>
+    globalThis.setTimeout(() => callback(0), 0));
 
 const isSameTableContext = (
   left: TableCommandContext,
@@ -77,6 +86,36 @@ const getTableContextsInOrder = (table: TableBlock): TableCommandContext[] => {
   return contexts;
 };
 
+const buildTableCellEditorTheme = (
+  isHeader: boolean
+): Extension =>
+  EditorView.theme({
+    "&": {
+      backgroundColor: "transparent",
+      color: isHeader
+        ? "var(--header-text, #d7dae0)"
+        : "var(--panel-text, #e6e9ef)",
+      font: "inherit",
+      outline: "none",
+    },
+    "&.cm-focused": {
+      outline: "none",
+    },
+    ".cm-scroller": {
+      font: "inherit",
+      lineHeight: "inherit",
+      outline: "none",
+    },
+    ".cm-content": {
+      minHeight: "2.25rem",
+      padding: "0.45rem 0.65rem",
+      caretColor: "var(--panel-text, #e6e9ef)",
+    },
+    ".cm-line": {
+      padding: 0,
+    },
+  });
+
 class TableWidget extends WidgetType {
   constructor(private readonly table: TableBlock) {
     super();
@@ -104,7 +143,7 @@ class TableWidget extends WidgetType {
     type CellController = {
       context: TableCommandContext;
       closeEditor: (nextValue?: string) => void;
-      openEditor: (cursor?: number) => HTMLInputElement;
+      openEditor: (cursor?: number) => EditorView;
     };
 
     const cellControllers = new Map<string, CellController>();
@@ -120,23 +159,53 @@ class TableWidget extends WidgetType {
       return orderedContexts[nextIndex] ?? context;
     };
 
+    const focusEditorWhenConnected = (
+      editor: EditorView,
+      cursor: number,
+      attemptsRemaining = 4
+    ) => {
+      const applyFocus = () => {
+        const nextCursor = Math.min(cursor, editor.state.doc.length);
+        editor.focus();
+        editor.dispatch({
+          selection: { anchor: nextCursor },
+          scrollIntoView: true,
+        });
+      };
+
+      if (editor.dom.isConnected) {
+        applyFocus();
+        return;
+      }
+
+      if (attemptsRemaining <= 0) {
+        return;
+      }
+
+      scheduleAnimationFrame(() => {
+        focusEditorWhenConnected(editor, cursor, attemptsRemaining - 1);
+      });
+    };
+
     const focusLocalEditor = (context: TableCommandContext, cursor?: number) => {
       cellControllers.get(tableContextKey(context))?.openEditor(cursor);
     };
 
     const focusCell = (context: TableCommandContext, cursor?: number) => {
-      const activeInput = getFocusedTableCellEditor(view);
-      if (activeInput) {
-        const activeKey = activeInput.dataset.tableCellKey;
+      const activeEditor = getFocusedTableCellEditor(view);
+      const activeRoot = activeEditor?.dom.closest<HTMLElement>(
+        TABLE_EDITOR_SELECTOR
+      );
+      if (activeEditor && activeRoot) {
+        const activeKey = activeRoot.dataset.tableCellKey;
         if (activeKey === tableContextKey(context)) {
-          activeInput.focus();
+          activeEditor.focus();
           if (cursor != null) {
-            const nextCursor = Math.min(cursor, activeInput.value.length);
-            try {
-              activeInput.setSelectionRange(nextCursor, nextCursor);
-            } catch {
-              // Keep focus even if the caret cannot be moved explicitly.
-            }
+            const nextCursor = Math.min(cursor, activeEditor.state.doc.length);
+            activeEditor.dispatch({
+              selection: { anchor: nextCursor },
+              scrollIntoView: true,
+            });
           }
           return;
         }
@@ -144,16 +213,17 @@ class TableWidget extends WidgetType {
         const activeController = activeKey
           ? cellControllers.get(activeKey)
           : null;
-        const originalValue = activeInput.dataset.originalValue ?? "";
-        if (activeInput.value !== originalValue) {
+        const currentValue = activeEditor.state.doc.toString();
+        const originalValue = activeRoot.dataset.originalValue ?? "";
+        if (currentValue !== originalValue) {
           commitFocusedTableCellEditor(view, {
             context,
-            cursor: cursor ?? activeInput.value.length,
+            cursor: cursor ?? currentValue.length,
           });
           return;
         }
 
-        activeController?.closeEditor(activeInput.value);
+        activeController?.closeEditor(currentValue);
       }
 
       focusLocalEditor(context, cursor);
@@ -193,7 +263,7 @@ class TableWidget extends WidgetType {
       }
 
       let currentValue = value;
-      let editor: HTMLInputElement | null = null;
+      let editor: EditorView | null = null;
 
       const renderDisplay = (nextValue: string) => {
         currentValue = nextValue;
@@ -203,6 +273,7 @@ class TableWidget extends WidgetType {
 
       const closeEditor = (nextValue = currentValue) => {
         currentValue = nextValue;
+        editor?.destroy();
         editor = null;
         cell.replaceChildren(display);
         renderDisplay(nextValue);
@@ -210,19 +281,6 @@ class TableWidget extends WidgetType {
 
       const openEditor = (cursor = currentValue.length) => {
         if (!editor) {
-          editor = document.createElement("input");
-          editor.type = "text";
-          editor.className = "cm-md-table-input";
-          editor.value = currentValue;
-          editor.dataset.bedrockTableEditor = "true";
-          editor.dataset.tableCellKey = key;
-          editor.dataset.originalValue = currentValue;
-          editor.dataset.tableFrom = String(this.table.from);
-          editor.dataset.tableTo = String(this.table.to);
-          editor.dataset.tableSection = section;
-          editor.dataset.tableRow = String(row);
-          editor.dataset.tableColumn = String(column);
-
           const commitEditorValue = (
             focus:
               | {
@@ -236,9 +294,10 @@ class TableWidget extends WidgetType {
               return;
             }
 
-            const nextValue = editor.value;
-            const nextCursor = editor.selectionStart ?? nextValue.length;
-            const originalValue = editor.dataset.originalValue ?? currentValue;
+            const nextValue = editor.state.doc.toString();
+            const nextCursor = editor.state.selection.main.head;
+            const originalValue =
+              editor.dom.dataset.originalValue ?? currentValue;
             if (nextValue === originalValue) {
               closeEditor(nextValue);
               unchanged();
@@ -248,81 +307,169 @@ class TableWidget extends WidgetType {
             setTableCellValueCommand(view, context, nextValue, nextCursor, focus);
           };
 
-          editor.addEventListener("blur", () => {
-            commitEditorValue(null, () => undefined);
+          editor = new EditorView({
+            state: EditorState.create({
+              doc: currentValue,
+              extensions: [
+                markdown({ extensions: [GFM] }),
+                createInlineMarkdownPlugin(),
+                buildTableCellEditorTheme(section === "header"),
+                EditorState.transactionFilter.of((transaction) => {
+                  if (!transaction.docChanged) {
+                    return transaction;
+                  }
+
+                  const nextText = transaction.newDoc.toString();
+                  if (!nextText.includes("\n")) {
+                    return transaction;
+                  }
+
+                  const sanitized = nextText.replace(/\s*\n+\s*/g, " ");
+                  const anchor = Math.min(
+                    transaction.newSelection.main.anchor,
+                    sanitized.length
+                  );
+                  const head = Math.min(
+                    transaction.newSelection.main.head,
+                    sanitized.length
+                  );
+
+                  return [
+                    {
+                      changes: {
+                        from: 0,
+                        to: transaction.startState.doc.length,
+                        insert: sanitized,
+                      },
+                      selection: { anchor, head },
+                    },
+                  ];
+                }),
+                EditorView.domEventHandlers({
+                  keydown: (event) => {
+                    const isPrimaryModifier =
+                      (event.metaKey || event.ctrlKey) && !event.altKey;
+
+                    if (isPrimaryModifier) {
+                      if (event.key.toLowerCase() === "a" && !event.shiftKey) {
+                        event.preventDefault();
+                        editor?.dispatch({
+                          selection: {
+                            anchor: 0,
+                            head: editor.state.doc.length,
+                          },
+                          scrollIntoView: true,
+                        });
+                        return true;
+                      }
+                      if (event.key.toLowerCase() === "b") {
+                        event.preventDefault();
+                        return runFocusedTableCellFormatCommand(view, "bold");
+                      }
+                      if (event.key.toLowerCase() === "i") {
+                        event.preventDefault();
+                        return runFocusedTableCellFormatCommand(view, "italic");
+                      }
+                      if (event.key.toLowerCase() === "k") {
+                        event.preventDefault();
+                        return runFocusedTableCellFormatCommand(view, "link");
+                      }
+                      if (event.key === "`") {
+                        event.preventDefault();
+                        return runFocusedTableCellFormatCommand(
+                          view,
+                          "inlineCode"
+                        );
+                      }
+                      if (event.key.toLowerCase() === "x" && event.shiftKey) {
+                        event.preventDefault();
+                        return runFocusedTableCellFormatCommand(
+                          view,
+                          "strikethrough"
+                        );
+                      }
+                    }
+
+                    if (event.key === "Tab") {
+                      event.preventDefault();
+                      const nextContext = getAdjacentContext(
+                        context,
+                        event.shiftKey ? -1 : 1
+                      );
+                      commitEditorValue(
+                        {
+                          context: nextContext,
+                          cursor: 0,
+                        },
+                        () => focusLocalEditor(nextContext, 0)
+                      );
+                      return true;
+                    }
+
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      const nextCursor = editor?.state.selection.main.head ?? 0;
+                      commitEditorValue(
+                        {
+                          context,
+                          cursor: nextCursor,
+                        },
+                        () => openEditor(nextCursor)
+                      );
+                      return true;
+                    }
+
+                    return false;
+                  },
+                  focusout: (event) => {
+                    const nextTarget = event.relatedTarget;
+                    if (
+                      nextTarget instanceof Node &&
+                      editor?.dom.contains(nextTarget)
+                    ) {
+                      return false;
+                    }
+
+                    commitEditorValue(null, () => undefined);
+                    return false;
+                  },
+                }),
+              ],
+            }),
           });
+          editor.dom.classList.add("cm-md-table-editor");
+          editor.dom.dataset.bedrockTableEditor = "true";
+          editor.dom.dataset.tableCellKey = key;
+          editor.dom.dataset.originalValue = currentValue;
+          editor.dom.dataset.tableFrom = String(this.table.from);
+          editor.dom.dataset.tableTo = String(this.table.to);
+          editor.dom.dataset.tableSection = section;
+          editor.dom.dataset.tableRow = String(row);
+          editor.dom.dataset.tableColumn = String(column);
 
-          editor.addEventListener("keydown", (event) => {
-            const isPrimaryModifier =
-              (event.metaKey || event.ctrlKey) &&
-              !event.altKey;
+          const stopNestedEditorEvent = (event: Event) => {
+            event.stopPropagation();
+          };
 
-            if (isPrimaryModifier) {
-              if (event.key.toLowerCase() === "b") {
-                event.preventDefault();
-                runFocusedTableCellFormatCommand(view, "bold");
-                return;
-              }
-              if (event.key.toLowerCase() === "i") {
-                event.preventDefault();
-                runFocusedTableCellFormatCommand(view, "italic");
-                return;
-              }
-              if (event.key.toLowerCase() === "k") {
-                event.preventDefault();
-                runFocusedTableCellFormatCommand(view, "link");
-                return;
-              }
-              if (event.key === "`") {
-                event.preventDefault();
-                runFocusedTableCellFormatCommand(view, "inlineCode");
-                return;
-              }
-              if (event.key.toLowerCase() === "x" && event.shiftKey) {
-                event.preventDefault();
-                runFocusedTableCellFormatCommand(view, "strikethrough");
-                return;
-              }
-            }
-
-            if (event.key === "Tab") {
-              event.preventDefault();
-              const nextContext = getAdjacentContext(
-                context,
-                event.shiftKey ? -1 : 1
-              );
-              commitEditorValue(
-                {
-                  context: nextContext,
-                  cursor: 0,
-                },
-                () => focusLocalEditor(nextContext, 0)
-              );
-              return;
-            }
-
-            if (event.key === "Enter") {
-              event.preventDefault();
-              const nextCursor = editor?.selectionStart ?? editor?.value.length ?? 0;
-              commitEditorValue(
-                {
-                  context,
-                  cursor: nextCursor,
-                },
-                () => openEditor(nextCursor)
-              );
-            }
+          [
+            "beforeinput",
+            "input",
+            "keydown",
+            "keyup",
+            "keypress",
+            "mousedown",
+            "mouseup",
+            "click",
+            "paste",
+            "copy",
+            "cut",
+          ].forEach((eventName) => {
+            editor?.dom.addEventListener(eventName, stopNestedEditorEvent);
           });
         }
 
-        cell.replaceChildren(editor);
-        editor.focus();
-        const nextCursor = Math.min(cursor, editor.value.length);
-        try {
-          editor.setSelectionRange(nextCursor, nextCursor);
-        } catch {
-          // Keep focus even if the caret cannot be moved explicitly.
-        }
+        cell.replaceChildren(editor.dom);
+        focusEditorWhenConnected(editor, cursor);
 
         return editor;
       };
@@ -330,11 +477,13 @@ class TableWidget extends WidgetType {
       renderDisplay(currentValue);
       cell.appendChild(display);
 
-      cell.addEventListener("click", (event) => {
+      cell.addEventListener("mousedown", (event) => {
         if (event.button !== 0) {
           return;
         }
 
+        event.preventDefault();
+        event.stopPropagation();
         focusCell(context);
       });
 
@@ -368,6 +517,42 @@ class TableWidget extends WidgetType {
       tbody.appendChild(bodyRow);
     });
     tableEl.appendChild(tbody);
+
+    const gap = document.createElement("div");
+    gap.className = "cm-md-table-gap";
+    gap.textContent = "\u00a0";
+    gap.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+    });
+    gap.addEventListener("click", () => {
+      const activeEditor = getFocusedTableCellEditor(view);
+      const activeRoot = activeEditor?.dom.closest<HTMLElement>(
+        TABLE_EDITOR_SELECTOR
+      );
+      const activeKey = activeRoot?.dataset.tableCellKey;
+      const activeController = activeKey
+        ? cellControllers.get(activeKey)
+        : null;
+      const currentValue = activeEditor?.state.doc.toString() ?? "";
+      const originalValue = activeRoot?.dataset.originalValue ?? "";
+
+      if (activeEditor && currentValue !== originalValue) {
+        commitFocusedTableCellEditor(view, null);
+        scheduleAnimationFrame(() => {
+          moveCursorBelowTableCommand(view, this.table.from);
+          view.focus();
+        });
+        return;
+      }
+
+      if (activeEditor) {
+        activeController?.closeEditor(currentValue);
+      }
+
+      moveCursorBelowTableCommand(view, this.table.from);
+      view.focus();
+    });
+    wrapper.appendChild(gap);
 
     return wrapper;
   }
@@ -492,39 +677,17 @@ const quoteRunFor = (kinds: LineKind[], start: number): [number, number] => {
   return [start, end];
 };
 
-export const hybridMarkdown = (): Extension => {
-  const buildTableDecorations = (
-    doc: import("@codemirror/state").Text
-  ): DecorationSet => {
-    const builder = new RangeSetBuilder<Decoration>();
-    for (const tableBlock of findTableBlocks(doc)) {
-      builder.add(
-        tableBlock.from,
-        tableBlock.to,
-        Decoration.replace({
-          widget: new TableWidget(tableBlock),
-          block: true,
-          inclusive: false,
-        })
-      );
-    }
-    return builder.finish();
-  };
+type InlineMarkdownPluginOptions = {
+  getExcludedRanges?: (
+    view: import("@codemirror/view").EditorView
+  ) => Array<{ from: number; to: number }>;
+  onBuild?: (view: import("@codemirror/view").EditorView) => void;
+};
 
-  const tableWidgetField = StateField.define<DecorationSet>({
-    create(state) {
-      return buildTableDecorations(state.doc);
-    },
-    update(decorations, transaction) {
-      if (!transaction.docChanged) {
-        return decorations;
-      }
-      return buildTableDecorations(transaction.state.doc);
-    },
-    provide: (field) => EditorView.decorations.from(field),
-  });
-
-  const inlinePlugin = ViewPlugin.fromClass(
+const createInlineMarkdownPlugin = (
+  options: InlineMarkdownPluginOptions = {}
+): Extension =>
+  ViewPlugin.fromClass(
     class {
       decorations: DecorationSet;
 
@@ -545,11 +708,7 @@ export const hybridMarkdown = (): Extension => {
       private buildDecorations(
         view: import("@codemirror/view").EditorView
       ): DecorationSet {
-        const doc = view.state.doc;
         const builder = new RangeSetBuilder<Decoration>();
-
-        // RangeSetBuilder requires decorations be added in ascending order.
-        // We collect them first (line-level + inline) and add them sorted.
         const pending: Array<{ from: number; to: number; deco: Decoration }> =
           [];
         const pushDeco = (from: number, to: number, deco: Decoration) => {
@@ -557,7 +716,6 @@ export const hybridMarkdown = (): Extension => {
         };
 
         const selectionTouches = (from: number, to: number): boolean => {
-          // Treat `to` as inclusive for UX purposes (cursor at end-of-range counts).
           for (const range of view.state.selection.ranges) {
             const a = Math.min(range.from, range.to);
             const b = Math.max(range.from, range.to);
@@ -569,109 +727,11 @@ export const hybridMarkdown = (): Extension => {
           }
           return false;
         };
-        const lines = [];
-        for (let i = 1; i <= doc.lines; i += 1) {
-          lines.push(doc.line(i).text);
-        }
-        const kinds = classifyLines(lines);
-        const tableBlocks = findTableBlocks(doc);
-        const tableStarts = new Map(
-          tableBlocks.map((table) => [table.startLine, table] as const)
-        );
-        const isTableRange = (from: number, to: number) => {
-          return tableBlocks.some((table) => from < table.to && to > table.from);
+
+        const excludedRanges = options.getExcludedRanges?.(view) ?? [];
+        const isExcludedRange = (from: number, to: number) => {
+          return excludedRanges.some((range) => from < range.to && to > range.from);
         };
-
-        const addLineClass = (lineNumber: number, cls: string) => {
-          const line = doc.line(lineNumber);
-          if (selectionTouches(line.from, line.to)) return;
-          pushDeco(line.from, line.from, Decoration.line({ class: cls }));
-        };
-
-        const hideRange = (lineNumber: number, from: number, to: number) => {
-          const line = doc.line(lineNumber);
-          if (selectionTouches(line.from, line.to)) return;
-          pushDeco(
-            line.from + from,
-            line.from + to,
-            Decoration.mark({ class: "cm-md-hide-marker", inclusive: false })
-          );
-        };
-
-        for (let i = 0; i < kinds.length; i += 1) {
-          const lineNo = i + 1;
-          const tableBlock = tableStarts.get(lineNo);
-          if (tableBlock) {
-            i = tableBlock.endLine - 1;
-            continue;
-          }
-
-          const kind = kinds[i];
-
-          switch (kind.type) {
-            case "heading": {
-              addLineClass(
-                lineNo,
-                `cm-md-heading cm-md-atxheading${kind.level}`
-              );
-              hideRange(lineNo, 0, kind.markerEnd);
-              break;
-            }
-            case "list": {
-              const [start, end] = listRunFor(kinds, i);
-              for (let ln = start + 1; ln <= end + 1; ln += 1) {
-                addLineClass(ln, "cm-md-list");
-                const text = lines[ln - 1] ?? "";
-                const marker = listMatch(text);
-                if (marker && "markerEnd" in marker) {
-                  hideRange(ln, 0, marker.markerEnd);
-                }
-              }
-              i = end;
-              break;
-            }
-            case "blockquote": {
-              const [start, end] = quoteRunFor(kinds, i);
-              for (let ln = start + 1; ln <= end + 1; ln += 1) {
-                addLineClass(ln, "cm-md-quote");
-                const text = lines[ln - 1] ?? "";
-                const marker = blockquoteMatch(text);
-                if (marker && "markerEnd" in marker) {
-                  hideRange(ln, 0, marker.markerEnd);
-                }
-              }
-              i = end;
-              break;
-            }
-            case "fenceDelimiter": {
-              addLineClass(lineNo, "cm-md-code-block");
-              hideRange(lineNo, 0, kind.markerEnd);
-              break;
-            }
-            case "fenceContent": {
-              addLineClass(lineNo, "cm-md-code-block");
-              break;
-            }
-            case "horizontalRule": {
-              const line = doc.line(lineNo);
-              if (!selectionTouches(line.from, line.to)) {
-                pushDeco(
-                  line.from,
-                  line.to,
-                  Decoration.replace({
-                    widget: new HRWidget(),
-                    inclusive: false,
-                  })
-                );
-              } else {
-                addLineClass(lineNo, "cm-md-hr-active");
-              }
-              break;
-            }
-            default:
-              break;
-          }
-        }
 
         const addInlineMark = (
           from: number,
@@ -743,7 +803,6 @@ export const hybridMarkdown = (): Extension => {
           );
         };
 
-        // Inline markdown styling + "hide marks when cursor isn't inside" behavior.
         const tree = syntaxTree(view.state);
 
         for (const range of view.visibleRanges) {
@@ -751,9 +810,10 @@ export const hybridMarkdown = (): Extension => {
             from: range.from,
             to: range.to,
             enter: (node) => {
-              if (isTableRange(node.from, node.to)) {
+              if (isExcludedRange(node.from, node.to)) {
                 return;
               }
+
               switch (node.name) {
                 case "StrongEmphasis": {
                   const container = findOutermostStylingContainer(node.node);
@@ -779,7 +839,6 @@ export const hybridMarkdown = (): Extension => {
                 case "InlineCode":
                   addInlineMark(node.from, node.to, "cm-md-inline-code");
                   break;
-                // Marks / delimiters (hide when cursor isn't inside their container)
                 case "StrongEmphasisMark":
                 case "EmphasisMark":
                 case "CodeMark":
@@ -795,7 +854,6 @@ export const hybridMarkdown = (): Extension => {
                     container.to
                   );
 
-                  // If it's a bare URL (not inside a Link node), mark it as a link too
                   if (node.name === "URL" && container.name !== "Link") {
                     addInlineMark(node.from, node.to, "cm-link", {
                       title: "Click to open link",
@@ -816,7 +874,7 @@ export const hybridMarkdown = (): Extension => {
         }
 
         const result = builder.finish();
-        restorePendingTableFocus(view);
+        options.onBuild?.(view);
         return result;
       }
     },
@@ -825,5 +883,193 @@ export const hybridMarkdown = (): Extension => {
     }
   );
 
-  return [tableWidgetField, inlinePlugin];
+export const hybridMarkdown = (): Extension => {
+  const buildTableDecorations = (
+    doc: import("@codemirror/state").Text
+  ): DecorationSet => {
+    const builder = new RangeSetBuilder<Decoration>();
+    for (const tableBlock of findTableBlocks(doc)) {
+      builder.add(
+        tableBlock.from,
+        tableBlock.to,
+        Decoration.replace({
+          widget: new TableWidget(tableBlock),
+          block: true,
+          inclusive: false,
+        })
+      );
+    }
+    return builder.finish();
+  };
+
+  const tableWidgetField = StateField.define<DecorationSet>({
+    create(state) {
+      return buildTableDecorations(state.doc);
+    },
+    update(decorations, transaction) {
+      if (!transaction.docChanged) {
+        return decorations;
+      }
+      return buildTableDecorations(transaction.state.doc);
+    },
+    provide: (field) => EditorView.decorations.from(field),
+  });
+
+  const inlinePlugin = createInlineMarkdownPlugin({
+    getExcludedRanges: (view) => findTableBlocks(view.state.doc),
+    onBuild: (view) => {
+      restorePendingTableFocus(view);
+    },
+  });
+
+  const linePlugin = ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
+
+      constructor(view: import("@codemirror/view").EditorView) {
+        this.decorations = this.buildDecorations(view);
+      }
+
+      update(update: import("@codemirror/view").ViewUpdate): void {
+        if (
+          update.docChanged ||
+          update.selectionSet ||
+          update.viewportChanged
+        ) {
+          this.decorations = this.buildDecorations(update.view);
+        }
+      }
+
+      private buildDecorations(
+        view: import("@codemirror/view").EditorView
+      ): DecorationSet {
+        const doc = view.state.doc;
+        const builder = new RangeSetBuilder<Decoration>();
+
+        const selectionTouches = (from: number, to: number): boolean => {
+          for (const range of view.state.selection.ranges) {
+            const a = Math.min(range.from, range.to);
+            const b = Math.max(range.from, range.to);
+            if (a === b) {
+              if (a >= from && a <= to) return true;
+              continue;
+            }
+            if (a <= to && b >= from) return true;
+          }
+          return false;
+        };
+        const lines = [];
+        for (let i = 1; i <= doc.lines; i += 1) {
+          lines.push(doc.line(i).text);
+        }
+        const kinds = classifyLines(lines);
+        const tableBlocks = findTableBlocks(doc);
+        const tableStarts = new Map(
+          tableBlocks.map((table) => [table.startLine, table] as const)
+        );
+
+        const addLineClass = (lineNumber: number, cls: string) => {
+          const line = doc.line(lineNumber);
+          if (selectionTouches(line.from, line.to)) return;
+          builder.add(
+            line.from,
+            line.from,
+            Decoration.line({ class: cls })
+          );
+        };
+
+        const hideRange = (lineNumber: number, from: number, to: number) => {
+          const line = doc.line(lineNumber);
+          if (selectionTouches(line.from, line.to)) return;
+          builder.add(
+            line.from + from,
+            line.from + to,
+            Decoration.mark({ class: "cm-md-hide-marker", inclusive: false })
+          );
+        };
+
+        for (let i = 0; i < kinds.length; i += 1) {
+          const lineNo = i + 1;
+          const tableBlock = tableStarts.get(lineNo);
+          if (tableBlock) {
+            i = tableBlock.endLine - 1;
+            continue;
+          }
+
+          const kind = kinds[i];
+
+          switch (kind.type) {
+            case "heading": {
+              addLineClass(
+                lineNo,
+                `cm-md-heading cm-md-atxheading${kind.level}`
+              );
+              hideRange(lineNo, 0, kind.markerEnd);
+              break;
+            }
+            case "list": {
+              const [start, end] = listRunFor(kinds, i);
+              for (let ln = start + 1; ln <= end + 1; ln += 1) {
+                addLineClass(ln, "cm-md-list");
+                const text = lines[ln - 1] ?? "";
+                const marker = listMatch(text);
+                if (marker && "markerEnd" in marker) {
+                  hideRange(ln, 0, marker.markerEnd);
+                }
+              }
+              i = end;
+              break;
+            }
+            case "blockquote": {
+              const [start, end] = quoteRunFor(kinds, i);
+              for (let ln = start + 1; ln <= end + 1; ln += 1) {
+                addLineClass(ln, "cm-md-quote");
+                const text = lines[ln - 1] ?? "";
+                const marker = blockquoteMatch(text);
+                if (marker && "markerEnd" in marker) {
+                  hideRange(ln, 0, marker.markerEnd);
+                }
+              }
+              i = end;
+              break;
+            }
+            case "fenceDelimiter": {
+              addLineClass(lineNo, "cm-md-code-block");
+              hideRange(lineNo, 0, kind.markerEnd);
+              break;
+            }
+            case "fenceContent": {
+              addLineClass(lineNo, "cm-md-code-block");
+              break;
+            }
+            case "horizontalRule": {
+              const line = doc.line(lineNo);
+              if (!selectionTouches(line.from, line.to)) {
+                builder.add(
+                  line.from,
+                  line.to,
+                  Decoration.replace({
+                    widget: new HRWidget(),
+                    inclusive: false,
+                  })
+                );
+              } else {
+                addLineClass(lineNo, "cm-md-hr-active");
+              }
+              break;
+            }
+            default:
+              break;
+          }
+        }
+
+        return builder.finish();
+      }
+    },
+    {
+      decorations: (value) => value.decorations,
+    }
+  );
+
+  return [tableWidgetField, linePlugin, inlinePlugin];
 };

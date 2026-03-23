@@ -6,6 +6,7 @@ import {
   formatTableCellText,
   insertTableCommand,
   insertTableCellMarkdownLink,
+  moveCursorBelowTableCommand,
   removeTableColumnCommand,
   removeTableRowCommand,
   setTableCellValueCommand,
@@ -14,6 +15,7 @@ import { markdownToInlineHtml } from "../src/renderer/lib/export";
 import {
   createDefaultMarkdownTable,
   findTableBlocks,
+  normalizeTableWrite,
   parseMarkdownTable,
   serializeMarkdownTable,
   type TableCommandContext,
@@ -165,6 +167,7 @@ runTest("insert table command inserts the default 3-column table", () => {
 
   assert.match(view.text, /^\| Column 1/);
   assert.match(view.text, /\| {0,}\| {0,}\| {0,}\|/);
+  assert.match(view.text, /\n\n$/);
 });
 
 runTest("cell edits rewrite only the targeted table block", () => {
@@ -198,6 +201,33 @@ runTest("table column commands preserve surrounding document content", () => {
   assert.match(view.text, /Omega$/);
   const table = parseMarkdownTable(view.text.split("\n\n")[1] ?? "");
   assert.equal(table?.header.length, 4);
+});
+
+runTest("table normalization keeps exactly one blank line after rewritten tables", () => {
+  const table = serializeMarkdownTable(createDefaultMarkdownTable());
+  const doc = Text.of(["Before", table, "", "", "After"].join("\n").split("\n"));
+  const block = findTableBlocks(doc)[0];
+  if (!block) {
+    throw new Error("Expected a table block");
+  }
+
+  const normalized = normalizeTableWrite(doc, block.from, block.to, table);
+
+  assert.equal(normalized.insert, `${table}\n\n`);
+  assert.equal(doc.sliceString(normalized.replaceTo), "After");
+});
+
+runTest("moving the cursor below a table normalizes a missing separator line", () => {
+  const table = serializeMarkdownTable(createDefaultMarkdownTable());
+  const view = new FakeView(`${table}\nAfter`);
+  const block = findTableBlocks(view.state.doc)[0];
+  if (!block) {
+    throw new Error("Expected a table block");
+  }
+
+  moveCursorBelowTableCommand(view as unknown as EditorView, block.from);
+
+  assert.match(view.text, /\n\nAfter$/);
 });
 
 runTest("remove row command rejects header-row contexts", () => {

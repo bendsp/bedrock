@@ -1,5 +1,5 @@
 import { Text } from "@codemirror/state";
-import type { EditorView } from "@codemirror/view";
+import { EditorView } from "@codemirror/view";
 
 export type TableCellSection = "header" | "body";
 
@@ -21,6 +21,14 @@ export type TableCommandContext = {
   section: TableCellSection;
   row: number;
   column: number;
+};
+
+export type NormalizedTableWrite = {
+  insert: string;
+  replaceFrom: number;
+  replaceTo: number;
+  tableTo: number;
+  afterTableAnchor: number;
 };
 
 type PendingTableFocus = TableCommandContext & {
@@ -230,6 +238,31 @@ export const createDefaultMarkdownTable = (): MarkdownTable => ({
   ],
 });
 
+export const normalizeTableWrite = (
+  doc: Text,
+  tableFrom: number,
+  tableTo: number,
+  markdown: string
+): NormalizedTableWrite => {
+  const endLine = doc.lineAt(tableTo).number;
+  let scanLine = endLine + 1;
+
+  while (scanLine <= doc.lines && doc.line(scanLine).text.trim() === "") {
+    scanLine += 1;
+  }
+
+  const replaceTo = scanLine <= doc.lines ? doc.line(scanLine).from : doc.length;
+  const insert = `${markdown}\n\n`;
+
+  return {
+    insert,
+    replaceFrom: tableFrom,
+    replaceTo,
+    tableTo: tableFrom + markdown.length,
+    afterTableAnchor: tableFrom + insert.length,
+  };
+};
+
 export const updateTableCell = (
   table: MarkdownTable,
   context: TableCommandContext,
@@ -380,18 +413,22 @@ export const restorePendingTableFocus = (view: EditorView): void => {
     }
 
     const selector = `${TABLE_EDITOR_SELECTOR}[data-table-from="${latest.tableFrom}"][data-table-section="${latest.section}"][data-table-row="${latest.row}"][data-table-column="${latest.column}"]`;
-    const input = view.dom.querySelector<HTMLInputElement>(selector);
-    if (!input) {
+    const editorRoot = view.dom.querySelector<HTMLElement>(selector);
+    if (!editorRoot) {
       return;
     }
 
-    input.focus();
-    const cursor = Math.min(latest.cursor, input.value.length);
-    try {
-      input.setSelectionRange(cursor, cursor);
-    } catch {
-      // Inputs without a selection API can still be focused safely.
+    const editorView = EditorView.findFromDOM(editorRoot);
+    if (!editorView) {
+      return;
     }
+
+    const cursor = Math.min(latest.cursor, editorView.state.doc.length);
+    editorView.focus();
+    editorView.dispatch({
+      selection: { anchor: cursor },
+      scrollIntoView: true,
+    });
     pendingTableFocus.delete(view);
   });
 };

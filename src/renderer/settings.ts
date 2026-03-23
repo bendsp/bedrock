@@ -18,7 +18,103 @@ export type KeyBindingAction =
 
 export type KeyBindings = Record<KeyBindingAction, string>;
 
+export type FontFamilyOption =
+  | "system"
+  | "inter"
+  | "satoshi"
+  | "helvetica"
+  | "roboto"
+  | "vercelPixel"
+  | "serif";
+
+type FontFamilyStacks = {
+  appFontFamily: string;
+  editorFontFamily: string;
+};
+
+const SYSTEM_SANS_STACK =
+  'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+const INTER_STACK =
+  '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+const SATOSHI_STACK =
+  '"Satoshi", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+const HELVETICA_STACK =
+  '"Helvetica Neue", Helvetica, Arial, sans-serif';
+
+const ROBOTO_STACK =
+  '"Roboto", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
+
+const VERCEL_PIXEL_STACK =
+  '"Geist Pixel Square", "GeistPixelSquare", "Geist Pixel Grid", "GeistPixelGrid", "Geist Pixel Circle", "GeistPixelCircle", "Geist Pixel Triangle", "GeistPixelTriangle", "Geist Pixel Line", "GeistPixelLine", "Geist Pixel", "Geist Sans", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
+
+const SERIF_STACK =
+  'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif';
+
+export const fontFamilyOptions: FontFamilyOption[] = [
+  "system",
+  "inter",
+  "satoshi",
+  "helvetica",
+  "roboto",
+  "vercelPixel",
+  "serif",
+];
+
+export const fontFamilyDisplayName: Record<FontFamilyOption, string> = {
+  system: "System Sans",
+  inter: "Inter",
+  satoshi: "Satoshi",
+  helvetica: "Helvetica",
+  roboto: "Roboto",
+  vercelPixel: "Vercel Pixel",
+  serif: "Serif",
+};
+
+const fontFamilyStacks: Record<FontFamilyOption, FontFamilyStacks> = {
+  system: {
+    appFontFamily: SYSTEM_SANS_STACK,
+    editorFontFamily: SYSTEM_SANS_STACK,
+  },
+  inter: {
+    appFontFamily: INTER_STACK,
+    editorFontFamily: INTER_STACK,
+  },
+  satoshi: {
+    appFontFamily: SATOSHI_STACK,
+    editorFontFamily: SATOSHI_STACK,
+  },
+  helvetica: {
+    appFontFamily: HELVETICA_STACK,
+    editorFontFamily: HELVETICA_STACK,
+  },
+  roboto: {
+    appFontFamily: ROBOTO_STACK,
+    editorFontFamily: ROBOTO_STACK,
+  },
+  vercelPixel: {
+    appFontFamily: VERCEL_PIXEL_STACK,
+    editorFontFamily: VERCEL_PIXEL_STACK,
+  },
+  serif: {
+    appFontFamily: SERIF_STACK,
+    editorFontFamily: SERIF_STACK,
+  },
+};
+
+export const isFontFamilyOption = (
+  value: string
+): value is FontFamilyOption =>
+  fontFamilyOptions.includes(value as FontFamilyOption);
+
+export const resolveFontFamily = (
+  fontFamily: FontFamilyOption
+): FontFamilyStacks => fontFamilyStacks[fontFamily] ?? fontFamilyStacks.system;
+
 export type UserSettings = {
+  fontFamily: FontFamilyOption;
   textSize: number;
   uiScale: number; // percentage; custom UI scaling (separate from Electron zoom)
   keyBindings: KeyBindings;
@@ -50,6 +146,7 @@ export const defaultKeyBindings: KeyBindings = {
 };
 
 export const defaultSettings: UserSettings = {
+  fontFamily: "system",
   textSize: 16,
   uiScale: 100,
   keyBindings: defaultKeyBindings,
@@ -150,6 +247,12 @@ export const loadSettings = (): UserSettings => {
       typeof uiScaleRaw === "number" && uiScaleRaw >= 63 && uiScaleRaw <= 173
         ? uiScaleRaw
         : defaultSettings.uiScale;
+    const fontFamily =
+      parsed.fontFamily &&
+      typeof parsed.fontFamily === "string" &&
+      isFontFamilyOption(parsed.fontFamily)
+        ? parsed.fontFamily
+        : defaultSettings.fontFamily;
     const keyBindings = normalizeKeyBindings(parsed.keyBindings);
     const theme =
       parsed.theme &&
@@ -185,6 +288,7 @@ export const loadSettings = (): UserSettings => {
         : defaultSettings.lastOpenedFilePath;
 
     return {
+      fontFamily,
       textSize,
       uiScale,
       keyBindings,

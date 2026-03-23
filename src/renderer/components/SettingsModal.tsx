@@ -1,5 +1,11 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { KeyBindingAction, UserSettings } from "../settings";
+import {
+  FontFamilyOption,
+  KeyBindingAction,
+  UserSettings,
+  fontFamilyDisplayName,
+  fontFamilyOptions,
+} from "../settings";
 import {
   eventToBinding,
   formatBinding,
@@ -493,6 +499,40 @@ const SettingsModal = ({
                             })
                           }
                         />
+                      </ItemActions>
+                    </Item>
+                    <ItemSeparator />
+                    <Item
+                      size="sm"
+                      className="rounded-none first:rounded-t-md last:rounded-b-md"
+                    >
+                      <ItemContent>
+                        <ItemTitle>Font family</ItemTitle>
+                        <ItemDescription>
+                          Choose the reading font for the app and editor.
+                        </ItemDescription>
+                      </ItemContent>
+                      <ItemActions className="ml-auto">
+                        <Select
+                          value={settings.fontFamily}
+                          onValueChange={(value) =>
+                            onChange({
+                              ...settings,
+                              fontFamily: value as FontFamilyOption,
+                            })
+                          }
+                        >
+                          <SelectTrigger className="w-[220px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {fontFamilyOptions.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {fontFamilyDisplayName[option]}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </ItemActions>
                     </Item>
                     <ItemSeparator />

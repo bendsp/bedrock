@@ -41,8 +41,17 @@ body {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
+  font-family: var(
+    --app-font-family,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif
+  );
 }
 
 .bed-drag-region {
@@ -58,6 +67,10 @@ body {
 }
 
 :root {
+  --app-font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+  --editor-font-family: system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --ui-font-size: 15px;
   --bg-body: #282c34;
   --text-body: #abb2bf;
@@ -130,6 +143,17 @@ body {
   padding: 20px 24px;
   box-sizing: border-box;
   overflow-y: auto;
+  font-family: var(
+    --app-font-family,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif
+  );
 }
 
 .inline-editor {
@@ -305,8 +329,17 @@ body {
 
 .cm-editor .cm-content {
   min-height: 100%;
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  font-family: var(
+    --editor-font-family,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif
+  );
 }
 
 .cm-editor .cm-line {

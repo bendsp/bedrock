@@ -14,6 +14,7 @@ import { markdownToHtml } from "./lib/export";
 import {
   defaultSettings,
   defaultKeyBindings,
+  resolveFontFamily,
   loadSettings,
   saveSettings,
   UserSettings,
@@ -138,6 +139,17 @@ const App = () => {
   const renderMode: RenderMode = settings.renderMode;
 
   useEffect(() => {
+    const { appFontFamily, editorFontFamily } = resolveFontFamily(
+      settings.fontFamily
+    );
+    document.documentElement.style.setProperty(
+      "--app-font-family",
+      appFontFamily
+    );
+    document.documentElement.style.setProperty(
+      "--editor-font-family",
+      editorFontFamily
+    );
     document.documentElement.style.setProperty(
       "--editor-font-size",
       `${settings.textSize}px`

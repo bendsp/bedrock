@@ -64,6 +64,29 @@ runTest("defaults apply when storage is empty", () => {
 
   const settings = loadSettings();
   assert.deepEqual(settings, defaultSettings);
+  assert.equal(settings.fontFamily, defaultSettings.fontFamily);
+});
+
+runTest("valid font families load correctly", () => {
+  installStorage();
+  const payload = {
+    fontFamily: "vercelPixel",
+  };
+  globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+
+  const settings = loadSettings();
+  assert.equal(settings.fontFamily, "vercelPixel");
+});
+
+runTest("invalid font families fall back to the default", () => {
+  installStorage();
+  const payload = {
+    fontFamily: "bedrock",
+  };
+  globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+
+  const settings = loadSettings();
+  assert.equal(settings.fontFamily, defaultSettings.fontFamily);
 });
 
 runTest("invalid themes fall back to defaults", () => {
@@ -146,4 +169,3 @@ runTest("clearSettingsStorage removes persisted data", () => {
 if (process.exitCode && process.exitCode !== 0) {
   throw new Error("One or more tests failed.");
 }
-

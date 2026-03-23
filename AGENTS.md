@@ -127,3 +127,4 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
 - 2026-03-21: Added a Playwright-based Electron E2E harness with test-only dialog/user-data controls for reproducible agent testing.
 - 2026-03-21: Added Sentry-ready telemetry hooks for Electron main/renderer plus Linear/GitHub helper scripts for agent issue and repo bootstrap workflows.
 - 2026-03-22: Main-process uncaught exceptions now flush telemetry and exit, and release automation no longer pushes version-bump commits directly to protected `main`.
+- 2026-03-23: Added a persisted font-family setting in Appearance with curated System/Inter/Satoshi/Helvetica/Roboto/Vercel Pixel/Serif options, live CSS variable plumbing for app and editor prose fonts, and fallback-safe handling that leaves explicit monospace surfaces unchanged.

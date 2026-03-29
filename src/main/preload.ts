@@ -6,6 +6,7 @@ import {
   SaveFilePayload,
   DiscardPromptPayload,
   OpenFileResult,
+  OpenSpecificFilePayload,
   SaveFileResult,
   ExportFilePayload,
 } from "../shared/types";
@@ -38,6 +39,23 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("file:export", payload),
   readFile: (filePath: string): Promise<OpenFileResult | null> =>
     ipcRenderer.invoke("file:read", filePath),
+  consumePendingExternalOpenFiles: (): Promise<OpenSpecificFilePayload[]> =>
+    ipcRenderer.invoke("file:consume-pending-external-open"),
+  onExternalOpenFile: (
+    callback: (payload: OpenSpecificFilePayload) => void
+  ): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      payload: OpenSpecificFilePayload
+    ) => callback(payload);
+    ipcRenderer.on("file:open-external", listener);
+    return () => {
+      ipcRenderer.removeListener("file:open-external", listener);
+    };
+  },
+  notifyRendererReady: (): void => {
+    ipcRenderer.send("app:renderer-ready");
+  },
   test:
     process.env.BEDROCK_E2E === "1"
       ? {
@@ -47,6 +65,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
             ipcRenderer.invoke("test:get-state"),
           reset: (): Promise<BedrockTestState | null> =>
             ipcRenderer.invoke("test:reset-state"),
+          simulateExternalOpen: (filePath: string): Promise<boolean> =>
+            ipcRenderer.invoke("test:simulate-external-open", filePath),
         }
       : undefined,
 });

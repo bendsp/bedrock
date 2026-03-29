@@ -13,6 +13,10 @@ export interface OpenFileResult {
   content: string;
 }
 
+export interface OpenSpecificFilePayload {
+  filePath: string;
+}
+
 export interface SaveFilePayload {
   filePath?: string;
   content: string;
@@ -66,9 +70,15 @@ export interface IElectronAPI {
   onFind: (callback: () => void) => () => void;
   exportFile: (payload: ExportFilePayload) => Promise<boolean>;
   readFile: (filePath: string) => Promise<OpenFileResult | null>;
+  consumePendingExternalOpenFiles: () => Promise<OpenSpecificFilePayload[]>;
+  onExternalOpenFile: (
+    callback: (payload: OpenSpecificFilePayload) => void
+  ) => () => void;
+  notifyRendererReady: () => void;
   test?: {
     configure: (config: BedrockTestConfig) => Promise<BedrockTestState | null>;
     getState: () => Promise<BedrockTestState | null>;
     reset: () => Promise<BedrockTestState | null>;
+    simulateExternalOpen: (filePath: string) => Promise<boolean>;
   };
 }

@@ -259,19 +259,19 @@ ipcMain.handle(
         if (nextSavePath) {
           targetPath = nextSavePath;
         } else {
-        const { canceled, filePath } = await dialog.showSaveDialog(
-          BrowserWindow.fromWebContents(event.sender) ?? undefined,
-          {
-            filters: [MARKDOWN_DIALOG_FILTER],
-            defaultPath: "Untitled.md",
+          const { canceled, filePath } = await dialog.showSaveDialog(
+            BrowserWindow.fromWebContents(event.sender) ?? undefined,
+            {
+              filters: [MARKDOWN_DIALOG_FILTER],
+              defaultPath: "Untitled.md",
+            }
+          );
+
+          if (canceled || !filePath) {
+            return null;
           }
-        );
 
-        if (canceled || !filePath) {
-          return null;
-        }
-
-        targetPath = ensureMarkdownExtension(filePath);
+          targetPath = ensureMarkdownExtension(filePath);
         }
       }
 
@@ -606,6 +606,9 @@ const createWindow = (): void => {
   windowDirtyState.set(webContentsId, false);
 
   window.webContents.on("render-process-gone", (_event, details) => {
+    if (mainWindow === window) {
+      rendererReady = false;
+    }
     captureMainTelemetryMessage("Renderer process terminated", {
       reason: details.reason,
       exitCode: details.exitCode,

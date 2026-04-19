@@ -197,11 +197,13 @@ const App = () => {
 
   const enqueueExternalOpen = useCallback(
     (payload: OpenSpecificFilePayload) => {
-      externalOpenSequenceRef.current = externalOpenSequenceRef.current.then(
-        async () => {
+      externalOpenSequenceRef.current = externalOpenSequenceRef.current
+        .then(async () => {
           await handleExternalOpen(payload);
-        }
-      );
+        })
+        .catch((error) => {
+          console.error("Failed to handle external open:", error);
+        });
     },
     [handleExternalOpen]
   );
@@ -211,30 +213,38 @@ const App = () => {
     setSettings(loaded);
 
     const initialize = async () => {
-      const pendingExternalOpenFiles =
-        await window.electronAPI.consumePendingExternalOpenFiles();
+      try {
+        const pendingExternalOpenFiles =
+          await window.electronAPI.consumePendingExternalOpenFiles();
 
-      if (pendingExternalOpenFiles.length > 0) {
-        pendingExternalOpenFiles.forEach((payload) => {
-          enqueueExternalOpen(payload);
-        });
-      } else if (loaded.openLastFileOnStartup && loaded.lastOpenedFilePath) {
-        try {
-          const result = await window.electronAPI.readFile(
-            loaded.lastOpenedFilePath
-          );
-          if (result) {
-            replaceDocument(result.content, result.filePath);
+        if (pendingExternalOpenFiles.length > 0) {
+          for (const payload of pendingExternalOpenFiles) {
+            const result = await window.electronAPI.readFile(payload.filePath);
+            if (result) {
+              replaceDocument(result.content, result.filePath);
+            }
           }
-        } catch (error) {
-          console.error("Failed to open last file on startup:", error);
+        } else if (loaded.openLastFileOnStartup && loaded.lastOpenedFilePath) {
+          try {
+            const result = await window.electronAPI.readFile(
+              loaded.lastOpenedFilePath
+            );
+            if (result) {
+              replaceDocument(result.content, result.filePath);
+            }
+          } catch (error) {
+            console.error("Failed to open last file on startup:", error);
+          }
         }
+      } catch (error) {
+        console.error("Failed during app initialization:", error);
+      } finally {
+        setIsInitializing(false);
       }
-      setIsInitializing(false);
     };
 
     void initialize();
-  }, [enqueueExternalOpen, replaceDocument]);
+  }, [replaceDocument]);
 
   const handleOpen = useCallback(async () => {
     const proceed = await confirmDiscardIfNeeded("open");

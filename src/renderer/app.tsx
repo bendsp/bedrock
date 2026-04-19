@@ -9,7 +9,7 @@ import { createRoot } from "react-dom/client";
 import { CodeMirrorEditor } from "./components/CodeMirrorEditor";
 import { Chrome } from "./components/Chrome";
 import SettingsModal from "./components/SettingsModal";
-import { RenderMode } from "../shared/types";
+import { OpenSpecificFilePayload, RenderMode } from "../shared/types";
 import { markdownToHtml } from "./lib/export";
 import {
   defaultSettings,
@@ -57,6 +57,7 @@ const App = () => {
   const [isInitializing, setIsInitializing] = useState(true);
   const suppressDirtyRef = useRef(false);
   const editorViewRef = useRef<EditorView | null>(null);
+  const externalOpenSequenceRef = useRef(Promise.resolve());
   const commandRegistry = useMemo(() => createCommandRegistry(), []);
   const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(
     () => window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -92,33 +93,6 @@ const App = () => {
   useEffect(() => {
     window.electronAPI.notifyDirtyState(isDirty);
   }, [isDirty]);
-
-  useEffect(() => {
-    const loaded = loadSettings();
-    setSettings(loaded);
-
-    const initialize = async () => {
-      // Open last file on startup if enabled
-      if (loaded.openLastFileOnStartup && loaded.lastOpenedFilePath) {
-        try {
-          const result = await window.electronAPI.readFile(
-            loaded.lastOpenedFilePath
-          );
-          if (result) {
-            suppressDirtyRef.current = true;
-            setDoc(result.content);
-            setFilePath(result.filePath);
-            setIsDirty(false);
-          }
-        } catch (error) {
-          console.error("Failed to open last file on startup:", error);
-        }
-      }
-      setIsInitializing(false);
-    };
-
-    void initialize();
-  }, []);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -191,6 +165,87 @@ const App = () => {
     [fileName, isDirty]
   );
 
+  const replaceDocument = useCallback(
+    (nextDoc: string, nextFilePath: string | null) => {
+      suppressDirtyRef.current = true;
+      setDoc(nextDoc);
+      setFilePath(nextFilePath);
+      setIsDirty(false);
+      focusEditor();
+    },
+    [focusEditor]
+  );
+
+  const handleExternalOpen = useCallback(
+    async ({ filePath: nextFilePath }: OpenSpecificFilePayload) => {
+      const proceed = await confirmDiscardIfNeeded("open");
+      if (!proceed) {
+        focusEditor();
+        return;
+      }
+
+      const result = await window.electronAPI.readFile(nextFilePath);
+      if (!result) {
+        focusEditor();
+        return;
+      }
+
+      replaceDocument(result.content, result.filePath);
+    },
+    [confirmDiscardIfNeeded, focusEditor, replaceDocument]
+  );
+
+  const enqueueExternalOpen = useCallback(
+    (payload: OpenSpecificFilePayload) => {
+      externalOpenSequenceRef.current = externalOpenSequenceRef.current
+        .then(async () => {
+          await handleExternalOpen(payload);
+        })
+        .catch((error) => {
+          console.error("Failed to handle external open:", error);
+        });
+    },
+    [handleExternalOpen]
+  );
+
+  useEffect(() => {
+    const loaded = loadSettings();
+    setSettings(loaded);
+
+    const initialize = async () => {
+      try {
+        const pendingExternalOpenFiles =
+          await window.electronAPI.consumePendingExternalOpenFiles();
+
+        if (pendingExternalOpenFiles.length > 0) {
+          for (const payload of pendingExternalOpenFiles) {
+            const result = await window.electronAPI.readFile(payload.filePath);
+            if (result) {
+              replaceDocument(result.content, result.filePath);
+            }
+          }
+        } else if (loaded.openLastFileOnStartup && loaded.lastOpenedFilePath) {
+          try {
+            const result = await window.electronAPI.readFile(
+              loaded.lastOpenedFilePath
+            );
+            if (result) {
+              replaceDocument(result.content, result.filePath);
+            }
+          } catch (error) {
+            console.error("Failed to open last file on startup:", error);
+          }
+        }
+      } catch (error) {
+        console.error("Failed during app initialization:", error);
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    void initialize();
+  }, [replaceDocument]);
+
   const handleOpen = useCallback(async () => {
     const proceed = await confirmDiscardIfNeeded("open");
     if (!proceed) {
@@ -204,12 +259,8 @@ const App = () => {
       return;
     }
 
-    suppressDirtyRef.current = true;
-    setDoc(result.content);
-    setFilePath(result.filePath);
-    setIsDirty(false);
-    focusEditor();
-  }, [confirmDiscardIfNeeded, focusEditor]);
+    replaceDocument(result.content, result.filePath);
+  }, [confirmDiscardIfNeeded, focusEditor, replaceDocument]);
 
   const handleNew = useCallback(async () => {
     const proceed = await confirmDiscardIfNeeded("new");
@@ -324,6 +375,26 @@ const App = () => {
     handleSaveAs,
     setSettings,
   ]);
+
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.onExternalOpenFile((payload) => {
+      enqueueExternalOpen(payload);
+    });
+    window.electronAPI.notifyRendererReady();
+    return unsubscribe;
+  }, [enqueueExternalOpen]);
+
+  useEffect(() => {
+    const flushQueuedExternalOpens = async () => {
+      const pendingExternalOpenFiles =
+        await window.electronAPI.consumePendingExternalOpenFiles();
+      pendingExternalOpenFiles.forEach((payload) => {
+        enqueueExternalOpen(payload);
+      });
+    };
+
+    void flushQueuedExternalOpens();
+  }, [enqueueExternalOpen]);
 
   useEffect(() => {
     const unsubscribe = window.electronAPI.onFind(() => {

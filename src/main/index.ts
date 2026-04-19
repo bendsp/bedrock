@@ -16,6 +16,7 @@ import {
   DiscardAction,
   SaveFilePayload,
   OpenFileResult,
+  OpenSpecificFilePayload,
   SaveFileResult,
   ExportFilePayload,
 } from "../shared/types";
@@ -39,6 +40,9 @@ const ensureMarkdownExtension = (filePath: string): string => {
 const windowDirtyState = new Map<number, boolean>();
 const runtimeInfo = initializeMainTelemetry();
 const isE2EMode = runtimeInfo.e2eMode;
+const pendingExternalOpenFiles: OpenSpecificFilePayload[] = [];
+let mainWindow: BrowserWindow | null = null;
+let rendererReady = false;
 
 const testState: BedrockTestState = {
   nextOpenPath: null,
@@ -109,6 +113,55 @@ const getDiscardDescription = (action: DiscardAction): string => {
   return "close this window";
 };
 
+const isMarkdownFilePath = (filePath: string): boolean => {
+  return filePath.toLowerCase().endsWith(".md");
+};
+
+const normalizeExternalOpenPath = (
+  filePath: unknown
+): OpenSpecificFilePayload | null => {
+  if (typeof filePath !== "string" || filePath.trim() === "") {
+    return null;
+  }
+
+  const resolvedPath = path.resolve(filePath);
+  if (!isMarkdownFilePath(resolvedPath)) {
+    return null;
+  }
+
+  return { filePath: resolvedPath };
+};
+
+const deliverExternalOpenFile = (payload: OpenSpecificFilePayload): boolean => {
+  if (!mainWindow || mainWindow.isDestroyed() || !rendererReady) {
+    return false;
+  }
+
+  mainWindow.webContents.send("file:open-external", payload);
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  mainWindow.focus();
+  return true;
+};
+
+const handleExternalOpenPath = (filePath: unknown): boolean => {
+  const payload = normalizeExternalOpenPath(filePath);
+  if (!payload) {
+    return false;
+  }
+
+  if (!deliverExternalOpenFile(payload)) {
+    pendingExternalOpenFiles.push(payload);
+
+    if (app.isReady() && (!mainWindow || mainWindow.isDestroyed())) {
+      createWindow();
+    }
+  }
+
+  return true;
+};
+
 const confirmDiscardChanges = async (
   browserWindow: BrowserWindow | null,
   action: DiscardAction,
@@ -169,7 +222,7 @@ ipcMain.handle(
   async (_event, filePath: string): Promise<OpenFileResult | null> => {
     try {
       // Basic security check: only allow reading .md files.
-      if (!filePath.toLowerCase().endsWith(".md")) {
+      if (!isMarkdownFilePath(filePath)) {
         console.error(
           `Rejected attempt to read non-markdown file: ${filePath}`
         );
@@ -191,6 +244,10 @@ ipcMain.handle(
   }
 );
 
+ipcMain.handle("file:consume-pending-external-open", () => {
+  return pendingExternalOpenFiles.splice(0);
+});
+
 ipcMain.handle(
   "file:save",
   async (event, args: SaveFilePayload): Promise<SaveFileResult | null> => {
@@ -202,19 +259,19 @@ ipcMain.handle(
         if (nextSavePath) {
           targetPath = nextSavePath;
         } else {
-        const { canceled, filePath } = await dialog.showSaveDialog(
-          BrowserWindow.fromWebContents(event.sender) ?? undefined,
-          {
-            filters: [MARKDOWN_DIALOG_FILTER],
-            defaultPath: "Untitled.md",
+          const { canceled, filePath } = await dialog.showSaveDialog(
+            BrowserWindow.fromWebContents(event.sender) ?? undefined,
+            {
+              filters: [MARKDOWN_DIALOG_FILTER],
+              defaultPath: "Untitled.md",
+            }
+          );
+
+          if (canceled || !filePath) {
+            return null;
           }
-        );
 
-        if (canceled || !filePath) {
-          return null;
-        }
-
-        targetPath = ensureMarkdownExtension(filePath);
+          targetPath = ensureMarkdownExtension(filePath);
         }
       }
 
@@ -257,6 +314,12 @@ ipcMain.on("devtools:open", (event) => {
   window?.webContents.openDevTools({ mode: "detach" });
 });
 
+ipcMain.on("app:renderer-ready", (event) => {
+  if (mainWindow && event.sender.id === mainWindow.webContents.id) {
+    rendererReady = true;
+  }
+});
+
 ipcMain.handle("app:get-version", (): string => {
   return app.getVersion();
 });
@@ -290,6 +353,10 @@ ipcMain.handle("test:get-state", () => {
 
 ipcMain.handle("test:reset-state", () => {
   return resetTestState();
+});
+
+ipcMain.handle("test:simulate-external-open", (_event, filePath: string) => {
+  return handleExternalOpenPath(filePath);
 });
 
 ipcMain.handle(
@@ -500,7 +567,7 @@ const createWindow = (): void => {
   });
 
   // Create the browser window.
-  const mainWindow = new BrowserWindow({
+  const window = new BrowserWindow({
     x: mainWindowState.x,
     y: mainWindowState.y,
     width: mainWindowState.width,
@@ -515,28 +582,33 @@ const createWindow = (): void => {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
     },
   });
+  mainWindow = window;
+  rendererReady = false;
 
   // Let us register listeners on the window, so we can update the state
   // automatically (the listeners will be removed when the window is closed)
   // and restore the maximized state of the window
-  mainWindowState.manage(mainWindow);
+  mainWindowState.manage(window);
 
   if (process.platform !== "darwin") {
     // Keep shortcuts active but hide the menu bar.
-    mainWindow.setMenuBarVisibility(false);
+    window.setMenuBarVisibility(false);
   }
 
-  const webContentsId = mainWindow.webContents.id;
+  const webContentsId = window.webContents.id;
 
   // and load the index.html of the app.
-  mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+  void window.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
 
   // Open the DevTools.
   // mainWindow.webContents.openDevTools();
 
   windowDirtyState.set(webContentsId, false);
 
-  mainWindow.webContents.on("render-process-gone", (_event, details) => {
+  window.webContents.on("render-process-gone", (_event, details) => {
+    if (mainWindow === window) {
+      rendererReady = false;
+    }
     captureMainTelemetryMessage("Renderer process terminated", {
       reason: details.reason,
       exitCode: details.exitCode,
@@ -544,7 +616,7 @@ const createWindow = (): void => {
     });
   });
 
-  mainWindow.webContents.on("unresponsive", () => {
+  window.webContents.on("unresponsive", () => {
     captureMainTelemetryMessage("Renderer process unresponsive", {
       webContentsId,
     });
@@ -552,7 +624,7 @@ const createWindow = (): void => {
 
   let forceClose = false;
 
-  mainWindow.on("close", async (event) => {
+  window.on("close", async (event) => {
     if (forceClose) {
       return;
     }
@@ -565,17 +637,21 @@ const createWindow = (): void => {
 
     event.preventDefault();
 
-    const confirmed = await confirmDiscardChanges(mainWindow, "close");
+    const confirmed = await confirmDiscardChanges(window, "close");
 
     if (confirmed) {
       windowDirtyState.set(webContentsId, false);
       forceClose = true;
-      mainWindow.close();
+      window.close();
     }
   });
 
-  mainWindow.on("closed", () => {
+  window.on("closed", () => {
     windowDirtyState.delete(webContentsId);
+    if (mainWindow === window) {
+      mainWindow = null;
+      rendererReady = false;
+    }
   });
 };
 
@@ -585,6 +661,28 @@ const createWindow = (): void => {
 app.on("ready", () => {
   installApplicationMenu();
   createWindow();
+
+  if (isE2EMode) {
+    try {
+      const seededPaths = JSON.parse(
+        process.env.BEDROCK_E2E_INITIAL_EXTERNAL_OPEN_PATHS ?? "[]"
+      ) as unknown;
+      if (Array.isArray(seededPaths)) {
+        seededPaths.forEach((filePath) => {
+          handleExternalOpenPath(filePath);
+        });
+      }
+    } catch (error) {
+      captureMainTelemetryException(error, {
+        operation: "parse-initial-external-open-paths",
+      });
+    }
+  }
+});
+
+app.on("open-file", (event, filePath) => {
+  event.preventDefault();
+  handleExternalOpenPath(filePath);
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common

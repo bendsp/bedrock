@@ -84,6 +84,16 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     icon: "./src/assets/icon",
+    extendInfo: {
+      CFBundleDocumentTypes: [
+        {
+          CFBundleTypeExtensions: ["md"],
+          CFBundleTypeName: "Markdown Document",
+          CFBundleTypeRole: "Editor",
+          LSHandlerRank: "Alternate",
+        },
+      ],
+    },
     osxSign: process.env.APPLE_IDENTITY
       ? { identity: process.env.APPLE_IDENTITY }
       : {},

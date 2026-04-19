@@ -48,7 +48,11 @@ const findCompiledMainEntry = async (): Promise<string> => {
   return matches[0].file;
 };
 
-const launchBedrock = async (): Promise<{
+const launchBedrock = async (
+  options: {
+    initialExternalOpenPaths?: string[];
+  } = {}
+): Promise<{
   app: ElectronApplication;
   page: Page;
   userDataDir: string;
@@ -61,6 +65,9 @@ const launchBedrock = async (): Promise<{
     env: {
       ...process.env,
       BEDROCK_E2E: "1",
+      BEDROCK_E2E_INITIAL_EXTERNAL_OPEN_PATHS: JSON.stringify(
+        options.initialExternalOpenPaths ?? []
+      ),
       BEDROCK_USER_DATA_DIR: userDataDir,
       NODE_ENV: "test",
       SENTRY_DSN: "",
@@ -95,6 +102,12 @@ const getTestState = async (page: Page) => {
   return page.evaluate(async () => {
     return window.electronAPI.test?.getState() ?? null;
   });
+};
+
+const simulateExternalOpen = async (page: Page, filePath: string) => {
+  return page.evaluate(async (value) => {
+    return window.electronAPI.test?.simulateExternalOpen(value) ?? false;
+  }, filePath);
 };
 
 test.describe("Bedrock Electron pipeline", () => {
@@ -159,6 +172,37 @@ test.describe("Bedrock Electron pipeline", () => {
     } finally {
       await app.close().catch((): undefined => undefined);
       await fs.rm(outputDir, { recursive: true, force: true });
+      await fs.rm(userDataDir, { recursive: true, force: true });
+    }
+  });
+
+  test("queues startup external opens and reuses discard confirmation for running-app opens", async () => {
+    const { app, page, userDataDir } = await launchBedrock({
+      initialExternalOpenPaths: [fixturePath],
+    });
+
+    try {
+      await expect(page.locator("header")).toContainText("open-source.md");
+      await expect.poll(() => getEditorText(page)).toContain("Opened From Fixture");
+
+      await page.locator(".cm-content").click();
+      await page.keyboard.type("\nUnsaved change");
+
+      await configureTestHarness(page, { discardResponse: false });
+      await expect(await simulateExternalOpen(page, fixturePath)).toBe(true);
+
+      const cancelledState = await getTestState(page);
+      expect(cancelledState?.lastDiscardPrompt?.action).toBe("open");
+      await expect(page.locator("header")).toContainText("*open-source.md");
+      await expect.poll(() => getEditorText(page)).toContain("Unsaved change");
+
+      await configureTestHarness(page, { discardResponse: true });
+      await expect(await simulateExternalOpen(page, fixturePath)).toBe(true);
+
+      await expect(page.locator("header")).toContainText("open-source.md");
+      await expect.poll(() => getEditorText(page)).not.toContain("Unsaved change");
+    } finally {
+      await app.close().catch((): undefined => undefined);
       await fs.rm(userDataDir, { recursive: true, force: true });
     }
   });

@@ -40,10 +40,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Windows Installer
+      - name: Upload Windows update artifacts
         shell: bash
         run: |
-          find out/make -name "Bedrock.exe" | xargs -I {} gh release upload ${{ github.ref_name }} "{}" --clobber
+          find out/make \( -name "Bedrock.exe" -o -name "*.nupkg" -o -name "RELEASES" \) \
+            | xargs -I {} gh release upload ${{ github.ref_name }} "{}" --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

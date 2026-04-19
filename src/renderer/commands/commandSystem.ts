@@ -20,6 +20,7 @@ export type CommandId =
   | "file.save"
   | "file.saveAs"
   | "app.openSettings"
+  | "app.checkForUpdates"
   | "format.bold"
   | "format.italic"
   | "format.strikethrough"
@@ -39,6 +40,7 @@ export type CommandArgs = {
   "file.save": void;
   "file.saveAs": void;
   "app.openSettings": void;
+  "app.checkForUpdates": void;
   "format.bold": void;
   "format.italic": void;
   "format.strikethrough": void;
@@ -107,6 +109,7 @@ export type CommandRunContext = {
   saveFile: () => Promise<void>;
   saveFileAs: () => Promise<void>;
   openSettings: () => void;
+  checkForUpdates: () => Promise<void>;
   setTheme: (theme: ThemeName) => void;
   exportFile: (format: "html" | "pdf") => Promise<void>;
 };
@@ -227,6 +230,17 @@ export const createCommandRegistry = (): CommandRegistry => {
       isGlobal: true,
       run: (ctx) => {
         ctx.openSettings();
+        return true;
+      },
+    },
+    {
+      id: "app.checkForUpdates",
+      title: "Check for Updates…",
+      category: "App",
+      description: "Check GitHub releases for a newer Bedrock version.",
+      isGlobal: true,
+      run: async (ctx) => {
+        await ctx.checkForUpdates();
         return true;
       },
     },

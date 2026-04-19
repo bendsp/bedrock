@@ -13,12 +13,15 @@ import * as path from "path";
 import {
   BedrockTestConfig,
   BedrockTestState,
+  BedrockTestUpdaterEvent,
   DiscardAction,
+  ManualUpdateCheckResult,
   SaveFilePayload,
   OpenFileResult,
   OpenSpecificFilePayload,
   SaveFileResult,
   ExportFilePayload,
+  UpdaterSnapshot,
 } from "../shared/types";
 import {
   buildRuntimeInfo,
@@ -27,6 +30,7 @@ import {
   flushMainTelemetry,
   initializeMainTelemetry,
 } from "./observability";
+import { createUpdaterService } from "./updater";
 
 const MARKDOWN_DIALOG_FILTER = {
   name: "Markdown Files",
@@ -43,13 +47,59 @@ const isE2EMode = runtimeInfo.e2eMode;
 const pendingExternalOpenFiles: OpenSpecificFilePayload[] = [];
 let mainWindow: BrowserWindow | null = null;
 let rendererReady = false;
+const updaterService = createUpdaterService(runtimeInfo);
 
 const testState: BedrockTestState = {
   nextOpenPath: null,
   nextSavePath: null,
   discardResponse: null,
   lastDiscardPrompt: null,
+  updaterSnapshot: updaterService.getState(),
+  updaterInstallRequested: false,
+  lastManualUpdateCheckResult: null,
 };
+
+const syncUpdaterTestState = () => {
+  if (!isE2EMode) {
+    return;
+  }
+
+  const meta = updaterService.getTestMeta();
+  if (!meta) {
+    return;
+  }
+
+  testState.updaterSnapshot = meta.updaterSnapshot;
+  testState.updaterInstallRequested = meta.updaterInstallRequested;
+  testState.lastManualUpdateCheckResult = meta.lastManualUpdateCheckResult;
+};
+
+const emitUpdaterState = (snapshot: UpdaterSnapshot) => {
+  syncUpdaterTestState();
+
+  if (!mainWindow || mainWindow.isDestroyed() || !rendererReady) {
+    return;
+  }
+
+  mainWindow.webContents.send("updater:state", snapshot);
+};
+
+const sendCheckForUpdatesRequest = () => {
+  if (!mainWindow || mainWindow.isDestroyed() || !rendererReady) {
+    return;
+  }
+
+  mainWindow.webContents.send("app:check-for-updates");
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  mainWindow.focus();
+};
+
+updaterService.subscribe((snapshot) => {
+  emitUpdaterState(snapshot);
+});
+syncUpdaterTestState();
 
 const applyTestConfig = (
   config: BedrockTestConfig = {}
@@ -76,10 +126,14 @@ const resetTestState = (): BedrockTestState | null => {
     return null;
   }
 
+  updaterService.resetTestState();
   testState.nextOpenPath = null;
   testState.nextSavePath = null;
   testState.discardResponse = null;
   testState.lastDiscardPrompt = null;
+  testState.updaterSnapshot = updaterService.getState();
+  testState.updaterInstallRequested = false;
+  testState.lastManualUpdateCheckResult = null;
   return { ...testState };
 };
 
@@ -328,6 +382,25 @@ ipcMain.handle("app:get-runtime-info", () => {
   return buildRuntimeInfo();
 });
 
+ipcMain.handle("updater:get-state", () => {
+  return updaterService.getState();
+});
+
+ipcMain.handle(
+  "updater:check",
+  async (): Promise<ManualUpdateCheckResult> => {
+    const result = await updaterService.checkForUpdates();
+    syncUpdaterTestState();
+    return result;
+  }
+);
+
+ipcMain.handle("updater:install", (): boolean => {
+  const installed = updaterService.installUpdate();
+  syncUpdaterTestState();
+  return installed;
+});
+
 ipcMain.handle("shell:open-external", async (_event, rawUrl: string) => {
   if (typeof rawUrl !== "string") {
     return;
@@ -348,6 +421,7 @@ ipcMain.handle("test:configure", (_event, config: BedrockTestConfig) => {
 });
 
 ipcMain.handle("test:get-state", () => {
+  syncUpdaterTestState();
   return isE2EMode ? { ...testState } : null;
 });
 
@@ -358,6 +432,28 @@ ipcMain.handle("test:reset-state", () => {
 ipcMain.handle("test:simulate-external-open", (_event, filePath: string) => {
   return handleExternalOpenPath(filePath);
 });
+
+ipcMain.handle("test:get-updater-state", () => {
+  return isE2EMode ? updaterService.getState() : null;
+});
+
+ipcMain.handle(
+  "test:set-updater-state",
+  (_event, snapshot: Partial<UpdaterSnapshot>) => {
+    const next = updaterService.setTestState(snapshot);
+    syncUpdaterTestState();
+    return next;
+  }
+);
+
+ipcMain.handle(
+  "test:emit-updater-event",
+  (_event, event: BedrockTestUpdaterEvent) => {
+    const next = updaterService.emitTestEvent(event);
+    syncUpdaterTestState();
+    return next;
+  }
+);
 
 ipcMain.handle(
   "file:export",
@@ -496,7 +592,27 @@ const installApplicationMenu = () => {
   const template: MenuItemConstructorOptions[] = [
     ...(isMac
       ? ([
-          { role: "appMenu" },
+          {
+            label: app.name,
+            submenu: [
+              { role: "about" },
+              { type: "separator" },
+              {
+                label: "Check for Updates…",
+                click: () => {
+                  sendCheckForUpdatesRequest();
+                },
+              },
+              { type: "separator" },
+              { role: "services" },
+              { type: "separator" },
+              { role: "hide" },
+              { role: "hideOthers" },
+              { role: "unhide" },
+              { type: "separator" },
+              { role: "quit" },
+            ],
+          },
           { role: "fileMenu" },
           {
             label: "Edit",
@@ -554,6 +670,17 @@ const installApplicationMenu = () => {
           },
           { role: "viewMenu" },
           { role: "windowMenu" },
+          {
+            label: "Help",
+            submenu: [
+              {
+                label: "Check for Updates…",
+                click: () => {
+                  sendCheckForUpdatesRequest();
+                },
+              },
+            ],
+          },
         ] as MenuItemConstructorOptions[])),
   ];
 
@@ -661,6 +788,7 @@ const createWindow = (): void => {
 app.on("ready", () => {
   installApplicationMenu();
   createWindow();
+  updaterService.startStartupCheck();
 
   if (isE2EMode) {
     try {

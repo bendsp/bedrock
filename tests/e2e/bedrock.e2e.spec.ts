@@ -77,6 +77,9 @@ const launchBedrock = async (
   const page = await app.firstWindow();
   await page.waitForLoadState("domcontentloaded");
   await page.locator(".cm-editor").waitFor();
+  await page.evaluate(async () => {
+    await window.electronAPI.test?.reset();
+  });
 
   return { app, page, userDataDir };
 };
@@ -102,6 +105,28 @@ const getTestState = async (page: Page) => {
   return page.evaluate(async () => {
     return window.electronAPI.test?.getState() ?? null;
   });
+};
+
+const setUpdaterState = async (
+  page: Page,
+  value: Record<string, unknown>
+) => {
+  return page.evaluate(async (snapshot) => {
+    return window.electronAPI.test?.setUpdaterState(snapshot) ?? null;
+  }, value);
+};
+
+const emitUpdaterEvent = async (
+  page: Page,
+  value:
+    | { type: "update-available" }
+    | { type: "update-not-available" }
+    | { type: "error"; message: string }
+    | { type: "update-downloaded"; version: string; releaseNotes?: string | null }
+) => {
+  return page.evaluate(async (event) => {
+    return window.electronAPI.test?.emitUpdaterEvent(event) ?? null;
+  }, value);
 };
 
 const simulateExternalOpen = async (page: Page, filePath: string) => {
@@ -201,6 +226,56 @@ test.describe("Bedrock Electron pipeline", () => {
 
       await expect(page.locator("header")).toContainText("open-source.md");
       await expect.poll(() => getEditorText(page)).not.toContain("Unsaved change");
+    } finally {
+      await app.close().catch((): undefined => undefined);
+      await fs.rm(userDataDir, { recursive: true, force: true });
+    }
+  });
+
+  test("surfaces manual update checks, ready banner, and install requests", async () => {
+    const { app, page, userDataDir } = await launchBedrock();
+
+    try {
+      await page.getByLabel("Settings").click();
+      const settingsDialog = page.getByRole("dialog");
+      await settingsDialog.getByRole("button", { name: "Updates" }).click();
+
+      await settingsDialog.getByRole("button", { name: "Check for Updates…" }).click();
+      await emitUpdaterEvent(page, { type: "update-not-available" });
+      await expect(settingsDialog.getByText("You’re up to date.")).toBeVisible();
+
+      await setUpdaterState(page, {
+        status: "downloading",
+        source: "manual",
+      });
+      await app.evaluate(({ BrowserWindow }) => {
+        BrowserWindow.getAllWindows()[0]?.webContents.send("app:check-for-updates");
+      });
+      await expect(
+        settingsDialog.getByText(
+          "Bedrock is already checking for or downloading an update."
+        )
+      ).toBeVisible();
+
+      await setUpdaterState(page, {
+        status: "checking",
+        source: "startup",
+      });
+      await emitUpdaterEvent(page, {
+        type: "update-downloaded",
+        version: "1.3.4",
+        releaseNotes: "Bug fixes and improvements.",
+      });
+
+      await expect(page.getByText("Update ready to install")).toBeVisible();
+      await expect(
+        page.getByText("Bedrock 1.3.4 has been downloaded and is ready to install.")
+      ).toBeVisible();
+
+      await settingsDialog.getByRole("button", { name: "Restart to Update" }).click();
+      await expect
+        .poll(async () => (await getTestState(page))?.updaterInstallRequested)
+        .toBe(true);
     } finally {
       await app.close().catch((): undefined => undefined);
       await fs.rm(userDataDir, { recursive: true, force: true });

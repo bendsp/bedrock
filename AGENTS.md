@@ -129,3 +129,4 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
 - 2026-03-22: Main-process uncaught exceptions now flush telemetry and exit, and release automation no longer pushes version-bump commits directly to protected `main`.
 - 2026-03-29: Added macOS `.md` document registration plus queued Finder/open-file handling so Bedrock can appear in Finder `Open With…`, reuse the existing single window, and honor dirty-document discard prompts for externally opened Markdown files.
 - 2026-04-19: Tightened external-open startup handling in the renderer and reset main-process renderer readiness after renderer termination so queued Finder opens recover more safely.
+- 2026-04-19: Added a main-process self-update service for stable GitHub releases, renderer updater status UI, and release workflow changes to publish Windows Squirrel update assets.

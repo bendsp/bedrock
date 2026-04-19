@@ -40,6 +40,45 @@ export interface BedrockRuntimeInfo {
   e2eMode: boolean;
 }
 
+export type UpdaterStatus =
+  | "idle"
+  | "checking"
+  | "downloading"
+  | "ready"
+  | "error";
+
+export type UpdaterCheckSource = "startup" | "manual";
+
+export interface UpdaterSnapshot {
+  status: UpdaterStatus;
+  availableVersion: string | null;
+  downloadedVersion: string | null;
+  releaseNotes: string | null;
+  errorMessage: string | null;
+  source: UpdaterCheckSource | null;
+}
+
+export interface ManualUpdateCheckResult {
+  kind:
+    | "started"
+    | "not-available"
+    | "already-in-progress"
+    | "already-ready"
+    | "unsupported"
+    | "error";
+  message?: string;
+}
+
+export type BedrockTestUpdaterEvent =
+  | { type: "update-available" }
+  | {
+      type: "update-downloaded";
+      version: string;
+      releaseNotes?: string | null;
+    }
+  | { type: "update-not-available" }
+  | { type: "error"; message: string };
+
 export interface BedrockTestConfig {
   nextOpenPath?: string | null;
   nextSavePath?: string | null;
@@ -48,6 +87,9 @@ export interface BedrockTestConfig {
 
 export interface BedrockTestState extends BedrockTestConfig {
   lastDiscardPrompt: DiscardPromptPayload | null;
+  updaterSnapshot: UpdaterSnapshot | null;
+  updaterInstallRequested: boolean;
+  lastManualUpdateCheckResult: ManualUpdateCheckResult | null;
 }
 
 export type ExportFormat = "html" | "pdf";
@@ -74,11 +116,23 @@ export interface IElectronAPI {
   onExternalOpenFile: (
     callback: (payload: OpenSpecificFilePayload) => void
   ) => () => void;
+  getUpdaterState: () => Promise<UpdaterSnapshot>;
+  checkForUpdates: () => Promise<ManualUpdateCheckResult>;
+  installUpdate: () => Promise<boolean>;
+  onUpdaterState: (callback: (snapshot: UpdaterSnapshot) => void) => () => void;
+  onCheckForUpdatesRequest: (callback: () => void) => () => void;
   notifyRendererReady: () => void;
   test?: {
     configure: (config: BedrockTestConfig) => Promise<BedrockTestState | null>;
     getState: () => Promise<BedrockTestState | null>;
     reset: () => Promise<BedrockTestState | null>;
     simulateExternalOpen: (filePath: string) => Promise<boolean>;
+    getUpdaterState: () => Promise<UpdaterSnapshot | null>;
+    setUpdaterState: (
+      snapshot: Partial<UpdaterSnapshot>
+    ) => Promise<UpdaterSnapshot | null>;
+    emitUpdaterEvent: (
+      event: BedrockTestUpdaterEvent
+    ) => Promise<UpdaterSnapshot | null>;
   };
 }

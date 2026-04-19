@@ -3,11 +3,14 @@ import {
   BedrockRuntimeInfo,
   BedrockTestConfig,
   BedrockTestState,
+  BedrockTestUpdaterEvent,
+  ManualUpdateCheckResult,
   SaveFilePayload,
   DiscardPromptPayload,
   OpenFileResult,
   OpenSpecificFilePayload,
   SaveFileResult,
+  UpdaterSnapshot,
   ExportFilePayload,
 } from "../shared/types";
 
@@ -35,6 +38,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.removeListener("editor:find", listener);
     };
   },
+  onCheckForUpdatesRequest: (callback: () => void): (() => void) => {
+    const listener = () => callback();
+    ipcRenderer.on("app:check-for-updates", listener);
+    return () => {
+      ipcRenderer.removeListener("app:check-for-updates", listener);
+    };
+  },
   exportFile: (payload: ExportFilePayload): Promise<boolean> =>
     ipcRenderer.invoke("file:export", payload),
   readFile: (filePath: string): Promise<OpenFileResult | null> =>
@@ -53,6 +63,23 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.removeListener("file:open-external", listener);
     };
   },
+  getUpdaterState: (): Promise<UpdaterSnapshot> =>
+    ipcRenderer.invoke("updater:get-state"),
+  checkForUpdates: (): Promise<ManualUpdateCheckResult> =>
+    ipcRenderer.invoke("updater:check"),
+  installUpdate: (): Promise<boolean> => ipcRenderer.invoke("updater:install"),
+  onUpdaterState: (
+    callback: (snapshot: UpdaterSnapshot) => void
+  ): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      snapshot: UpdaterSnapshot
+    ) => callback(snapshot);
+    ipcRenderer.on("updater:state", listener);
+    return () => {
+      ipcRenderer.removeListener("updater:state", listener);
+    };
+  },
   notifyRendererReady: (): void => {
     ipcRenderer.send("app:renderer-ready");
   },
@@ -67,6 +94,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
             ipcRenderer.invoke("test:reset-state"),
           simulateExternalOpen: (filePath: string): Promise<boolean> =>
             ipcRenderer.invoke("test:simulate-external-open", filePath),
+          getUpdaterState: (): Promise<UpdaterSnapshot | null> =>
+            ipcRenderer.invoke("test:get-updater-state"),
+          setUpdaterState: (
+            snapshot: Partial<UpdaterSnapshot>
+          ): Promise<UpdaterSnapshot | null> =>
+            ipcRenderer.invoke("test:set-updater-state", snapshot),
+          emitUpdaterEvent: (
+            event: BedrockTestUpdaterEvent
+          ): Promise<UpdaterSnapshot | null> =>
+            ipcRenderer.invoke("test:emit-updater-event", event),
         }
       : undefined,
 });

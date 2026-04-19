@@ -35,6 +35,7 @@ export type ChromeProps = {
   onExportHtml: () => void;
   onExportPdf: () => void;
   onOpenSettings: () => void;
+  topBanner?: React.ReactNode;
   children: React.ReactNode;
 };
 
@@ -48,6 +49,7 @@ export function Chrome({
   onExportHtml,
   onExportPdf,
   onOpenSettings,
+  topBanner,
   children,
 }: ChromeProps) {
   const isMac = useMemo(() => {
@@ -213,6 +215,7 @@ export function Chrome({
             </aside>
 
             <div className="flex-1 min-w-0 overflow-hidden rounded-2xl border border-border bg-background text-foreground shadow-2xl flex flex-col">
+              {topBanner ? <div className="border-b border-border">{topBanner}</div> : null}
               <div className="flex-1 min-h-0 overflow-hidden">
                 <div className="app-shell">
                   <div className="flex-1 min-h-0">{children}</div>

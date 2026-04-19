@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { KeyBindingAction, UserSettings } from "../settings";
+import { UpdaterSnapshot } from "../../shared/types";
 import {
   eventToBinding,
   formatBinding,
@@ -42,8 +43,10 @@ import {
   Info,
   Keyboard,
   Palette,
+  RefreshCw,
   RotateCcw,
   Type,
+  Download,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
@@ -59,25 +62,36 @@ const ABOUT_LINKS = {
 
 type SettingsModalProps = {
   settings: UserSettings;
+  appVersion: string | null;
+  updaterState: UpdaterSnapshot;
+  updateMessage: string | null;
   onClose: () => void;
   onChange: (settings: UserSettings) => void;
   onResetBindings: () => void;
   onClearLocalStorage: () => void;
+  onCheckForUpdates: () => Promise<void>;
+  onInstallUpdate: () => Promise<void>;
 };
 
 type SettingsCategory =
   | "editor"
   | "appearance"
+  | "updates"
   | "keybindings"
   | "developer"
   | "about";
 
 const SettingsModal = ({
   settings,
+  appVersion,
+  updaterState,
+  updateMessage,
   onClose,
   onChange,
   onResetBindings,
   onClearLocalStorage,
+  onCheckForUpdates,
+  onInstallUpdate,
 }: SettingsModalProps) => {
   const settingsRef = useRef(settings);
   useEffect(() => {
@@ -90,7 +104,6 @@ const SettingsModal = ({
     null
   );
   const [pendingBinding, setPendingBinding] = useState<string | null>(null);
-  const [appVersion, setAppVersion] = useState<string | null>(null);
   const originalBindingRef = useRef<{
     action: KeyBindingAction | null;
     binding: string | null;
@@ -160,31 +173,6 @@ const SettingsModal = ({
       window.removeEventListener("keyup", handleKeyUp, { capture: true });
     };
   }, [listeningFor, onChange, pendingBinding, settings]);
-
-  useEffect(() => {
-    if (activeCategory !== "about") {
-      return;
-    }
-    if (appVersion) {
-      return;
-    }
-    let cancelled = false;
-    window.electronAPI
-      .getAppVersion()
-      .then((version) => {
-        if (!cancelled) {
-          setAppVersion(version);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setAppVersion("Unknown");
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeCategory, appVersion]);
 
   const updateTextSize = (delta: number) => {
     const next = Math.min(28, Math.max(12, settings.textSize + delta));
@@ -265,6 +253,7 @@ const SettingsModal = ({
     }> = [
       { id: "editor", label: "Editor", icon: Type },
       { id: "appearance", label: "Appearance", icon: Palette },
+      { id: "updates", label: "Updates", icon: Download },
       { id: "keybindings", label: "Keybindings", icon: Keyboard },
       { id: "developer", label: "Developer", icon: Wrench },
       { id: "about", label: "About", icon: Info },
@@ -331,6 +320,12 @@ const SettingsModal = ({
                   <h3 className="m-0 text-base font-medium">
                     {activeCategoryLabel}
                   </h3>
+                  {activeCategory === "updates" ? (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Check for stable published Bedrock releases and install a
+                      downloaded update when it is ready.
+                    </p>
+                  ) : null}
                   {activeCategory === "keybindings" ? (
                     <p className="mt-1 text-sm text-muted-foreground">
                       Click Change, then press a new shortcut. Use Cmd/Ctrl
@@ -600,6 +595,107 @@ const SettingsModal = ({
                         </Item>
                       </>
                     )}
+                  </ItemGroup>
+                ) : null}
+
+                {activeCategory === "updates" ? (
+                  <ItemGroup className="rounded-md border border-border bg-background">
+                    <Item
+                      size="sm"
+                      className="rounded-none first:rounded-t-md last:rounded-b-md"
+                    >
+                      <ItemContent>
+                        <ItemTitle>Current version</ItemTitle>
+                        <ItemDescription>
+                          {appVersion ?? "…"}
+                        </ItemDescription>
+                      </ItemContent>
+                    </Item>
+                    <ItemSeparator />
+                    <Item
+                      size="sm"
+                      className="rounded-none first:rounded-t-md last:rounded-b-md"
+                    >
+                      <ItemContent>
+                        <ItemTitle>Update status</ItemTitle>
+                        <ItemDescription>
+                          {updaterState.status === "idle"
+                            ? "No update is currently being checked or downloaded."
+                            : updaterState.status === "checking"
+                            ? "Checking GitHub Releases for a newer stable version…"
+                            : updaterState.status === "downloading"
+                            ? "Downloading the latest stable Bedrock update in the background."
+                            : updaterState.status === "ready"
+                            ? `Version ${
+                                updaterState.downloadedVersion ?? "the latest update"
+                              } is ready to install.`
+                            : updaterState.errorMessage ??
+                              "Bedrock hit an error while checking for updates."}
+                        </ItemDescription>
+                      </ItemContent>
+                      <ItemActions className="ml-auto flex-wrap justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => {
+                            void onCheckForUpdates();
+                          }}
+                          disabled={
+                            updaterState.status === "checking" ||
+                            updaterState.status === "downloading"
+                          }
+                        >
+                          {updaterState.status === "checking" ? (
+                            <>
+                              <RefreshCw className="animate-spin" />
+                              Checking…
+                            </>
+                          ) : (
+                            "Check for Updates…"
+                          )}
+                        </Button>
+                        {updaterState.status === "ready" ? (
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              void onInstallUpdate();
+                            }}
+                          >
+                            Restart to Update
+                          </Button>
+                        ) : null}
+                      </ItemActions>
+                    </Item>
+                    {updateMessage ? (
+                      <>
+                        <ItemSeparator />
+                        <Item
+                          size="sm"
+                          className="rounded-none first:rounded-t-md last:rounded-b-md"
+                        >
+                          <ItemContent>
+                            <ItemTitle>Latest check</ItemTitle>
+                            <ItemDescription>{updateMessage}</ItemDescription>
+                          </ItemContent>
+                        </Item>
+                      </>
+                    ) : null}
+                    {updaterState.releaseNotes ? (
+                      <>
+                        <ItemSeparator />
+                        <Item
+                          size="sm"
+                          className="rounded-none first:rounded-t-md last:rounded-b-md"
+                        >
+                          <ItemContent>
+                            <ItemTitle>Release notes</ItemTitle>
+                            <ItemDescription className="whitespace-pre-wrap">
+                              {updaterState.releaseNotes}
+                            </ItemDescription>
+                          </ItemContent>
+                        </Item>
+                      </>
+                    ) : null}
                   </ItemGroup>
                 ) : null}
 

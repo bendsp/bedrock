@@ -4,7 +4,7 @@ This repo publishes release artifacts on tag push via `.github/workflows/release
 
 ## What gets built
 
-- Windows: Squirrel installer (`Bedrock.exe`)
+- Windows: Squirrel installer (`Bedrock.exe`) plus update metadata/assets (`RELEASES`, `.nupkg`)
 - macOS: `dmg` + `zip` (signed + notarized)
 
 Releases are created as **drafts** and assets are uploaded to the GitHub Release for the tag.
@@ -15,6 +15,8 @@ Releases are created as **drafts** and assets are uploaded to the GitHub Release
 - GitHub Actions applies the tag version only in the release workspace; it does not push version-bump commits back to `main`
 - Release jobs install with `pnpm install --frozen-lockfile`
 - Build commands use `pnpm build` / `pnpm make:mac`
+- Bedrock self-update reads only from **stable published releases**
+- Draft and prerelease GitHub Releases remain outside the in-app updater flow
 
 ## macOS signing + notarization (CI)
 
@@ -68,3 +70,15 @@ base64 -i path/to/AuthKey_XXXXXXXXXX.p8 | pbcopy
 - `APPLE_TEAM_ID`
 
 But CI is designed to use the `.p8` API key flow.
+
+## Self-update release requirements
+
+To keep Bedrock self-update functional:
+
+- Publish the GitHub Release when you are ready for users to receive it
+- Do not rely on draft or prerelease releases for in-app updates
+- Ensure Windows releases include:
+  - `Bedrock.exe`
+  - `RELEASES`
+  - one or more `.nupkg` packages
+- Ensure macOS releases include the generated `.zip` artifact

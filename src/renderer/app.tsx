@@ -9,7 +9,13 @@ import { createRoot } from "react-dom/client";
 import { CodeMirrorEditor } from "./components/CodeMirrorEditor";
 import { Chrome } from "./components/Chrome";
 import SettingsModal from "./components/SettingsModal";
-import { OpenSpecificFilePayload, RenderMode } from "../shared/types";
+import { Button } from "./components/ui/button";
+import {
+  ManualUpdateCheckResult,
+  OpenSpecificFilePayload,
+  RenderMode,
+  UpdaterSnapshot,
+} from "../shared/types";
 import { markdownToHtml } from "./lib/export";
 import {
   defaultSettings,
@@ -48,6 +54,20 @@ const buildWindowTitle = (fileName: string, isDirty: boolean): string => {
   return `${formatFileName(fileName, isDirty)} — Bedrock`;
 };
 
+const defaultUpdaterSnapshot = (): UpdaterSnapshot => ({
+  status: "idle",
+  availableVersion: null,
+  downloadedVersion: null,
+  releaseNotes: null,
+  errorMessage: null,
+  source: null,
+});
+
+type AppNotice = {
+  tone: "info" | "error";
+  message: string;
+} | null;
+
 const App = () => {
   const [doc, setDoc] = useState<string>("");
   const [filePath, setFilePath] = useState<string | null>(null);
@@ -55,6 +75,14 @@ const App = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+  const [updaterState, setUpdaterState] = useState<UpdaterSnapshot>(
+    defaultUpdaterSnapshot
+  );
+  const [updateNotice, setUpdateNotice] = useState<AppNotice>(null);
+  const [dismissedReadyVersion, setDismissedReadyVersion] = useState<
+    string | null
+  >(null);
   const suppressDirtyRef = useRef(false);
   const editorViewRef = useRef<EditorView | null>(null);
   const externalOpenSequenceRef = useRef(Promise.resolve());
@@ -339,6 +367,47 @@ const App = () => {
     setSettings(defaultSettings);
   }, []);
 
+  const showUpdateNotice = useCallback(
+    (result: Pick<ManualUpdateCheckResult, "message">, tone: "info" | "error") => {
+      if (!result.message) {
+        return;
+      }
+      setUpdateNotice({
+        tone,
+        message: result.message,
+      });
+    },
+    []
+  );
+
+  const handleCheckForUpdates = useCallback(async () => {
+    const result = await window.electronAPI.checkForUpdates();
+    if (result.kind === "error") {
+      showUpdateNotice(result, "error");
+      return;
+    }
+
+    if (
+      result.kind === "not-available" ||
+      result.kind === "already-in-progress" ||
+      result.kind === "already-ready" ||
+      result.kind === "unsupported" ||
+      result.kind === "started"
+    ) {
+      showUpdateNotice(result, "info");
+    }
+  }, [showUpdateNotice]);
+
+  const handleInstallUpdate = useCallback(async () => {
+    const installed = await window.electronAPI.installUpdate();
+    if (!installed) {
+      setUpdateNotice({
+        tone: "error",
+        message: "No downloaded update is ready to install.",
+      });
+    }
+  }, []);
+
   const commands = useMemo(() => {
     return createCommandRunner(commandRegistry, {
       getEditorView: () => editorViewRef.current,
@@ -347,6 +416,7 @@ const App = () => {
       saveFile: handleSave,
       saveFileAs: handleSaveAs,
       openSettings: handleOpenSettings,
+      checkForUpdates: handleCheckForUpdates,
       setTheme: (theme) => {
         setSettings((prev) => ({
           ...prev,
@@ -369,6 +439,7 @@ const App = () => {
   }, [
     commandRegistry,
     doc,
+    handleCheckForUpdates,
     handleOpen,
     handleOpenSettings,
     handleSave,
@@ -397,8 +468,55 @@ const App = () => {
   }, [enqueueExternalOpen]);
 
   useEffect(() => {
+    let cancelled = false;
+    window.electronAPI
+      .getAppVersion()
+      .then((version) => {
+        if (!cancelled) {
+          setAppVersion(version);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAppVersion("Unknown");
+        }
+      });
+
+    window.electronAPI
+      .getUpdaterState()
+      .then((snapshot) => {
+        if (!cancelled) {
+          setUpdaterState(snapshot);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setUpdaterState(defaultUpdaterSnapshot());
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.onUpdaterState((snapshot) => {
+      setUpdaterState(snapshot);
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
     const unsubscribe = window.electronAPI.onFind(() => {
       void commands.run("editor.find");
+    });
+    return unsubscribe;
+  }, [commands]);
+
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.onCheckForUpdatesRequest(() => {
+      void commands.run("app.checkForUpdates");
     });
     return unsubscribe;
   }, [commands]);
@@ -434,7 +552,24 @@ const App = () => {
     return () => window.removeEventListener("keydown", handleGlobalShortcut);
   }, [commands, isSettingsOpen, settings]);
 
+  useEffect(() => {
+    if (!updateNotice) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setUpdateNotice(null);
+    }, 4000);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [updateNotice]);
+
   const displayLabel = formatFileName(fileName, isDirty);
+  const showReadyBanner =
+    updaterState.status === "ready" &&
+    updaterState.downloadedVersion !== dismissedReadyVersion;
 
   const keyBindings = useMemo<KeyBinding[]>(() => {
     return [
@@ -457,6 +592,45 @@ const App = () => {
         onExportHtml={() => void commands.run("file.exportHtml")}
         onExportPdf={() => void commands.run("file.exportPdf")}
         onOpenSettings={() => void commands.run("app.openSettings")}
+        topBanner={
+          showReadyBanner ? (
+            <div className="flex items-center justify-between gap-4 bg-secondary/60 px-4 py-3 text-sm">
+              <div className="min-w-0">
+                <div className="font-medium">
+                  Update ready to install
+                </div>
+                <div className="text-muted-foreground">
+                  Bedrock{" "}
+                  <span className="font-medium text-foreground">
+                    {updaterState.downloadedVersion ?? "update"}
+                  </span>{" "}
+                  has been downloaded and is ready to install.
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    setDismissedReadyVersion(updaterState.downloadedVersion)
+                  }
+                >
+                  Later
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    void handleInstallUpdate();
+                  }}
+                >
+                  Restart to Update
+                </Button>
+              </div>
+            </div>
+          ) : null
+        }
       >
         <CodeMirrorEditor
           value={doc}
@@ -480,11 +654,30 @@ const App = () => {
       {isSettingsOpen ? (
         <SettingsModal
           settings={settings}
+          appVersion={appVersion}
+          updaterState={updaterState}
+          updateMessage={updateNotice?.message ?? null}
           onClose={handleCloseSettings}
           onChange={handleUpdateSettings}
           onResetBindings={handleResetBindings}
           onClearLocalStorage={handleClearLocalStorage}
+          onCheckForUpdates={handleCheckForUpdates}
+          onInstallUpdate={handleInstallUpdate}
         />
+      ) : null}
+
+      {updateNotice ? (
+        <div className="pointer-events-none fixed bottom-4 right-4 z-[1100] max-w-sm rounded-lg border border-border bg-card/95 px-4 py-3 shadow-2xl backdrop-blur">
+          <div
+            className={`text-sm ${
+              updateNotice.tone === "error"
+                ? "text-destructive"
+                : "text-foreground"
+            }`}
+          >
+            {updateNotice.message}
+          </div>
+        </div>
       ) : null}
     </>
   );

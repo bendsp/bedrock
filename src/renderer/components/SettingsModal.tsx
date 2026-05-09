@@ -64,19 +64,10 @@ const ABOUT_LINKS = {
 const editorFontOptions: Array<{
   value: EditorFontFamily;
   label: string;
-  css: string;
 }> = [
-  {
-    value: "sans",
-    label: "Sans",
-    css: '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  { value: "serif", label: "Serif", css: 'Georgia, "Times New Roman", serif' },
-  {
-    value: "mono",
-    label: "Mono",
-    css: '"Fira Code", "Source Code Pro", Monaco, Consolas, monospace',
-  },
+  { value: "sans", label: "Sans" },
+  { value: "serif", label: "Serif" },
+  { value: "mono", label: "Mono" },
 ];
 
 type SettingsModalProps = {
@@ -296,10 +287,6 @@ const SettingsModal = ({
 
   const activeCategoryLabel =
     categories.find((c) => c.id === activeCategory)?.label ?? "Settings";
-  const activeEditorFont =
-    editorFontOptions.find((option) => option.value === settings.editorFontFamily) ??
-    editorFontOptions[0];
-
   return (
     <div
       className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60"
@@ -412,7 +399,7 @@ const SettingsModal = ({
                       </div>
                       <div
                         className="mt-2 rounded-md border border-border bg-card px-3 py-2 text-sm leading-6 text-card-foreground"
-                        style={{ fontFamily: activeEditorFont.css }}
+                        style={{ fontFamily: "var(--editor-font-family)" }}
                       >
                         # Heading
                         <br />

@@ -7,6 +7,14 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === "object" && value !== null;
 };
 
+const hasOwn = (value: Record<string, unknown>, key: string): boolean => {
+  return Object.prototype.hasOwnProperty.call(value, key);
+};
+
+type ValidationResult<T> =
+  | { ok: true; payload: T }
+  | { ok: false; message: string };
+
 export const hasReasonableContentSize = (
   content: unknown,
   maxBytes: number
@@ -20,58 +28,97 @@ export const hasReasonableContentSize = (
 export const normalizeSaveFilePayload = (
   payload: unknown
 ): SaveFilePayload | null => {
+  const result = validateSaveFilePayload(payload);
+  return result.ok ? result.payload : null;
+};
+
+export const validateSaveFilePayload = (
+  payload: unknown
+): ValidationResult<SaveFilePayload> => {
   if (!isRecord(payload)) {
-    return null;
+    return { ok: false, message: "Invalid save payload." };
   }
   if (!hasReasonableContentSize(payload.content, MAX_MARKDOWN_FILE_BYTES)) {
-    return null;
+    return {
+      ok: false,
+      message:
+        typeof payload.content === "string"
+          ? "Markdown content is too large to save."
+          : "Save content must be text.",
+    };
   }
+  const hasFilePath = hasOwn(payload, "filePath");
   if (
-    "filePath" in payload &&
+    hasFilePath &&
     payload.filePath !== undefined &&
     (typeof payload.filePath !== "string" || payload.filePath.trim() === "")
   ) {
-    return null;
+    return { ok: false, message: "Save file path must be a non-empty string." };
   }
 
   const filePath =
-    typeof payload.filePath === "string" ? payload.filePath : undefined;
+    hasFilePath && typeof payload.filePath === "string"
+      ? payload.filePath
+      : undefined;
 
   return {
-    content: payload.content,
-    filePath,
+    ok: true,
+    payload: {
+      content: payload.content,
+      filePath,
+    },
   };
 };
 
 export const normalizeExportFilePayload = (
   payload: unknown
 ): ExportFilePayload | null => {
+  const result = validateExportFilePayload(payload);
+  return result.ok ? result.payload : null;
+};
+
+export const validateExportFilePayload = (
+  payload: unknown
+): ValidationResult<ExportFilePayload> => {
   if (!isRecord(payload)) {
-    return null;
+    return { ok: false, message: "Invalid export payload." };
   }
   if (payload.format !== "html" && payload.format !== "pdf") {
-    return null;
+    return { ok: false, message: "Unsupported export format." };
   }
   if (!hasReasonableContentSize(payload.content, MAX_EXPORT_HTML_BYTES)) {
-    return null;
+    return {
+      ok: false,
+      message:
+        typeof payload.content === "string"
+          ? "Export content is too large."
+          : "Export content must be text.",
+    };
   }
+  const hasDefaultFileName = hasOwn(payload, "defaultFileName");
   if (
-    "defaultFileName" in payload &&
+    hasDefaultFileName &&
     payload.defaultFileName !== undefined &&
     typeof payload.defaultFileName !== "string"
   ) {
-    return null;
+    return {
+      ok: false,
+      message: "Export default filename must be a string.",
+    };
   }
 
   const defaultFileName =
-    typeof payload.defaultFileName === "string"
+    hasDefaultFileName && typeof payload.defaultFileName === "string"
       ? payload.defaultFileName
       : undefined;
 
   return {
-    content: payload.content,
-    format: payload.format,
-    defaultFileName,
+    ok: true,
+    payload: {
+      content: payload.content,
+      format: payload.format,
+      defaultFileName,
+    },
   };
 };
 
@@ -86,6 +133,14 @@ export const safeExportBaseName = (
     .map((char) =>
       char.charCodeAt(0) < 32 || reservedCharacters.includes(char) ? "-" : char
     )
-    .join("");
-  return sanitized || "Exported";
+    .join("")
+    .replace(/[ .]+$/g, "");
+
+  if (!sanitized) {
+    return "Exported";
+  }
+  if (/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(sanitized)) {
+    return `${sanitized}-file`;
+  }
+  return sanitized;
 };

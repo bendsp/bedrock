@@ -20,9 +20,9 @@ import {
 } from "../shared/types";
 import {
   MAX_MARKDOWN_FILE_BYTES,
-  normalizeExportFilePayload,
-  normalizeSaveFilePayload,
   safeExportBaseName,
+  validateExportFilePayload,
+  validateSaveFilePayload,
 } from "./ipcValidation";
 import {
   buildRuntimeInfo,
@@ -278,11 +278,14 @@ ipcMain.handle("file:consume-pending-external-open", () => {
 ipcMain.handle(
   "file:save",
   async (event, args: unknown): Promise<SaveFileResult | null> => {
+    let telemetryFilePath: string | undefined;
     try {
-      const payload = normalizeSaveFilePayload(args);
-      if (!payload) {
-        throw new Error("Invalid save payload.");
+      const validation = validateSaveFilePayload(args);
+      if (validation.ok === false) {
+        throw new Error(validation.message);
       }
+      const payload = validation.payload;
+      telemetryFilePath = payload.filePath;
 
       let targetPath = payload.filePath
         ? ensureMarkdownExtension(path.resolve(payload.filePath))
@@ -316,6 +319,7 @@ ipcMain.handle(
         error instanceof Error ? error.message : "An unknown error occurred.";
       captureMainTelemetryException(error, {
         operation: "file:save",
+        filePath: telemetryFilePath,
       });
       dialog.showErrorBox("Unable to save file", message);
       return null;
@@ -395,12 +399,15 @@ ipcMain.handle("test:simulate-external-open", (_event, filePath: string) => {
 ipcMain.handle(
   "file:export",
   async (event, args: unknown): Promise<boolean> => {
+    let telemetryFormat: string | undefined;
     try {
-      const payload = normalizeExportFilePayload(args);
-      if (!payload) {
-        throw new Error("Invalid export payload.");
+      const validation = validateExportFilePayload(args);
+      if (validation.ok === false) {
+        throw new Error(validation.message);
       }
+      const payload = validation.payload;
       const { content, format, defaultFileName } = payload;
+      telemetryFormat = format;
 
       const extension = format === "html" ? "html" : "pdf";
       const filters =
@@ -497,6 +504,7 @@ ipcMain.handle(
         error instanceof Error ? error.message : "An unknown error occurred.";
       captureMainTelemetryException(error, {
         operation: "file:export",
+        format: telemetryFormat,
       });
       dialog.showErrorBox("Unable to export file", message);
       return false;

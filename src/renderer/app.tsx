@@ -48,6 +48,22 @@ const buildWindowTitle = (fileName: string, isDirty: boolean): string => {
   return `${formatFileName(fileName, isDirty)} — Bedrock`;
 };
 
+const editorFontFamilyValues: Record<UserSettings["editorFontFamily"], string> =
+  {
+    sans: '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    serif: 'Georgia, "Times New Roman", serif',
+    mono: '"Fira Code", "Source Code Pro", Monaco, Consolas, monospace',
+  };
+
+const getDocumentStats = (value: string) => {
+  const trimmed = value.trim();
+  const words = trimmed ? trimmed.split(/\s+/).length : 0;
+  const chars = value.length;
+  const lines = value.length === 0 ? 1 : value.split(/\r\n|\r|\n/).length;
+  const readingMinutes = words === 0 ? 0 : Math.max(1, Math.ceil(words / 225));
+  return { words, chars, lines, readingMinutes };
+};
+
 const App = () => {
   const [doc, setDoc] = useState<string>("");
   const [filePath, setFilePath] = useState<string | null>(null);
@@ -115,6 +131,10 @@ const App = () => {
     document.documentElement.style.setProperty(
       "--editor-font-size",
       `${settings.textSize}px`
+    );
+    document.documentElement.style.setProperty(
+      "--editor-font-family",
+      editorFontFamilyValues[settings.editorFontFamily]
     );
     document.documentElement.style.setProperty(
       "--ui-font-size",
@@ -435,6 +455,7 @@ const App = () => {
   }, [commands, isSettingsOpen, settings]);
 
   const displayLabel = formatFileName(fileName, isDirty);
+  const documentStats = useMemo(() => getDocumentStats(doc), [doc]);
 
   const keyBindings = useMemo<KeyBinding[]>(() => {
     return [
@@ -457,6 +478,7 @@ const App = () => {
         onExportHtml={() => void commands.run("file.exportHtml")}
         onExportPdf={() => void commands.run("file.exportPdf")}
         onOpenSettings={() => void commands.run("app.openSettings")}
+        stats={documentStats}
       >
         <CodeMirrorEditor
           value={doc}

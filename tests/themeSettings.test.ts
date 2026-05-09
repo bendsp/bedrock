@@ -113,6 +113,28 @@ runTest("startup settings load correctly", () => {
   assert.equal(settings.lastOpenedFilePath, "/path/to/file.md");
 });
 
+runTest("editor font family setting loads valid values", () => {
+  installStorage();
+  const payload = {
+    editorFontFamily: "mono",
+  };
+  globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+
+  const settings = loadSettings();
+  assert.equal(settings.editorFontFamily, "mono");
+});
+
+runTest("editor font family falls back on invalid values", () => {
+  installStorage();
+  const payload = {
+    editorFontFamily: "comic-sans",
+  };
+  globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+
+  const settings = loadSettings();
+  assert.equal(settings.editorFontFamily, defaultSettings.editorFontFamily);
+});
+
 runTest("startup settings fall back to defaults on invalid values", () => {
   installStorage();
   const payload = {
@@ -146,4 +168,3 @@ runTest("clearSettingsStorage removes persisted data", () => {
 if (process.exitCode && process.exitCode !== 0) {
   throw new Error("One or more tests failed.");
 }
-

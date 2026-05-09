@@ -375,6 +375,149 @@ export const insertHorizontalRuleCommand = (
   return true;
 };
 
+type LinePrefixOptions = {
+  match: RegExp;
+  prefixForLine: (lineIndex: number) => string;
+};
+
+const getSelectedLineNumbers = (
+  view: import("@codemirror/view").EditorView
+): { start: number; end: number } => {
+  const { from, to } = view.state.selection.main;
+  const doc = view.state.doc;
+  const start = doc.lineAt(from).number;
+  const endPos = to > from ? to - 1 : to;
+  const end = doc.lineAt(Math.max(0, endPos)).number;
+  return { start, end };
+};
+
+const toggleLinePrefix = (
+  view: import("@codemirror/view").EditorView,
+  options: LinePrefixOptions
+): boolean => {
+  const { start, end } = getSelectedLineNumbers(view);
+  const lines = [];
+  for (let lineNumber = start; lineNumber <= end; lineNumber += 1) {
+    const line = view.state.doc.line(lineNumber);
+    lines.push(line);
+  }
+
+  const actionableLines = lines.filter((line) => line.text.trim() !== "");
+  if (actionableLines.length === 0) {
+    const line = view.state.doc.line(start);
+    const indent = line.text.match(/^\s*/)?.[0] ?? "";
+    view.dispatch({
+      changes: {
+        from: line.from,
+        to: line.from + indent.length,
+        insert: `${indent}${options.prefixForLine(0)}`,
+      },
+      scrollIntoView: true,
+    });
+    return true;
+  }
+
+  const allPrefixed = actionableLines.every((line) =>
+    options.match.test(line.text)
+  );
+
+  const changes = actionableLines.map((line, index) => {
+    const match = line.text.match(options.match);
+    if (allPrefixed && match) {
+      const markerStart = line.text.match(/^\s*/)?.[0].length ?? 0;
+      return {
+        from: line.from + markerStart,
+        to: line.from + match[0].length,
+        insert: "",
+      };
+    }
+
+    const indent = line.text.match(/^\s*/)?.[0] ?? "";
+    return {
+      from: line.from + indent.length,
+      to: line.from + indent.length,
+      insert: options.prefixForLine(index),
+    };
+  });
+
+  view.dispatch({
+    changes,
+    scrollIntoView: true,
+  });
+
+  return true;
+};
+
+export const toggleUnorderedListCommand = (
+  view: import("@codemirror/view").EditorView
+): boolean =>
+  toggleLinePrefix(view, {
+    match: /^\s*(?:[-*+]\s+)/,
+    prefixForLine: () => "- ",
+  });
+
+export const toggleOrderedListCommand = (
+  view: import("@codemirror/view").EditorView
+): boolean =>
+  toggleLinePrefix(view, {
+    match: /^\s*(?:\d+[.)]\s+)/,
+    prefixForLine: (lineIndex) => `${lineIndex + 1}. `,
+  });
+
+export const toggleTaskListCommand = (
+  view: import("@codemirror/view").EditorView
+): boolean =>
+  toggleLinePrefix(view, {
+    match: /^\s*(?:[-*+]\s+\[[ xX]\]\s+)/,
+    prefixForLine: () => "- [ ] ",
+  });
+
+export const toggleBlockquoteCommand = (
+  view: import("@codemirror/view").EditorView
+): boolean =>
+  toggleLinePrefix(view, {
+    match: /^\s*(?:>\s?)/,
+    prefixForLine: () => "> ",
+  });
+
+export const toggleFencedCodeBlockCommand = (
+  view: import("@codemirror/view").EditorView
+): boolean => {
+  const { start, end } = getSelectedLineNumbers(view);
+  const doc = view.state.doc;
+  const firstLine = doc.line(start);
+  const lastLine = doc.line(end);
+  const hasFenceWrapper =
+    start < end &&
+    firstLine.text.trim().startsWith("```") &&
+    lastLine.text.trim().startsWith("```");
+
+  if (hasFenceWrapper) {
+    const innerFrom = Math.min(firstLine.to + 1, doc.length);
+    const innerTo = Math.max(innerFrom, lastLine.from - 1);
+    const inner = doc.sliceString(innerFrom, innerTo);
+
+    view.dispatch({
+      changes: { from: firstLine.from, to: lastLine.to, insert: inner },
+      scrollIntoView: true,
+    });
+    return true;
+  }
+
+  const before = firstLine.from;
+  const after = lastLine.to;
+
+  view.dispatch({
+    changes: [
+      { from: before, to: before, insert: "```\n" },
+      { from: after, to: after, insert: "\n```" },
+    ],
+    scrollIntoView: true,
+  });
+
+  return true;
+};
+
 export const snippetKeyBinding = (
   key: string,
   snippet: string,

@@ -61,6 +61,11 @@ export function EditorContextMenu({
       strikethrough: get("format.strikethrough"),
       inlineCode: get("format.inlineCode"),
       link: get("insert.link"),
+      unorderedList: get("insert.unorderedList"),
+      orderedList: get("insert.orderedList"),
+      taskList: get("insert.taskList"),
+      blockquote: get("insert.blockquote"),
+      codeBlock: get("insert.codeBlock"),
       settings: get("app.openSettings"),
     };
   }, [commandRegistry, settings]);
@@ -169,6 +174,41 @@ export function EditorContextMenu({
             <ContextMenuItem inset onSelect={() => runCommand("insert.link")}>
               Link
               <ContextMenuShortcut>{shortcuts.link}</ContextMenuShortcut>
+            </ContextMenuItem>
+            <ContextMenuItem
+              inset
+              onSelect={() => runCommand("insert.unorderedList")}
+            >
+              Bulleted list
+              <ContextMenuShortcut>{shortcuts.unorderedList}</ContextMenuShortcut>
+            </ContextMenuItem>
+            <ContextMenuItem
+              inset
+              onSelect={() => runCommand("insert.orderedList")}
+            >
+              Numbered list
+              <ContextMenuShortcut>{shortcuts.orderedList}</ContextMenuShortcut>
+            </ContextMenuItem>
+            <ContextMenuItem
+              inset
+              onSelect={() => runCommand("insert.taskList")}
+            >
+              Task list
+              <ContextMenuShortcut>{shortcuts.taskList}</ContextMenuShortcut>
+            </ContextMenuItem>
+            <ContextMenuItem
+              inset
+              onSelect={() => runCommand("insert.blockquote")}
+            >
+              Quote
+              <ContextMenuShortcut>{shortcuts.blockquote}</ContextMenuShortcut>
+            </ContextMenuItem>
+            <ContextMenuItem
+              inset
+              onSelect={() => runCommand("insert.codeBlock")}
+            >
+              Code block
+              <ContextMenuShortcut>{shortcuts.codeBlock}</ContextMenuShortcut>
             </ContextMenuItem>
             <ContextMenuItem
               inset

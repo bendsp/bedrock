@@ -5,6 +5,11 @@ import {
   createMarkdownLinkCommand,
   createWrapSelectionOrWordCommand,
   insertHorizontalRuleCommand,
+  toggleBlockquoteCommand,
+  toggleFencedCodeBlockCommand,
+  toggleOrderedListCommand,
+  toggleTaskListCommand,
+  toggleUnorderedListCommand,
 } from "../editor/codemirror/commands";
 import {
   bindingToCodeMirrorKey,
@@ -26,6 +31,11 @@ export type CommandId =
   | "format.inlineCode"
   | "insert.link"
   | "insert.horizontalRule"
+  | "insert.unorderedList"
+  | "insert.orderedList"
+  | "insert.taskList"
+  | "insert.blockquote"
+  | "insert.codeBlock"
   | "theme.set"
   | "editor.undo"
   | "editor.redo"
@@ -45,6 +55,11 @@ export type CommandArgs = {
   "format.inlineCode": void;
   "insert.link": void;
   "insert.horizontalRule": void;
+  "insert.unorderedList": void;
+  "insert.orderedList": void;
+  "insert.taskList": void;
+  "insert.blockquote": void;
+  "insert.codeBlock": void;
   "theme.set": { theme: ThemeName };
   "editor.undo": void;
   "editor.redo": void;
@@ -161,6 +176,11 @@ const editorCommands = {
   }),
   link: createMarkdownLinkCommand,
   horizontalRule: insertHorizontalRuleCommand,
+  unorderedList: toggleUnorderedListCommand,
+  orderedList: toggleOrderedListCommand,
+  taskList: toggleTaskListCommand,
+  blockquote: toggleBlockquoteCommand,
+  codeBlock: toggleFencedCodeBlockCommand,
 } as const;
 
 export const createCommandRegistry = (): CommandRegistry => {
@@ -304,6 +324,71 @@ export const createCommandRegistry = (): CommandRegistry => {
       run: (ctx) => {
         const view = ctx.getEditorView();
         return view ? editorCommands.horizontalRule(view) : false;
+      },
+    },
+    {
+      id: "insert.unorderedList",
+      title: "Bulleted list",
+      category: "Insert",
+      description: "Toggle a bulleted list for the selected lines.",
+      defaultBinding: "mod+alt+l",
+      settingsKey: "unorderedList",
+      requiresEditor: true,
+      run: (ctx) => {
+        const view = ctx.getEditorView();
+        return view ? editorCommands.unorderedList(view) : false;
+      },
+    },
+    {
+      id: "insert.orderedList",
+      title: "Numbered list",
+      category: "Insert",
+      description: "Toggle a numbered list for the selected lines.",
+      defaultBinding: "mod+alt+o",
+      settingsKey: "orderedList",
+      requiresEditor: true,
+      run: (ctx) => {
+        const view = ctx.getEditorView();
+        return view ? editorCommands.orderedList(view) : false;
+      },
+    },
+    {
+      id: "insert.taskList",
+      title: "Task list",
+      category: "Insert",
+      description: "Toggle a task checklist for the selected lines.",
+      defaultBinding: "mod+alt+t",
+      settingsKey: "taskList",
+      requiresEditor: true,
+      run: (ctx) => {
+        const view = ctx.getEditorView();
+        return view ? editorCommands.taskList(view) : false;
+      },
+    },
+    {
+      id: "insert.blockquote",
+      title: "Quote",
+      category: "Insert",
+      description: "Toggle a blockquote for the selected lines.",
+      defaultBinding: "mod+alt+q",
+      settingsKey: "blockquote",
+      requiresEditor: true,
+      run: (ctx) => {
+        const view = ctx.getEditorView();
+        return view ? editorCommands.blockquote(view) : false;
+      },
+    },
+    {
+      id: "insert.codeBlock",
+      title: "Code block",
+      category: "Insert",
+      description: "Wrap the selection in a fenced code block.",
+      defaultBinding: "mod+alt+c",
+      settingsKey: "codeBlock",
+      requiresEditor: true,
+      run: (ctx) => {
+        const view = ctx.getEditorView();
+        return view ? editorCommands.codeBlock(view) : false;
       },
     },
     {

@@ -12,14 +12,21 @@ export type KeyBindingAction =
   | "link"
   | "inlineCode"
   | "strikethrough"
+  | "unorderedList"
+  | "orderedList"
+  | "taskList"
+  | "blockquote"
+  | "codeBlock"
   | "undo"
   | "redo"
   | "find";
 
 export type KeyBindings = Record<KeyBindingAction, string>;
+export type EditorFontFamily = "sans" | "serif" | "mono";
 
 export type UserSettings = {
   textSize: number;
+  editorFontFamily: EditorFontFamily;
   uiScale: number; // percentage; custom UI scaling (separate from Electron zoom)
   keyBindings: KeyBindings;
   theme: ThemeName;
@@ -47,10 +54,16 @@ export const defaultKeyBindings: KeyBindings = {
   undo: "mod+z",
   redo: "mod+y",
   find: "mod+f",
+  unorderedList: "mod+alt+l",
+  orderedList: "mod+alt+o",
+  taskList: "mod+alt+t",
+  blockquote: "mod+alt+q",
+  codeBlock: "mod+alt+c",
 };
 
 export const defaultSettings: UserSettings = {
   textSize: 16,
+  editorFontFamily: "sans",
   uiScale: 100,
   keyBindings: defaultKeyBindings,
   theme: "dark",
@@ -118,6 +131,26 @@ const normalizeKeyBindings = (
       stored?.find && typeof stored.find === "string"
         ? stored.find
         : defaultKeyBindings.find,
+    unorderedList:
+      stored?.unorderedList && typeof stored.unorderedList === "string"
+        ? stored.unorderedList
+        : defaultKeyBindings.unorderedList,
+    orderedList:
+      stored?.orderedList && typeof stored.orderedList === "string"
+        ? stored.orderedList
+        : defaultKeyBindings.orderedList,
+    taskList:
+      stored?.taskList && typeof stored.taskList === "string"
+        ? stored.taskList
+        : defaultKeyBindings.taskList,
+    blockquote:
+      stored?.blockquote && typeof stored.blockquote === "string"
+        ? stored.blockquote
+        : defaultKeyBindings.blockquote,
+    codeBlock:
+      stored?.codeBlock && typeof stored.codeBlock === "string"
+        ? stored.codeBlock
+        : defaultKeyBindings.codeBlock,
   };
 };
 
@@ -144,6 +177,12 @@ export const loadSettings = (): UserSettings => {
       typeof parsed.textSize === "number" && parsed.textSize > 8
         ? parsed.textSize
         : defaultSettings.textSize;
+    const editorFontFamily =
+      parsed.editorFontFamily === "sans" ||
+      parsed.editorFontFamily === "serif" ||
+      parsed.editorFontFamily === "mono"
+        ? parsed.editorFontFamily
+        : defaultSettings.editorFontFamily;
     const uiScaleRaw =
       typeof parsed.uiScale === "number" ? parsed.uiScale : uiScaleFromLegacy;
     const uiScale =
@@ -186,6 +225,7 @@ export const loadSettings = (): UserSettings => {
 
     return {
       textSize,
+      editorFontFamily,
       uiScale,
       keyBindings,
       theme,

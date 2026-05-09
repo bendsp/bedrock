@@ -32,9 +32,17 @@ const MARKDOWN_DIALOG_FILTER = {
   name: "Markdown Files",
   extensions: ["md"],
 };
+const MAX_MARKDOWN_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_EXPORT_HTML_BYTES = 25 * 1024 * 1024;
 
 const ensureMarkdownExtension = (filePath: string): string => {
   return filePath.toLowerCase().endsWith(".md") ? filePath : `${filePath}.md`;
+};
+
+const ensureExtension = (filePath: string, extension: string): string => {
+  return filePath.toLowerCase().endsWith(`.${extension}`)
+    ? filePath
+    : `${filePath}.${extension}`;
 };
 
 const windowDirtyState = new Map<number, boolean>();
@@ -117,6 +125,41 @@ const isMarkdownFilePath = (filePath: string): boolean => {
   return filePath.toLowerCase().endsWith(".md");
 };
 
+const normalizeMarkdownFilePath = (filePath: unknown): string | null => {
+  if (typeof filePath !== "string" || filePath.trim() === "") {
+    return null;
+  }
+  const resolvedPath = path.resolve(filePath);
+  return isMarkdownFilePath(resolvedPath) ? resolvedPath : null;
+};
+
+const assertReasonableContentSize = (
+  content: unknown,
+  maxBytes: number
+): content is string => {
+  return (
+    typeof content === "string" &&
+    Buffer.byteLength(content, "utf-8") <= maxBytes
+  );
+};
+
+const readMarkdownFile = async (
+  filePath: string
+): Promise<OpenFileResult | null> => {
+  const normalizedPath = normalizeMarkdownFilePath(filePath);
+  if (!normalizedPath) {
+    return null;
+  }
+
+  const stat = await fs.stat(normalizedPath);
+  if (!stat.isFile() || stat.size > MAX_MARKDOWN_FILE_BYTES) {
+    return null;
+  }
+
+  const content = await fs.readFile(normalizedPath, "utf-8");
+  return { filePath: normalizedPath, content };
+};
+
 const normalizeExternalOpenPath = (
   filePath: unknown
 ): OpenSpecificFilePayload | null => {
@@ -124,12 +167,8 @@ const normalizeExternalOpenPath = (
     return null;
   }
 
-  const resolvedPath = path.resolve(filePath);
-  if (!isMarkdownFilePath(resolvedPath)) {
-    return null;
-  }
-
-  return { filePath: resolvedPath };
+  const resolvedPath = normalizeMarkdownFilePath(filePath);
+  return resolvedPath ? { filePath: resolvedPath } : null;
 };
 
 const deliverExternalOpenFile = (payload: OpenSpecificFilePayload): boolean => {
@@ -192,8 +231,7 @@ ipcMain.handle("file:open", async (): Promise<OpenFileResult | null> => {
   try {
     const nextOpenPath = resolveNextOpenPath();
     if (nextOpenPath) {
-      const content = await fs.readFile(nextOpenPath, "utf-8");
-      return { filePath: nextOpenPath, content };
+      return await readMarkdownFile(nextOpenPath);
     }
 
     const { canceled, filePaths } = await dialog.showOpenDialog({
@@ -206,8 +244,7 @@ ipcMain.handle("file:open", async (): Promise<OpenFileResult | null> => {
     }
 
     const filePath = filePaths[0];
-    const content = await fs.readFile(filePath, "utf-8");
-    return { filePath, content };
+    return await readMarkdownFile(filePath);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "An unknown error occurred.";
@@ -221,16 +258,14 @@ ipcMain.handle(
   "file:read",
   async (_event, filePath: string): Promise<OpenFileResult | null> => {
     try {
-      // Basic security check: only allow reading .md files.
-      if (!isMarkdownFilePath(filePath)) {
+      const result = await readMarkdownFile(filePath);
+      if (!result) {
         console.error(
           `Rejected attempt to read non-markdown file: ${filePath}`
         );
         return null;
       }
-
-      const content = await fs.readFile(filePath, "utf-8");
-      return { filePath, content };
+      return result;
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "An unknown error occurred.";
@@ -252,7 +287,13 @@ ipcMain.handle(
   "file:save",
   async (event, args: SaveFilePayload): Promise<SaveFileResult | null> => {
     try {
-      let targetPath = args.filePath;
+      if (!assertReasonableContentSize(args.content, MAX_MARKDOWN_FILE_BYTES)) {
+        throw new Error("Markdown content is too large to save.");
+      }
+
+      let targetPath = args.filePath
+        ? ensureMarkdownExtension(path.resolve(args.filePath))
+        : args.filePath;
 
       if (!targetPath) {
         const nextSavePath = resolveNextSavePath();
@@ -282,7 +323,7 @@ ipcMain.handle(
         error instanceof Error ? error.message : "An unknown error occurred.";
       captureMainTelemetryException(error, {
         operation: "file:save",
-        filePath: args.filePath,
+        filePath: args?.filePath,
       });
       dialog.showErrorBox("Unable to save file", message);
       return null;
@@ -364,6 +405,13 @@ ipcMain.handle(
   async (event, args: ExportFilePayload): Promise<boolean> => {
     try {
       const { content, format, defaultFileName } = args;
+      if (format !== "html" && format !== "pdf") {
+        throw new Error("Unsupported export format.");
+      }
+      if (!assertReasonableContentSize(content, MAX_EXPORT_HTML_BYTES)) {
+        throw new Error("Export content is too large.");
+      }
+
       const extension = format === "html" ? "html" : "pdf";
       const filters =
         format === "html"
@@ -383,6 +431,7 @@ ipcMain.handle(
       if (canceled || !filePath) {
         return false;
       }
+      const targetPath = ensureExtension(filePath, extension);
 
       // Load GitHub Markdown CSS
       let css = "";
@@ -424,7 +473,7 @@ ipcMain.handle(
       `;
 
       if (format === "html") {
-        await fs.writeFile(filePath, fullHtml, "utf-8");
+        await fs.writeFile(targetPath, fullHtml, "utf-8");
         return true;
       } else {
         // PDF Export
@@ -434,21 +483,23 @@ ipcMain.handle(
             nodeIntegration: false,
           },
         });
-
-        await win.loadURL(
-          `data:text/html;charset=utf-8,${encodeURIComponent(fullHtml)}`
-        );
-        const data = await win.webContents.printToPDF({
-          printBackground: true,
-          margins: {
-            top: 0,
-            bottom: 0,
-            left: 0,
-            right: 0,
-          },
-        });
-        await fs.writeFile(filePath, data);
-        win.destroy();
+        try {
+          await win.loadURL(
+            `data:text/html;charset=utf-8,${encodeURIComponent(fullHtml)}`
+          );
+          const data = await win.webContents.printToPDF({
+            printBackground: true,
+            margins: {
+              top: 0,
+              bottom: 0,
+              left: 0,
+              right: 0,
+            },
+          });
+          await fs.writeFile(targetPath, data);
+        } finally {
+          win.destroy();
+        }
         return true;
       }
     } catch (error) {
@@ -456,7 +507,7 @@ ipcMain.handle(
         error instanceof Error ? error.message : "An unknown error occurred.";
       captureMainTelemetryException(error, {
         operation: "file:export",
-        format: args.format,
+        format: args?.format,
       });
       dialog.showErrorBox("Unable to export file", message);
       return false;

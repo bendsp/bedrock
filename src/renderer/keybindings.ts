@@ -1,6 +1,9 @@
 import { KeyBindingAction, KeyBindings } from "./settings";
 
-const MOD_LABEL = navigator.platform.includes("Mac") ? "Cmd" : "Ctrl";
+const getPlatform = (): string =>
+  typeof navigator === "undefined" ? "" : navigator.platform;
+
+const MOD_LABEL = getPlatform().includes("Mac") ? "Cmd" : "Ctrl";
 
 const order = ["mod", "ctrl", "alt", "shift"] as const;
 
@@ -108,7 +111,7 @@ export const formatBinding = (binding: string): string => {
  * - Elsewhere, uses readable labels with "+" (e.g. "Ctrl+Shift+B")
  */
 export const formatBindingShortcut = (binding: string): string => {
-  const isMac = navigator.platform.includes("Mac");
+  const isMac = getPlatform().includes("Mac");
   const parts = normalizeBinding(binding).split("+").filter(Boolean);
   const joiner = isMac ? "" : "+";
 
@@ -204,3 +207,33 @@ export const clampKeyBindings = (bindings: KeyBindings): KeyBindings => ({
   redo: normalizeBinding(bindings.redo),
   find: normalizeBinding(bindings.find),
 });
+
+export type KeyBindingConflicts = Partial<
+  Record<KeyBindingAction, KeyBindingAction[]>
+>;
+
+export const findKeyBindingConflicts = (
+  bindings: KeyBindings
+): KeyBindingConflicts => {
+  const groups = new Map<string, KeyBindingAction[]>();
+
+  for (const action of Object.keys(bindings) as KeyBindingAction[]) {
+    const binding = normalizeBinding(bindings[action]);
+    if (!binding) {
+      continue;
+    }
+    groups.set(binding, [...(groups.get(binding) ?? []), action]);
+  }
+
+  const conflicts: KeyBindingConflicts = {};
+  for (const actions of groups.values()) {
+    if (actions.length <= 1) {
+      continue;
+    }
+    for (const action of actions) {
+      conflicts[action] = actions.filter((candidate) => candidate !== action);
+    }
+  }
+
+  return conflicts;
+};

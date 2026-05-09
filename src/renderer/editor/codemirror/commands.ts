@@ -472,6 +472,43 @@ export const toggleTaskListCommand = (
     prefixForLine: () => "- [ ] ",
   });
 
+export const toggleTaskCheckCommand = (
+  view: import("@codemirror/view").EditorView
+): boolean => {
+  const { start, end } = getSelectedLineNumbers(view);
+  const taskLines = [];
+
+  for (let lineNumber = start; lineNumber <= end; lineNumber += 1) {
+    const line = view.state.doc.line(lineNumber);
+    const match = line.text.match(/^(\s*[-*+]\s+\[)([ xX])(\]\s+)/);
+    if (match) {
+      taskLines.push({ line, match });
+    }
+  }
+
+  if (taskLines.length === 0) {
+    return false;
+  }
+
+  const shouldUncheck = taskLines.every(({ match }) =>
+    /[xX]/.test(match[2])
+  );
+  const changes = taskLines.map(({ line, match }) => {
+    const markerOffset = match[1].length;
+    return {
+      from: line.from + markerOffset,
+      to: line.from + markerOffset + 1,
+      insert: shouldUncheck ? " " : "x",
+    };
+  });
+
+  view.dispatch({
+    changes,
+    scrollIntoView: true,
+  });
+  return true;
+};
+
 export const toggleBlockquoteCommand = (
   view: import("@codemirror/view").EditorView
 ): boolean =>

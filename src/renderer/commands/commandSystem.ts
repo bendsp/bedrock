@@ -6,6 +6,7 @@ import {
   createWrapSelectionOrWordCommand,
   insertHorizontalRuleCommand,
   toggleBlockquoteCommand,
+  toggleTaskCheckCommand,
   toggleFencedCodeBlockCommand,
   toggleOrderedListCommand,
   toggleTaskListCommand,
@@ -34,6 +35,7 @@ export type CommandId =
   | "insert.unorderedList"
   | "insert.orderedList"
   | "insert.taskList"
+  | "insert.toggleTaskCheck"
   | "insert.blockquote"
   | "insert.codeBlock"
   | "theme.set"
@@ -58,6 +60,7 @@ export type CommandArgs = {
   "insert.unorderedList": void;
   "insert.orderedList": void;
   "insert.taskList": void;
+  "insert.toggleTaskCheck": void;
   "insert.blockquote": void;
   "insert.codeBlock": void;
   "theme.set": { theme: ThemeName };
@@ -179,6 +182,7 @@ const editorCommands = {
   unorderedList: toggleUnorderedListCommand,
   orderedList: toggleOrderedListCommand,
   taskList: toggleTaskListCommand,
+  taskCheck: toggleTaskCheckCommand,
   blockquote: toggleBlockquoteCommand,
   codeBlock: toggleFencedCodeBlockCommand,
 } as const;
@@ -363,6 +367,17 @@ export const createCommandRegistry = (): CommandRegistry => {
       run: (ctx) => {
         const view = ctx.getEditorView();
         return view ? editorCommands.taskList(view) : false;
+      },
+    },
+    {
+      id: "insert.toggleTaskCheck",
+      title: "Toggle task check",
+      category: "Insert",
+      description: "Toggle checked state for task checklist items.",
+      requiresEditor: true,
+      run: (ctx) => {
+        const view = ctx.getEditorView();
+        return view ? editorCommands.taskCheck(view) : false;
       },
     },
     {

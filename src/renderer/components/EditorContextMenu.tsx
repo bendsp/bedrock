@@ -198,6 +198,12 @@ export function EditorContextMenu({
             </ContextMenuItem>
             <ContextMenuItem
               inset
+              onSelect={() => runCommand("insert.toggleTaskCheck")}
+            >
+              Toggle task check
+            </ContextMenuItem>
+            <ContextMenuItem
+              inset
               onSelect={() => runCommand("insert.blockquote")}
             >
               Quote

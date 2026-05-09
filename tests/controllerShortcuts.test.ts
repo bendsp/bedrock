@@ -1,5 +1,6 @@
 import { strict as assert } from "assert";
 import {
+  continueOrderedListCommand,
   createSnippetCommand,
   toggleBlockquoteCommand,
   toggleFencedCodeBlockCommand,
@@ -74,6 +75,7 @@ class FakeView {
       | { from: number; to?: number; insert: string }
       | Array<{ from: number; to?: number; insert: string }>;
     selection?: { anchor: number; head?: number };
+    scrollIntoView?: boolean;
   }): void {
     const changes = Array.isArray(spec.changes)
       ? spec.changes
@@ -161,6 +163,35 @@ runTest("ordered list command numbers selected lines", () => {
   toggleOrderedListCommand(view as unknown as EditorView);
 
   assert.equal(view.text, "1. one\n2. two");
+});
+
+runTest("enter continues ordered list numbers", () => {
+  const view = new FakeView("7. first", { from: 8, to: 8 });
+
+  const handled = continueOrderedListCommand(view as unknown as EditorView);
+
+  assert.equal(handled, true);
+  assert.equal(view.text, "7. first\n8. ");
+  assert.deepEqual(view.state.selection.main, { from: 12, to: 12 });
+});
+
+runTest("enter preserves ordered list delimiter style", () => {
+  const view = new FakeView("2) first", { from: 8, to: 8 });
+
+  const handled = continueOrderedListCommand(view as unknown as EditorView);
+
+  assert.equal(handled, true);
+  assert.equal(view.text, "2) first\n3) ");
+});
+
+runTest("enter exits an empty ordered list item", () => {
+  const view = new FakeView("  3.   ", { from: 7, to: 7 });
+
+  const handled = continueOrderedListCommand(view as unknown as EditorView);
+
+  assert.equal(handled, true);
+  assert.equal(view.text, "  ");
+  assert.deepEqual(view.state.selection.main, { from: 2, to: 2 });
 });
 
 runTest("task list command toggles checklist markers", () => {

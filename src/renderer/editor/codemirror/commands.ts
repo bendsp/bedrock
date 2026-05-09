@@ -456,6 +456,43 @@ export const toggleUnorderedListCommand = (
     prefixForLine: () => "- ",
   });
 
+export const continueUnorderedListCommand = (
+  view: import("@codemirror/view").EditorView
+): boolean => {
+  const { from, to } = view.state.selection.main;
+  if (from !== to) {
+    return false;
+  }
+
+  const line = view.state.doc.lineAt(from);
+  const match = line.text.match(/^(\s*)([-*+])\s+(.*)$/);
+  if (!match) {
+    return false;
+  }
+
+  const [, indent, marker, content] = match;
+  if (content.trim() === "") {
+    view.dispatch({
+      changes: {
+        from: line.from,
+        to: line.to,
+        insert: indent,
+      },
+      selection: { anchor: line.from + indent.length },
+      scrollIntoView: true,
+    });
+    return true;
+  }
+
+  const insert = `\n${indent}${marker} `;
+  view.dispatch({
+    changes: { from, to, insert },
+    selection: { anchor: from + insert.length },
+    scrollIntoView: true,
+  });
+  return true;
+};
+
 export const toggleOrderedListCommand = (
   view: import("@codemirror/view").EditorView
 ): boolean =>

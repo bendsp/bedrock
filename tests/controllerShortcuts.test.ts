@@ -1,5 +1,6 @@
 import { strict as assert } from "assert";
 import {
+  continueUnorderedListCommand,
   createSnippetCommand,
   toggleBlockquoteCommand,
   toggleFencedCodeBlockCommand,
@@ -74,6 +75,7 @@ class FakeView {
       | { from: number; to?: number; insert: string }
       | Array<{ from: number; to?: number; insert: string }>;
     selection?: { anchor: number; head?: number };
+    scrollIntoView?: boolean;
   }): void {
     const changes = Array.isArray(spec.changes)
       ? spec.changes
@@ -145,6 +147,35 @@ runTest("unordered list command toggles selected lines", () => {
   view.state.selection.main = { from: 0, to: view.text.length };
   toggleUnorderedListCommand(view as unknown as EditorView);
   assert.equal(view.text, "one\ntwo");
+});
+
+runTest("enter continues unordered list markers", () => {
+  const view = new FakeView("- first", { from: 7, to: 7 });
+
+  const handled = continueUnorderedListCommand(view as unknown as EditorView);
+
+  assert.equal(handled, true);
+  assert.equal(view.text, "- first\n- ");
+  assert.deepEqual(view.state.selection.main, { from: 10, to: 10 });
+});
+
+runTest("enter exits an empty unordered list item", () => {
+  const view = new FakeView("  -   ", { from: 6, to: 6 });
+
+  const handled = continueUnorderedListCommand(view as unknown as EditorView);
+
+  assert.equal(handled, true);
+  assert.equal(view.text, "  ");
+  assert.deepEqual(view.state.selection.main, { from: 2, to: 2 });
+});
+
+runTest("enter falls through outside unordered lists", () => {
+  const view = new FakeView("plain", { from: 5, to: 5 });
+
+  const handled = continueUnorderedListCommand(view as unknown as EditorView);
+
+  assert.equal(handled, false);
+  assert.equal(view.text, "plain");
 });
 
 runTest("line prefix commands preserve indentation when toggled off", () => {

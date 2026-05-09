@@ -287,7 +287,6 @@ const SettingsModal = ({
 
   const activeCategoryLabel =
     categories.find((c) => c.id === activeCategory)?.label ?? "Settings";
-
   return (
     <div
       className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60"
@@ -393,6 +392,20 @@ const SettingsModal = ({
                         </Button>
                       </ItemActions>
                     </Item>
+                    <ItemSeparator />
+                    <div className="border-b border-border px-4 py-3">
+                      <div className="text-xs font-medium text-muted-foreground">
+                        Font preview
+                      </div>
+                      <div
+                        className="mt-2 rounded-md border border-border bg-card px-3 py-2 text-sm leading-6 text-card-foreground"
+                        style={{ fontFamily: "var(--editor-font-family)" }}
+                      >
+                        # Heading
+                        <br />
+                        Plain text, `inline code`, and a [link](https://example.com)
+                      </div>
+                    </div>
                     <ItemSeparator />
                     <Item
                       size="sm"

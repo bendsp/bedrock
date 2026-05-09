@@ -4,6 +4,7 @@ import {
   toggleBlockquoteCommand,
   toggleFencedCodeBlockCommand,
   toggleOrderedListCommand,
+  toggleTaskCheckCommand,
   toggleTaskListCommand,
   toggleUnorderedListCommand,
 } from "../src/renderer/editor/codemirror/commands";
@@ -172,6 +173,33 @@ runTest("task list command toggles checklist markers", () => {
   view.state.selection.main = { from: 0, to: view.text.length };
   toggleTaskListCommand(view as unknown as EditorView);
   assert.equal(view.text, "one\ntwo");
+});
+
+runTest("task check command toggles unchecked tasks on", () => {
+  const view = new FakeView("- [ ] one\n- [x] two", { from: 0, to: 19 });
+
+  const handled = toggleTaskCheckCommand(view as unknown as EditorView);
+
+  assert.equal(handled, true);
+  assert.equal(view.text, "- [x] one\n- [x] two");
+});
+
+runTest("task check command toggles checked tasks off", () => {
+  const view = new FakeView("- [x] one\n- [X] two", { from: 0, to: 19 });
+
+  const handled = toggleTaskCheckCommand(view as unknown as EditorView);
+
+  assert.equal(handled, true);
+  assert.equal(view.text, "- [ ] one\n- [ ] two");
+});
+
+runTest("task check command falls through outside task lines", () => {
+  const view = new FakeView("- one", { from: 0, to: 5 });
+
+  const handled = toggleTaskCheckCommand(view as unknown as EditorView);
+
+  assert.equal(handled, false);
+  assert.equal(view.text, "- one");
 });
 
 runTest("blockquote command toggles selected lines", () => {

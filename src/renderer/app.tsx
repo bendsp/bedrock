@@ -9,8 +9,13 @@ import { createRoot } from "react-dom/client";
 import { CodeMirrorEditor } from "./components/CodeMirrorEditor";
 import { Chrome } from "./components/Chrome";
 import SettingsModal from "./components/SettingsModal";
-import { OpenSpecificFilePayload, RenderMode } from "../shared/types";
+import {
+  OpenSpecificFilePayload,
+  RenderMode,
+  SelectionStats,
+} from "../shared/types";
 import { markdownToHtml } from "./lib/export";
+import { getDocumentStats } from "./lib/documentStats";
 import {
   defaultSettings,
   defaultKeyBindings,
@@ -55,20 +60,16 @@ const editorFontFamilyValues: Record<UserSettings["editorFontFamily"], string> =
     mono: '"Fira Code", "Source Code Pro", Monaco, Consolas, monospace',
   };
 
-const getDocumentStats = (value: string) => {
-  const trimmed = value.trim();
-  const words = trimmed ? trimmed.split(/\s+/).length : 0;
-  const chars = value.length;
-  const lines = value.length === 0 ? 1 : value.split(/\r\n|\r|\n/).length;
-  const readingMinutes = words === 0 ? 0 : Math.max(1, Math.ceil(words / 225));
-  return { words, chars, lines, readingMinutes };
-};
-
 const App = () => {
   const [doc, setDoc] = useState<string>("");
   const [filePath, setFilePath] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [selectionStats, setSelectionStats] = useState<SelectionStats>({
+    hasSelection: false,
+    words: 0,
+    chars: 0,
+  });
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
   const [isInitializing, setIsInitializing] = useState(true);
   const suppressDirtyRef = useRef(false);
@@ -479,6 +480,7 @@ const App = () => {
         onExportPdf={() => void commands.run("file.exportPdf")}
         onOpenSettings={() => void commands.run("app.openSettings")}
         stats={documentStats}
+        selectionStats={selectionStats}
       >
         <CodeMirrorEditor
           value={doc}
@@ -491,6 +493,7 @@ const App = () => {
           keyBindings={keyBindings}
           placeholder="Start typing…"
           onChange={handleDocChange}
+          onSelectionStatsChange={setSelectionStats}
           onReady={(view) => {
             editorViewRef.current = view;
             view.focus();

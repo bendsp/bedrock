@@ -10,8 +10,13 @@ import { search, searchKeymap } from "@codemirror/search";
 import { markdown } from "@codemirror/lang-markdown";
 import { indentUnit } from "@codemirror/language";
 import { GFM } from "@lezer/markdown";
-import { CursorPosition, RenderMode } from "../../../shared/types";
+import {
+  CursorPosition,
+  RenderMode,
+  SelectionStats,
+} from "../../../shared/types";
 import { ThemeName } from "../../theme";
+import { getSelectionStats } from "../../lib/documentStats";
 import { buildThemeExtension } from "./theme";
 import { hybridMarkdown } from "./hybridMarkdown";
 import { linkClickHandler } from "./links";
@@ -25,6 +30,7 @@ type ExtensionOptions = {
   placeholder?: string;
   onDocChange: (doc: string) => void;
   onCursorChange?: (cursor: CursorPosition) => void;
+  onSelectionStatsChange?: (stats: SelectionStats) => void;
 };
 
 export type ExtensionBundle = {
@@ -38,6 +44,18 @@ export type ExtensionBundle = {
 
 export const buildBaseKeymap =
   (): import("@codemirror/view").KeyBinding[] => [...searchKeymap];
+
+const selectionStatsEqual = (
+  left: SelectionStats,
+  right: SelectionStats | null
+): boolean => {
+  return (
+    right !== null &&
+    left.hasSelection === right.hasSelection &&
+    left.words === right.words &&
+    left.chars === right.chars
+  );
+};
 
 export const renderModeExtension = (mode: RenderMode): Extension => {
   if (mode === "hybrid") {
@@ -57,6 +75,7 @@ export const createCmExtensions = (
   const themeCompartment = new Compartment();
   const keymapCompartment = new Compartment();
   const renderModeCompartment = new Compartment();
+  let lastSelectionStats: SelectionStats | null = null;
 
   const updateListener = EditorView.updateListener.of((update) => {
     if (update.docChanged) {
@@ -68,6 +87,20 @@ export const createCmExtensions = (
         line: cursor.number - 1,
         char: update.state.selection.main.head - cursor.from,
       });
+    }
+    if (
+      options.onSelectionStatsChange &&
+      (update.selectionSet || update.docChanged)
+    ) {
+      const selectedText = update.state.selection.ranges
+        .filter((range) => !range.empty)
+        .map((range) => update.state.doc.sliceString(range.from, range.to))
+        .join("\n");
+      const selectionStats = getSelectionStats(selectedText);
+      if (!selectionStatsEqual(selectionStats, lastSelectionStats)) {
+        lastSelectionStats = selectionStats;
+        options.onSelectionStatsChange(selectionStats);
+      }
     }
   });
 

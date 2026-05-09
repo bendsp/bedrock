@@ -24,6 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import type { SelectionStats } from "../../shared/types";
 
 export type ChromeProps = {
   title: string;
@@ -33,6 +34,7 @@ export type ChromeProps = {
     lines: number;
     readingMinutes: number;
   };
+  selectionStats: SelectionStats;
   onNew: () => void;
   onOpen: () => void;
   onSave: () => void;
@@ -47,6 +49,7 @@ export type ChromeProps = {
 export function Chrome({
   title,
   stats,
+  selectionStats,
   onNew,
   onOpen,
   onSave,
@@ -225,11 +228,18 @@ export function Chrome({
                   <div className="flex-1 min-h-0">{children}</div>
                 </div>
               </div>
-              <footer className="flex h-8 shrink-0 items-center justify-end gap-3 border-t border-border px-4 text-xs tabular-nums text-muted-foreground">
-                <span>{stats.lines} lines</span>
-                <span>{stats.words} words</span>
-                <span>{stats.chars} chars</span>
-                <span>{stats.readingMinutes} min read</span>
+              <footer className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border px-4 text-xs tabular-nums text-muted-foreground">
+                <span className="min-w-0 truncate">
+                  {selectionStats?.hasSelection
+                    ? `selection: ${selectionStats.words} words / ${selectionStats.chars} chars`
+                    : "no selection"}
+                </span>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span>{stats.lines} lines</span>
+                  <span>{stats.words} words</span>
+                  <span>{stats.chars} chars</span>
+                  <span>{stats.readingMinutes} min read</span>
+                </div>
               </footer>
             </div>
           </div>

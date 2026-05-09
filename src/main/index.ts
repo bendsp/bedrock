@@ -14,12 +14,16 @@ import {
   BedrockTestConfig,
   BedrockTestState,
   DiscardAction,
-  SaveFilePayload,
   OpenFileResult,
   OpenSpecificFilePayload,
   SaveFileResult,
-  ExportFilePayload,
 } from "../shared/types";
+import {
+  MAX_MARKDOWN_FILE_BYTES,
+  normalizeExportFilePayload,
+  normalizeSaveFilePayload,
+  safeExportBaseName,
+} from "./ipcValidation";
 import {
   buildRuntimeInfo,
   captureMainTelemetryException,
@@ -32,8 +36,6 @@ const MARKDOWN_DIALOG_FILTER = {
   name: "Markdown Files",
   extensions: ["md"],
 };
-const MAX_MARKDOWN_FILE_BYTES = 10 * 1024 * 1024;
-const MAX_EXPORT_HTML_BYTES = 25 * 1024 * 1024;
 
 const ensureMarkdownExtension = (filePath: string): string => {
   return filePath.toLowerCase().endsWith(".md") ? filePath : `${filePath}.md`;
@@ -131,16 +133,6 @@ const normalizeMarkdownFilePath = (filePath: unknown): string | null => {
   }
   const resolvedPath = path.resolve(filePath);
   return isMarkdownFilePath(resolvedPath) ? resolvedPath : null;
-};
-
-const assertReasonableContentSize = (
-  content: unknown,
-  maxBytes: number
-): content is string => {
-  return (
-    typeof content === "string" &&
-    Buffer.byteLength(content, "utf-8") <= maxBytes
-  );
 };
 
 const readMarkdownFile = async (
@@ -285,15 +277,16 @@ ipcMain.handle("file:consume-pending-external-open", () => {
 
 ipcMain.handle(
   "file:save",
-  async (event, args: SaveFilePayload): Promise<SaveFileResult | null> => {
+  async (event, args: unknown): Promise<SaveFileResult | null> => {
     try {
-      if (!assertReasonableContentSize(args.content, MAX_MARKDOWN_FILE_BYTES)) {
-        throw new Error("Markdown content is too large to save.");
+      const payload = normalizeSaveFilePayload(args);
+      if (!payload) {
+        throw new Error("Invalid save payload.");
       }
 
-      let targetPath = args.filePath
-        ? ensureMarkdownExtension(path.resolve(args.filePath))
-        : args.filePath;
+      let targetPath = payload.filePath
+        ? ensureMarkdownExtension(path.resolve(payload.filePath))
+        : payload.filePath;
 
       if (!targetPath) {
         const nextSavePath = resolveNextSavePath();
@@ -316,14 +309,13 @@ ipcMain.handle(
         }
       }
 
-      await fs.writeFile(targetPath, args.content, "utf-8");
+      await fs.writeFile(targetPath, payload.content, "utf-8");
       return { filePath: targetPath };
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "An unknown error occurred.";
       captureMainTelemetryException(error, {
         operation: "file:save",
-        filePath: args?.filePath,
       });
       dialog.showErrorBox("Unable to save file", message);
       return null;
@@ -402,15 +394,13 @@ ipcMain.handle("test:simulate-external-open", (_event, filePath: string) => {
 
 ipcMain.handle(
   "file:export",
-  async (event, args: ExportFilePayload): Promise<boolean> => {
+  async (event, args: unknown): Promise<boolean> => {
     try {
-      const { content, format, defaultFileName } = args;
-      if (format !== "html" && format !== "pdf") {
-        throw new Error("Unsupported export format.");
+      const payload = normalizeExportFilePayload(args);
+      if (!payload) {
+        throw new Error("Invalid export payload.");
       }
-      if (!assertReasonableContentSize(content, MAX_EXPORT_HTML_BYTES)) {
-        throw new Error("Export content is too large.");
-      }
+      const { content, format, defaultFileName } = payload;
 
       const extension = format === "html" ? "html" : "pdf";
       const filters =
@@ -418,7 +408,7 @@ ipcMain.handle(
           ? [{ name: "HTML Files", extensions: ["html"] }]
           : [{ name: "PDF Files", extensions: ["pdf"] }];
 
-      const baseName = defaultFileName || "Exported";
+      const baseName = safeExportBaseName(defaultFileName);
 
       const { canceled, filePath } = await dialog.showSaveDialog(
         BrowserWindow.fromWebContents(event.sender) ?? undefined,
@@ -507,7 +497,6 @@ ipcMain.handle(
         error instanceof Error ? error.message : "An unknown error occurred.";
       captureMainTelemetryException(error, {
         operation: "file:export",
-        format: args?.format,
       });
       dialog.showErrorBox("Unable to export file", message);
       return false;

@@ -551,6 +551,44 @@ export const toggleOrderedListCommand = (
     prefixForLine: (lineIndex) => `${lineIndex + 1}. `,
   });
 
+export const continueOrderedListCommand = (
+  view: import("@codemirror/view").EditorView
+): boolean => {
+  const { from, to } = view.state.selection.main;
+  if (from !== to) {
+    return false;
+  }
+
+  const line = view.state.doc.lineAt(from);
+  const match = line.text.match(/^(\s*)(\d+)([.)])\s+(.*)$/);
+  if (!match) {
+    return false;
+  }
+
+  const [, indent, numberText, delimiter, content] = match;
+  if (content.trim() === "") {
+    view.dispatch({
+      changes: {
+        from: line.from,
+        to: line.to,
+        insert: indent,
+      },
+      selection: { anchor: line.from + indent.length },
+      scrollIntoView: true,
+    });
+    return true;
+  }
+
+  const nextNumber = Number.parseInt(numberText, 10) + 1;
+  const insert = `\n${indent}${nextNumber}${delimiter} `;
+  view.dispatch({
+    changes: { from, to, insert },
+    selection: { anchor: from + insert.length },
+    scrollIntoView: true,
+  });
+  return true;
+};
+
 export const toggleTaskListCommand = (
   view: import("@codemirror/view").EditorView
 ): boolean =>

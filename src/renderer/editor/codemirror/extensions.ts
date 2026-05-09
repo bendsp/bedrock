@@ -21,7 +21,10 @@ import { buildThemeExtension } from "./theme";
 import { hybridMarkdown } from "./hybridMarkdown";
 import { linkClickHandler } from "./links";
 import { createReactSearchPanel } from "./searchPanel";
-import { continueUnorderedListCommand } from "./commands";
+import {
+  continueOrderedListCommand,
+  continueUnorderedListCommand,
+} from "./commands";
 
 type ExtensionOptions = {
   renderMode: RenderMode;
@@ -47,7 +50,8 @@ export const buildBaseKeymap =
   (): import("@codemirror/view").KeyBinding[] => [
     {
       key: "Enter",
-      run: continueUnorderedListCommand,
+      run: (view) =>
+        continueUnorderedListCommand(view) || continueOrderedListCommand(view),
     },
     ...searchKeymap,
   ];

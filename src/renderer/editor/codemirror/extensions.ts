@@ -56,7 +56,7 @@ export const renderModeExtension = (mode: RenderMode): Extension => {
 export const keymapExtension = (
   bindings: import("@codemirror/view").KeyBinding[],
   base: import("@codemirror/view").KeyBinding[]
-): Extension => keymap.of([...bindings, ...base]);
+): Extension => keymap.of([...base, ...bindings]);
 
 export const createCmExtensions = (
   options: ExtensionOptions

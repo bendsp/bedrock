@@ -380,6 +380,48 @@ type LinePrefixOptions = {
   prefixForLine: (lineIndex: number) => string;
 };
 
+const isFenceDelimiterLine = (text: string): boolean => {
+  return /^```/.test(text.trim());
+};
+
+const isInsideFencedCode = (
+  doc: import("@codemirror/state").Text,
+  lineNumber: number
+): boolean => {
+  let inFence = false;
+  for (let currentLine = 1; currentLine < lineNumber; currentLine += 1) {
+    if (isFenceDelimiterLine(doc.line(currentLine).text)) {
+      inFence = !inFence;
+    }
+  }
+  return inFence;
+};
+
+const previousNonBlankLineText = (
+  doc: import("@codemirror/state").Text,
+  lineNumber: number
+): string | null => {
+  for (let currentLine = lineNumber - 1; currentLine >= 1; currentLine -= 1) {
+    const text = doc.line(currentLine).text;
+    if (text.trim() !== "") {
+      return text;
+    }
+  }
+  return null;
+};
+
+const isLikelyIndentedCodeLine = (
+  doc: import("@codemirror/state").Text,
+  lineNumber: number,
+  indent: string
+): boolean => {
+  if (indent.length < 4) {
+    return false;
+  }
+  const previousLine = previousNonBlankLineText(doc, lineNumber);
+  return previousLine === null || !/^\s*(?:[-*+]|\d+[.)])\s+/.test(previousLine);
+};
+
 const getSelectedLineNumbers = (
   view: import("@codemirror/view").EditorView
 ): { start: number; end: number } => {
@@ -471,6 +513,14 @@ export const continueUnorderedListCommand = (
   }
 
   const [, indent, marker, content] = match;
+  if (
+    /^(\s*)[-*+]\s+\[[ xX]\]\s+/.test(line.text) ||
+    isInsideFencedCode(view.state.doc, line.number) ||
+    isLikelyIndentedCodeLine(view.state.doc, line.number, indent)
+  ) {
+    return false;
+  }
+
   if (content.trim() === "") {
     view.dispatch({
       changes: {

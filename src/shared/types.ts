@@ -3,6 +3,12 @@ export interface CursorPosition {
   char: number;
 }
 
+export interface SelectionStats {
+  hasSelection: boolean;
+  words: number;
+  chars: number;
+}
+
 export type RenderMode = "hybrid" | "raw";
 
 // File Operation Types

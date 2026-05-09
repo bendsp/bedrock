@@ -198,7 +198,7 @@ export function EditorContextMenu({
             </ContextMenuItem>
             <ContextMenuItem
               inset
-              onSelect={() => runCommand("insert.toggleTaskCheck")}
+              onSelect={() => runCommand("insert.taskCheck")}
             >
               Toggle task check
             </ContextMenuItem>

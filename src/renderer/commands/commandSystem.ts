@@ -35,7 +35,7 @@ export type CommandId =
   | "insert.unorderedList"
   | "insert.orderedList"
   | "insert.taskList"
-  | "insert.toggleTaskCheck"
+  | "insert.taskCheck"
   | "insert.blockquote"
   | "insert.codeBlock"
   | "theme.set"
@@ -60,7 +60,7 @@ export type CommandArgs = {
   "insert.unorderedList": void;
   "insert.orderedList": void;
   "insert.taskList": void;
-  "insert.toggleTaskCheck": void;
+  "insert.taskCheck": void;
   "insert.blockquote": void;
   "insert.codeBlock": void;
   "theme.set": { theme: ThemeName };
@@ -370,7 +370,7 @@ export const createCommandRegistry = (): CommandRegistry => {
       },
     },
     {
-      id: "insert.toggleTaskCheck",
+      id: "insert.taskCheck",
       title: "Toggle task check",
       category: "Insert",
       description: "Toggle checked state for task checklist items.",

@@ -22,6 +22,7 @@ import { hybridMarkdown } from "./hybridMarkdown";
 import { linkClickHandler } from "./links";
 import { createReactSearchPanel } from "./searchPanel";
 import {
+  continueBlockquoteCommand,
   continueOrderedListCommand,
   continueUnorderedListCommand,
 } from "./commands";
@@ -50,8 +51,11 @@ export const buildBaseKeymap =
   (): import("@codemirror/view").KeyBinding[] => [
     {
       key: "Enter",
+      preventDefault: true,
       run: (view) =>
-        continueUnorderedListCommand(view) || continueOrderedListCommand(view),
+        continueUnorderedListCommand(view) ||
+        continueOrderedListCommand(view) ||
+        continueBlockquoteCommand(view),
     },
     ...searchKeymap,
   ];

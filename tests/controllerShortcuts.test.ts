@@ -370,6 +370,24 @@ runTest("code block command wraps and unwraps selected lines", () => {
   assert.equal(view.text, "const x = 1;");
 });
 
+runTest("code block command inserts editable empty fenced block", () => {
+  const view = new FakeView("", { from: 0, to: 0 });
+
+  toggleFencedCodeBlockCommand(view as unknown as EditorView);
+
+  assert.equal(view.text, "```\n\n```");
+  assert.deepEqual(view.state.selection.main, { from: 4, to: 4 });
+});
+
+runTest("code block command preserves indentation for empty fenced blocks", () => {
+  const view = new FakeView("  ", { from: 2, to: 2 });
+
+  toggleFencedCodeBlockCommand(view as unknown as EditorView);
+
+  assert.equal(view.text, "  ```\n  \n  ```");
+  assert.deepEqual(view.state.selection.main, { from: 8, to: 8 });
+});
+
 if (process.exitCode && process.exitCode !== 0) {
   throw new Error("One or more tests failed.");
 }

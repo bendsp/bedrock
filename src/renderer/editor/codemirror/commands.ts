@@ -687,6 +687,7 @@ export const continueBlockquoteCommand = (
 export const toggleFencedCodeBlockCommand = (
   view: import("@codemirror/view").EditorView
 ): boolean => {
+  const { from, to } = view.state.selection.main;
   const { start, end } = getSelectedLineNumbers(view);
   const doc = view.state.doc;
   const firstLine = doc.line(start);
@@ -703,6 +704,18 @@ export const toggleFencedCodeBlockCommand = (
 
     view.dispatch({
       changes: { from: firstLine.from, to: lastLine.to, insert: inner },
+      scrollIntoView: true,
+    });
+    return true;
+  }
+
+  if (from === to && firstLine.text.trim() === "") {
+    const indent = firstLine.text.match(/^\s*/)?.[0] ?? "";
+    const snippet = `${indent}\`\`\`\n${indent}\n${indent}\`\`\``;
+    const cursor = firstLine.from + indent.length + 4 + indent.length;
+    view.dispatch({
+      changes: { from: firstLine.from, to: firstLine.to, insert: snippet },
+      selection: { anchor: cursor },
       scrollIntoView: true,
     });
     return true;

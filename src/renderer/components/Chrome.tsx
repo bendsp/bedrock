@@ -27,6 +27,12 @@ import {
 
 export type ChromeProps = {
   title: string;
+  stats: {
+    words: number;
+    chars: number;
+    lines: number;
+    readingMinutes: number;
+  };
   onNew: () => void;
   onOpen: () => void;
   onSave: () => void;
@@ -40,6 +46,7 @@ export type ChromeProps = {
 
 export function Chrome({
   title,
+  stats,
   onNew,
   onOpen,
   onSave,
@@ -218,6 +225,12 @@ export function Chrome({
                   <div className="flex-1 min-h-0">{children}</div>
                 </div>
               </div>
+              <footer className="flex h-8 shrink-0 items-center justify-end gap-3 border-t border-border px-4 text-xs tabular-nums text-muted-foreground">
+                <span>{stats.lines} lines</span>
+                <span>{stats.words} words</span>
+                <span>{stats.chars} chars</span>
+                <span>{stats.readingMinutes} min read</span>
+              </footer>
             </div>
           </div>
         </div>

@@ -120,6 +120,7 @@ test.describe("Bedrock Electron pipeline", () => {
       await page.locator(".cm-content").click();
       await page.keyboard.type("Bedrock agent pipeline smoke test");
       await expect(page.locator("header")).toContainText("*Untitled.md");
+      await expect(page.locator("footer")).toContainText("5 words");
 
       await page.keyboard.press(`${shortcutModifier}+F`);
       await expect(page.getByPlaceholder("Find...")).toBeVisible();
@@ -187,6 +188,7 @@ test.describe("Bedrock Electron pipeline", () => {
 
       await page.locator(".cm-content").click();
       await page.keyboard.type("\nUnsaved change");
+      await expect(page.locator("header")).toContainText("*open-source.md");
 
       await configureTestHarness(page, { discardResponse: false });
       await expect(await simulateExternalOpen(page, fixturePath)).toBe(true);

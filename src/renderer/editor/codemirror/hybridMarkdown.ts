@@ -24,6 +24,7 @@ type LineKind =
   | { type: "heading"; level: number; markerEnd: number }
   | { type: "blockquote"; markerEnd: number }
   | { type: "list"; markerEnd: number }
+  | { type: "taskList"; markerEnd: number; checked: boolean }
   | { type: "fenceDelimiter"; markerEnd: number }
   | { type: "fenceContent" }
   | { type: "horizontalRule" }
@@ -40,6 +41,16 @@ const listMatch = (text: string): LineKind | null => {
   const match = text.match(/^\s*([*-]|\d+[.)])\s+/);
   if (!match) return null;
   return { type: "list", markerEnd: match[0].length };
+};
+
+const taskListMatch = (text: string): LineKind | null => {
+  const match = text.match(/^\s*[-*+]\s+\[([ xX])\]\s+/);
+  if (!match) return null;
+  return {
+    type: "taskList",
+    markerEnd: match[0].length,
+    checked: match[1].toLowerCase() === "x",
+  };
 };
 
 const blockquoteMatch = (text: string): LineKind | null => {
@@ -90,6 +101,12 @@ const classifyLines = (lines: string[]): LineKind[] => {
       continue;
     }
 
+    const taskList = taskListMatch(line);
+    if (taskList) {
+      kinds.push(taskList);
+      continue;
+    }
+
     const list = listMatch(line);
     if (list) {
       kinds.push(list);
@@ -121,7 +138,10 @@ const classifyLines = (lines: string[]): LineKind[] => {
 
 const listRunFor = (kinds: LineKind[], start: number): [number, number] => {
   let end = start;
-  while (end + 1 < kinds.length && kinds[end + 1].type === "list") {
+  while (
+    end + 1 < kinds.length &&
+    (kinds[end + 1].type === "list" || kinds[end + 1].type === "taskList")
+  ) {
     end += 1;
   }
   return [start, end];
@@ -181,7 +201,7 @@ export const hybridMarkdown = (): Extension => {
           }
           return false;
         };
-        const lines = [];
+        const lines: string[] = [];
         for (let i = 1; i <= doc.lines; i += 1) {
           lines.push(doc.line(i).text);
         }
@@ -202,6 +222,25 @@ export const hybridMarkdown = (): Extension => {
             Decoration.mark({ class: "cm-md-hide-marker", inclusive: false })
           );
         };
+        const decorateListRun = (start: number, end: number) => {
+          for (let ln = start + 1; ln <= end + 1; ln += 1) {
+            const lineKind = kinds[ln - 1];
+            addLineClass(
+              ln,
+              lineKind.type === "taskList" && lineKind.checked
+                ? "cm-md-task-list cm-md-task-list-checked"
+                : lineKind.type === "taskList"
+                ? "cm-md-task-list"
+                : "cm-md-list"
+            );
+            const text = lines[ln - 1] ?? "";
+            const marker =
+              lineKind.type === "taskList" ? taskListMatch(text) : listMatch(text);
+            if (marker && "markerEnd" in marker) {
+              hideRange(ln, 0, marker.markerEnd);
+            }
+          }
+        };
 
         for (let i = 0; i < kinds.length; i += 1) {
           const lineNo = i + 1;
@@ -218,14 +257,13 @@ export const hybridMarkdown = (): Extension => {
             }
             case "list": {
               const [start, end] = listRunFor(kinds, i);
-              for (let ln = start + 1; ln <= end + 1; ln += 1) {
-                addLineClass(ln, "cm-md-list");
-                const text = lines[ln - 1] ?? "";
-                const marker = listMatch(text);
-                if (marker && "markerEnd" in marker) {
-                  hideRange(ln, 0, marker.markerEnd);
-                }
-              }
+              decorateListRun(start, end);
+              i = end;
+              break;
+            }
+            case "taskList": {
+              const [start, end] = listRunFor(kinds, i);
+              decorateListRun(start, end);
               i = end;
               break;
             }

@@ -24,8 +24,7 @@ export const buildThemeExtension = (
         boxShadow: "none",
       },
       ".cm-scroller": {
-        fontFamily:
-          '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontFamily: "var(--editor-font-family)",
         lineHeight: 1.6,
         outline: "none",
       },

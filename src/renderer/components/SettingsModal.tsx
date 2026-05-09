@@ -1,5 +1,9 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { KeyBindingAction, UserSettings } from "../settings";
+import {
+  EditorFontFamily,
+  KeyBindingAction,
+  UserSettings,
+} from "../settings";
 import {
   eventToBinding,
   formatBinding,
@@ -56,6 +60,15 @@ const ABOUT_LINKS = {
   benWebsite: "https://desprets.net/",
   githubRepo: "https://github.com/bendsp/bedrock",
 } as const;
+
+const editorFontOptions: Array<{
+  value: EditorFontFamily;
+  label: string;
+}> = [
+  { value: "sans", label: "Sans" },
+  { value: "serif", label: "Serif" },
+  { value: "mono", label: "Mono" },
+];
 
 type SettingsModalProps = {
   settings: UserSettings;
@@ -386,6 +399,43 @@ const SettingsModal = ({
                       className="rounded-none first:rounded-t-md last:rounded-b-md"
                     >
                       <ItemContent>
+                        <ItemTitle>Editor font</ItemTitle>
+                        <ItemDescription>
+                          Choose the typeface used for Markdown editing.
+                        </ItemDescription>
+                      </ItemContent>
+                      <ItemActions className="ml-auto">
+                        <Select
+                          value={settings.editorFontFamily}
+                          onValueChange={(value) =>
+                            onChange({
+                              ...settings,
+                              editorFontFamily: value as EditorFontFamily,
+                            })
+                          }
+                        >
+                          <SelectTrigger className="w-[180px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {editorFontOptions.map((option) => (
+                              <SelectItem
+                                key={option.value}
+                                value={option.value}
+                              >
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </ItemActions>
+                    </Item>
+                    <ItemSeparator />
+                    <Item
+                      size="sm"
+                      className="rounded-none first:rounded-t-md last:rounded-b-md"
+                    >
+                      <ItemContent>
                         <ItemTitle>UI scale</ItemTitle>
                       </ItemContent>
                       <ItemActions className="ml-auto">
@@ -620,6 +670,11 @@ const SettingsModal = ({
                         "link",
                         "inlineCode",
                         "strikethrough",
+                        "unorderedList",
+                        "orderedList",
+                        "taskList",
+                        "blockquote",
+                        "codeBlock",
                       ] as KeyBindingAction[]
                     ).map((action, index, arr) => {
                       const isActive = listeningFor === action;
@@ -657,7 +712,17 @@ const SettingsModal = ({
                                   ? "Insert a markdown link, or wrap the selection."
                                   : action === "inlineCode"
                                   ? "Toggle inline code markdown (`…`) for the selection or word."
-                                  : "Toggle strikethrough markdown (~~…~~) for the selection or word."}
+                                  : action === "strikethrough"
+                                  ? "Toggle strikethrough markdown (~~…~~) for the selection or word."
+                                  : action === "unorderedList"
+                                  ? "Toggle a bulleted list for the selected lines."
+                                  : action === "orderedList"
+                                  ? "Toggle a numbered list for the selected lines."
+                                  : action === "taskList"
+                                  ? "Toggle a task checklist for the selected lines."
+                                  : action === "blockquote"
+                                  ? "Toggle a blockquote for the selected lines."
+                                  : "Wrap the selected lines in a fenced code block."}
                               </ItemDescription>
                             </ItemContent>
                             <ItemActions className="ml-auto flex-wrap justify-end">

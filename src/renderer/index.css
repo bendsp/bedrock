@@ -59,6 +59,8 @@ body {
 
 :root {
   --ui-font-size: 15px;
+  --editor-font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
   --bg-body: #282c34;
   --text-body: #abb2bf;
   --shell-bg: #1f2329;
@@ -305,8 +307,7 @@ body {
 
 .cm-editor .cm-content {
   min-height: 100%;
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  font-family: var(--editor-font-family);
 }
 
 .cm-editor .cm-line {
@@ -371,6 +372,34 @@ body {
   border-radius: 999px;
   background: color-mix(in srgb, var(--panel-text, #e6e9ef) 85%, transparent);
   transform: translateY(-50%);
+}
+
+.cm-line.cm-md-task-list {
+  position: relative;
+  padding-left: 1.55em;
+}
+
+.cm-line.cm-md-task-list::before {
+  content: "";
+  position: absolute;
+  left: 0.25em;
+  top: 0.9em;
+  width: 0.78em;
+  height: 0.78em;
+  border-radius: 3px;
+  border: 1.5px solid var(--blockquote-border, #3f4755);
+  background: color-mix(in srgb, var(--panel-bg, #1b1e24) 70%, transparent);
+  transform: translateY(-50%);
+}
+
+.cm-line.cm-md-task-list-checked::before {
+  border-color: var(--ui-primary);
+  background: var(--ui-primary);
+  box-shadow: inset 0 0 0 2px var(--panel-bg, #1b1e24);
+}
+
+.cm-line.cm-md-task-list-checked {
+  color: var(--muted-text);
 }
 
 .cm-line.cm-md-quote {

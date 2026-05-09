@@ -380,6 +380,48 @@ type LinePrefixOptions = {
   prefixForLine: (lineIndex: number) => string;
 };
 
+const isFenceDelimiterLine = (text: string): boolean => {
+  return /^```/.test(text.trim());
+};
+
+const isInsideFencedCode = (
+  doc: import("@codemirror/state").Text,
+  lineNumber: number
+): boolean => {
+  let inFence = false;
+  for (let currentLine = 1; currentLine < lineNumber; currentLine += 1) {
+    if (isFenceDelimiterLine(doc.line(currentLine).text)) {
+      inFence = !inFence;
+    }
+  }
+  return inFence;
+};
+
+const previousNonBlankLineText = (
+  doc: import("@codemirror/state").Text,
+  lineNumber: number
+): string | null => {
+  for (let currentLine = lineNumber - 1; currentLine >= 1; currentLine -= 1) {
+    const text = doc.line(currentLine).text;
+    if (text.trim() !== "") {
+      return text;
+    }
+  }
+  return null;
+};
+
+const isLikelyIndentedCodeLine = (
+  doc: import("@codemirror/state").Text,
+  lineNumber: number,
+  indent: string
+): boolean => {
+  if (indent.length < 4) {
+    return false;
+  }
+  const previousLine = previousNonBlankLineText(doc, lineNumber);
+  return previousLine === null || !/^\s*(?:[-*+]|\d+[.)])\s+/.test(previousLine);
+};
+
 const getSelectedLineNumbers = (
   view: import("@codemirror/view").EditorView
 ): { start: number; end: number } => {
@@ -455,6 +497,51 @@ export const toggleUnorderedListCommand = (
     match: /^\s*(?:[-*+]\s+)/,
     prefixForLine: () => "- ",
   });
+
+export const continueUnorderedListCommand = (
+  view: import("@codemirror/view").EditorView
+): boolean => {
+  const { from, to } = view.state.selection.main;
+  if (from !== to) {
+    return false;
+  }
+
+  const line = view.state.doc.lineAt(from);
+  const match = line.text.match(/^(\s*)([-*+])\s+(.*)$/);
+  if (!match) {
+    return false;
+  }
+
+  const [, indent, marker, content] = match;
+  if (
+    /^(\s*)[-*+]\s+\[[ xX]\]\s+/.test(line.text) ||
+    isInsideFencedCode(view.state.doc, line.number) ||
+    isLikelyIndentedCodeLine(view.state.doc, line.number, indent)
+  ) {
+    return false;
+  }
+
+  if (content.trim() === "") {
+    view.dispatch({
+      changes: {
+        from: line.from,
+        to: line.to,
+        insert: indent,
+      },
+      selection: { anchor: line.from + indent.length },
+      scrollIntoView: true,
+    });
+    return true;
+  }
+
+  const insert = `\n${indent}${marker} `;
+  view.dispatch({
+    changes: { from, to, insert },
+    selection: { anchor: from + insert.length },
+    scrollIntoView: true,
+  });
+  return true;
+};
 
 export const toggleOrderedListCommand = (
   view: import("@codemirror/view").EditorView

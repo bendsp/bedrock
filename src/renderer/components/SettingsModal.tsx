@@ -6,6 +6,7 @@ import {
 } from "../settings";
 import {
   eventToBinding,
+  findKeyBindingConflicts,
   formatBinding,
   keyBindingLabels,
   isModifierKey,
@@ -104,6 +105,10 @@ const SettingsModal = ({
   );
   const [pendingBinding, setPendingBinding] = useState<string | null>(null);
   const [appVersion, setAppVersion] = useState<string | null>(null);
+  const keyBindingConflicts = useMemo(
+    () => findKeyBindingConflicts(settings.keyBindings),
+    [settings.keyBindings]
+  );
   const originalBindingRef = useRef<{
     action: KeyBindingAction | null;
     binding: string | null;
@@ -692,6 +697,7 @@ const SettingsModal = ({
                     ).map((action, index, arr) => {
                       const isActive = listeningFor === action;
                       const isLast = index === arr.length - 1;
+                      const conflicts = keyBindingConflicts[action] ?? [];
                       return (
                         <Fragment key={action}>
                           <Item
@@ -700,42 +706,53 @@ const SettingsModal = ({
                           >
                             <ItemContent>
                               <ItemTitle>{keyBindingLabels[action]}</ItemTitle>
-                              <ItemDescription>
-                                {action === "new"
-                                  ? "Create a new markdown file."
-                                  : action === "open"
-                                  ? "Open a markdown file."
-                                  : action === "save"
-                                  ? "Save the current file."
-                                  : action === "saveAs"
-                                  ? "Save the current file with a new name."
-                                  : action === "openSettings"
-                                  ? "Open this settings dialog."
-                                  : action === "undo"
-                                  ? "Undo the last change."
-                                  : action === "redo"
-                                  ? "Redo the last undone change."
-                                  : action === "find"
-                                  ? "Search for text in the current file."
-                                  : action === "bold"
-                                  ? "Toggle bold markdown (**…**) for the selection or word."
-                                  : action === "italic"
-                                  ? "Toggle italic markdown (*…*) for the selection or word."
-                                  : action === "link"
-                                  ? "Insert a markdown link, or wrap the selection."
-                                  : action === "inlineCode"
-                                  ? "Toggle inline code markdown (`…`) for the selection or word."
-                                  : action === "strikethrough"
-                                  ? "Toggle strikethrough markdown (~~…~~) for the selection or word."
-                                  : action === "unorderedList"
-                                  ? "Toggle a bulleted list for the selected lines."
-                                  : action === "orderedList"
-                                  ? "Toggle a numbered list for the selected lines."
-                                  : action === "taskList"
-                                  ? "Toggle a task checklist for the selected lines."
-                                  : action === "blockquote"
-                                  ? "Toggle a blockquote for the selected lines."
-                                  : "Wrap the selected lines in a fenced code block."}
+                              <ItemDescription className="line-clamp-none">
+                                <span>
+                                  {action === "new"
+                                    ? "Create a new markdown file."
+                                    : action === "open"
+                                    ? "Open a markdown file."
+                                    : action === "save"
+                                    ? "Save the current file."
+                                    : action === "saveAs"
+                                    ? "Save the current file with a new name."
+                                    : action === "openSettings"
+                                    ? "Open this settings dialog."
+                                    : action === "undo"
+                                    ? "Undo the last change."
+                                    : action === "redo"
+                                    ? "Redo the last undone change."
+                                    : action === "find"
+                                    ? "Search for text in the current file."
+                                    : action === "bold"
+                                    ? "Toggle bold markdown (**…**) for the selection or word."
+                                    : action === "italic"
+                                    ? "Toggle italic markdown (*…*) for the selection or word."
+                                    : action === "link"
+                                    ? "Insert a markdown link, or wrap the selection."
+                                    : action === "inlineCode"
+                                    ? "Toggle inline code markdown (`…`) for the selection or word."
+                                    : action === "strikethrough"
+                                    ? "Toggle strikethrough markdown (~~…~~) for the selection or word."
+                                    : action === "unorderedList"
+                                    ? "Toggle a bulleted list for the selected lines."
+                                    : action === "orderedList"
+                                    ? "Toggle a numbered list for the selected lines."
+                                    : action === "taskList"
+                                    ? "Toggle a task checklist for the selected lines."
+                                    : action === "blockquote"
+                                    ? "Toggle a blockquote for the selected lines."
+                                    : "Wrap the selected lines in a fenced code block."}
+                                </span>
+                                {conflicts.length > 0 ? (
+                                  <span className="mt-1 block text-destructive">
+                                    Conflicts with{" "}
+                                    {conflicts
+                                      .map((conflict) => keyBindingLabels[conflict])
+                                      .join(", ")}
+                                    .
+                                  </span>
+                                ) : null}
                               </ItemDescription>
                             </ItemContent>
                             <ItemActions className="ml-auto flex-wrap justify-end">

@@ -1,6 +1,10 @@
 import React, { useEffect, useRef } from "react";
 import { EditorView } from "@codemirror/view";
-import { RenderMode, CursorPosition } from "../../shared/types";
+import {
+  RenderMode,
+  CursorPosition,
+  SelectionStats,
+} from "../../shared/types";
 import { ThemeName } from "../theme";
 import type { CommandRegistry, CommandRunner } from "../commands/commandSystem";
 import type { UserSettings } from "../settings";
@@ -27,6 +31,7 @@ type CodeMirrorEditorProps = {
   placeholder?: string;
   onChange: (nextValue: string) => void;
   onCursorChange?: (cursor: CursorPosition) => void;
+  onSelectionStatsChange?: (stats: SelectionStats) => void;
   onReady?: (view: EditorView) => void;
   className?: string;
 };
@@ -43,6 +48,7 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
   placeholder,
   onChange,
   onCursorChange,
+  onSelectionStatsChange,
   onReady,
   className,
 }) => {
@@ -63,6 +69,7 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
       placeholder,
       onDocChange: onChange,
       onCursorChange,
+      onSelectionStatsChange,
     });
 
     const state = createState(value, bundle);

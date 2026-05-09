@@ -16,6 +16,7 @@ import { buildThemeExtension } from "./theme";
 import { hybridMarkdown } from "./hybridMarkdown";
 import { linkClickHandler } from "./links";
 import { createReactSearchPanel } from "./searchPanel";
+import { continueBlockquoteCommand } from "./commands";
 
 type ExtensionOptions = {
   renderMode: RenderMode;
@@ -37,7 +38,14 @@ export type ExtensionBundle = {
 };
 
 export const buildBaseKeymap =
-  (): import("@codemirror/view").KeyBinding[] => [...searchKeymap];
+  (): import("@codemirror/view").KeyBinding[] => [
+    {
+      key: "Enter",
+      preventDefault: true,
+      run: continueBlockquoteCommand,
+    },
+    ...searchKeymap,
+  ];
 
 export const renderModeExtension = (mode: RenderMode): Extension => {
   if (mode === "hybrid") {

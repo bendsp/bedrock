@@ -380,6 +380,23 @@ type LinePrefixOptions = {
   prefixForLine: (lineIndex: number) => string;
 };
 
+const isFenceDelimiterLine = (text: string): boolean => {
+  return /^```/.test(text.trim());
+};
+
+const isInsideFencedCode = (
+  doc: import("@codemirror/state").Text,
+  lineNumber: number
+): boolean => {
+  let inFence = false;
+  for (let currentLine = 1; currentLine < lineNumber; currentLine += 1) {
+    if (isFenceDelimiterLine(doc.line(currentLine).text)) {
+      inFence = !inFence;
+    }
+  }
+  return inFence;
+};
+
 const getSelectedLineNumbers = (
   view: import("@codemirror/view").EditorView
 ): { start: number; end: number } => {
@@ -479,6 +496,48 @@ export const toggleBlockquoteCommand = (
     match: /^\s*(?:>\s?)/,
     prefixForLine: () => "> ",
   });
+
+export const continueBlockquoteCommand = (
+  view: import("@codemirror/view").EditorView
+): boolean => {
+  const { from, to } = view.state.selection.main;
+  if (from !== to) {
+    return false;
+  }
+
+  const line = view.state.doc.lineAt(from);
+  const match = line.text.match(/^(\s*(?:>\s*)+)(.*)$/);
+  if (!match) {
+    return false;
+  }
+
+  const [, marker, content] = match;
+  const indent = line.text.match(/^\s*/)?.[0] ?? "";
+  if (indent.length >= 4 || isInsideFencedCode(view.state.doc, line.number)) {
+    return false;
+  }
+
+  if (content.trim() === "") {
+    view.dispatch({
+      changes: {
+        from: line.from,
+        to: line.to,
+        insert: indent,
+      },
+      selection: { anchor: line.from + indent.length },
+      scrollIntoView: true,
+    });
+    return true;
+  }
+
+  const insert = `\n${marker}`;
+  view.dispatch({
+    changes: { from, to, insert },
+    selection: { anchor: from + insert.length },
+    scrollIntoView: true,
+  });
+  return true;
+};
 
 export const toggleFencedCodeBlockCommand = (
   view: import("@codemirror/view").EditorView

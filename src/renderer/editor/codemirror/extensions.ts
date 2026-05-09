@@ -45,6 +45,18 @@ export type ExtensionBundle = {
 export const buildBaseKeymap =
   (): import("@codemirror/view").KeyBinding[] => [...searchKeymap];
 
+const selectionStatsEqual = (
+  left: SelectionStats,
+  right: SelectionStats | null
+): boolean => {
+  return (
+    right !== null &&
+    left.hasSelection === right.hasSelection &&
+    left.words === right.words &&
+    left.chars === right.chars
+  );
+};
+
 export const renderModeExtension = (mode: RenderMode): Extension => {
   if (mode === "hybrid") {
     return hybridMarkdown();
@@ -63,6 +75,7 @@ export const createCmExtensions = (
   const themeCompartment = new Compartment();
   const keymapCompartment = new Compartment();
   const renderModeCompartment = new Compartment();
+  let lastSelectionStats: SelectionStats | null = null;
 
   const updateListener = EditorView.updateListener.of((update) => {
     if (update.docChanged) {
@@ -75,12 +88,19 @@ export const createCmExtensions = (
         char: update.state.selection.main.head - cursor.from,
       });
     }
-    if (options.onSelectionStatsChange && update.selectionSet) {
+    if (
+      options.onSelectionStatsChange &&
+      (update.selectionSet || update.docChanged)
+    ) {
       const selectedText = update.state.selection.ranges
         .filter((range) => !range.empty)
         .map((range) => update.state.doc.sliceString(range.from, range.to))
         .join("\n");
-      options.onSelectionStatsChange(getSelectionStats(selectedText));
+      const selectionStats = getSelectionStats(selectedText);
+      if (!selectionStatsEqual(selectionStats, lastSelectionStats)) {
+        lastSelectionStats = selectionStats;
+        options.onSelectionStatsChange(selectionStats);
+      }
     }
   });
 

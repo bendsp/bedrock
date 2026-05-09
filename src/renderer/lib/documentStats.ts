@@ -1,14 +1,10 @@
+import type { SelectionStats } from "../../shared/types";
+
 export type DocumentStats = {
   words: number;
   chars: number;
   lines: number;
   readingMinutes: number;
-};
-
-export type SelectionStats = {
-  hasSelection: boolean;
-  words: number;
-  chars: number;
 };
 
 const countWords = (value: string): number => {

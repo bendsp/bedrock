@@ -34,7 +34,7 @@ export type ChromeProps = {
     lines: number;
     readingMinutes: number;
   };
-  selectionStats?: SelectionStats;
+  selectionStats: SelectionStats;
   onNew: () => void;
   onOpen: () => void;
   onSave: () => void;

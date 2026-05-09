@@ -64,10 +64,19 @@ const ABOUT_LINKS = {
 const editorFontOptions: Array<{
   value: EditorFontFamily;
   label: string;
+  css: string;
 }> = [
-  { value: "sans", label: "Sans" },
-  { value: "serif", label: "Serif" },
-  { value: "mono", label: "Mono" },
+  {
+    value: "sans",
+    label: "Sans",
+    css: '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  { value: "serif", label: "Serif", css: 'Georgia, "Times New Roman", serif' },
+  {
+    value: "mono",
+    label: "Mono",
+    css: '"Fira Code", "Source Code Pro", Monaco, Consolas, monospace',
+  },
 ];
 
 type SettingsModalProps = {
@@ -287,6 +296,9 @@ const SettingsModal = ({
 
   const activeCategoryLabel =
     categories.find((c) => c.id === activeCategory)?.label ?? "Settings";
+  const activeEditorFont =
+    editorFontOptions.find((option) => option.value === settings.editorFontFamily) ??
+    editorFontOptions[0];
 
   return (
     <div
@@ -393,6 +405,20 @@ const SettingsModal = ({
                         </Button>
                       </ItemActions>
                     </Item>
+                    <ItemSeparator />
+                    <div className="border-b border-border px-4 py-3">
+                      <div className="text-xs font-medium text-muted-foreground">
+                        Font preview
+                      </div>
+                      <div
+                        className="mt-2 rounded-md border border-border bg-card px-3 py-2 text-sm leading-6 text-card-foreground"
+                        style={{ fontFamily: activeEditorFont.css }}
+                      >
+                        # Heading
+                        <br />
+                        Plain text, `inline code`, and a [link](https://example.com)
+                      </div>
+                    </div>
                     <ItemSeparator />
                     <Item
                       size="sm"

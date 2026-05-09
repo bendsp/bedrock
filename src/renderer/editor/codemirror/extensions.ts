@@ -41,6 +41,7 @@ export const buildBaseKeymap =
   (): import("@codemirror/view").KeyBinding[] => [
     {
       key: "Enter",
+      preventDefault: true,
       run: continueBlockquoteCommand,
     },
     ...searchKeymap,

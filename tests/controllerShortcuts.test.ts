@@ -197,6 +197,16 @@ runTest("enter continues blockquotes", () => {
   assert.deepEqual(view.state.selection.main, { from: 10, to: 10 });
 });
 
+runTest("enter preserves spaced nested blockquote markers", () => {
+  const view = new FakeView("> > nested", { from: 10, to: 10 });
+
+  const handled = continueBlockquoteCommand(view as unknown as EditorView);
+
+  assert.equal(handled, true);
+  assert.equal(view.text, "> > nested\n> > ");
+  assert.deepEqual(view.state.selection.main, { from: 15, to: 15 });
+});
+
 runTest("enter exits an empty blockquote", () => {
   const view = new FakeView("  >   ", { from: 6, to: 6 });
 
@@ -205,6 +215,24 @@ runTest("enter exits an empty blockquote", () => {
   assert.equal(handled, true);
   assert.equal(view.text, "  ");
   assert.deepEqual(view.state.selection.main, { from: 2, to: 2 });
+});
+
+runTest("enter falls through for fenced code lines shaped like quotes", () => {
+  const view = new FakeView("```\n> flag\n```", { from: 10, to: 10 });
+
+  const handled = continueBlockquoteCommand(view as unknown as EditorView);
+
+  assert.equal(handled, false);
+  assert.equal(view.text, "```\n> flag\n```");
+});
+
+runTest("enter falls through for indented code lines shaped like quotes", () => {
+  const view = new FakeView("    > flag", { from: 10, to: 10 });
+
+  const handled = continueBlockquoteCommand(view as unknown as EditorView);
+
+  assert.equal(handled, false);
+  assert.equal(view.text, "    > flag");
 });
 
 runTest("enter falls through outside blockquotes", () => {

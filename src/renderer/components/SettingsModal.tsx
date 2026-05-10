@@ -403,12 +403,22 @@ const SettingsModal = ({
                         Font preview
                       </div>
                       <div
-                        className="mt-2 rounded-md border border-border bg-card px-3 py-2 text-sm leading-6 text-card-foreground"
+                        className="mt-2 space-y-2 rounded-md border border-border bg-card px-3 py-2 text-card-foreground"
                         style={{ fontFamily: "var(--editor-font-family)" }}
                       >
-                        # Heading
-                        <br />
-                        Plain text, `inline code`, and a [link](https://example.com)
+                        <div className="text-lg font-semibold leading-snug">
+                          Heading
+                        </div>
+                        <p className="text-sm leading-6">
+                          Plain text,{" "}
+                          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.9em]">
+                            inline code
+                          </code>
+                          , and a{" "}
+                          <span className="text-primary underline underline-offset-4">
+                            link
+                          </span>
+                        </p>
                       </div>
                     </div>
                     <ItemSeparator />

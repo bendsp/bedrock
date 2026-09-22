@@ -116,7 +116,7 @@ test("local reference images resolve after multiline footnote definitions", asyn
   const { app, page, userDataDir } = await launchBedrock();
   try {
     await fs.copyFile(
-      path.resolve("src/assets/icon.png"),
+      path.resolve("tests/e2e/fixtures/reference-image.png"),
       path.join(userDataDir, "icon.png"),
     );
     const note = path.join(userDataDir, "images.md");
@@ -130,7 +130,7 @@ test("local reference images resolve after multiline footnote definitions", asyn
     await expect(image).toBeVisible();
     await expect
       .poll(() => image.evaluate((el: HTMLImageElement) => el.naturalWidth))
-      .toBe(1920);
+      .toBe(32);
     await expect(image).toHaveAttribute("src", /^data:image\/png;base64,/);
   } finally {
     await disposeBedrock(app, userDataDir);

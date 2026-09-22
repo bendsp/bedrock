@@ -1,7 +1,21 @@
+import { syntaxTree } from "@codemirror/language";
+import {
+  activeTableCell,
+  tableCellOwners,
+} from "../editor/codemirror/tableCellContext";
+import {
+  insertTable,
+  tableCommand,
+  tableAt,
+} from "../editor/codemirror/tables";
 import { undo, redo } from "@codemirror/commands";
 import { openSearchPanel, closeSearchPanel } from "@codemirror/search";
 import type { EditorView, KeyBinding } from "@codemirror/view";
 import {
+  headingCommand,
+  insertImageCommand,
+  insertFootnoteCommand,
+  createSnippetCommand,
   createMarkdownLinkCommand,
   createWrapSelectionOrWordCommand,
   insertHorizontalRuleCommand,
@@ -18,34 +32,49 @@ import {
   normalizeBinding,
 } from "../keybindings";
 import type { KeyBindingAction, UserSettings } from "../settings";
-import type { ThemeName } from "../theme";
+import {
+  isThemeName,
+  ThemeName,
+  themeOptions,
+  themeDisplayName,
+} from "../theme";
+import { followSourceLink, sourceLink } from "../editor/codemirror/links";
 
-export type CommandId =
-  | "file.new"
-  | "file.open"
-  | "file.save"
-  | "file.saveAs"
-  | "app.openSettings"
-  | "format.bold"
-  | "format.italic"
-  | "format.strikethrough"
-  | "format.inlineCode"
-  | "insert.link"
-  | "insert.horizontalRule"
-  | "insert.unorderedList"
-  | "insert.orderedList"
-  | "insert.taskList"
-  | "insert.taskCheck"
-  | "insert.blockquote"
-  | "insert.codeBlock"
-  | "theme.set"
-  | "editor.undo"
-  | "editor.redo"
-  | "editor.find"
-  | "file.exportHtml"
-  | "file.exportPdf";
+export type CommandId = keyof CommandArgs;
 
 export type CommandArgs = {
+  "app.commandPalette": void;
+  "file.quickOpen": void;
+  "insert.attachImages": { files: File[] } | undefined;
+  "insert.pasteImage": void;
+  "format.heading1": void;
+  "format.heading2": void;
+  "format.heading3": void;
+  "format.heading4": void;
+  "format.heading5": void;
+  "format.heading6": void;
+  "format.paragraph": void;
+  "format.highlight": void;
+  "insert.image": void;
+  "insert.table": void;
+  "insert.footnote": void;
+  "insert.math": void;
+  "insert.frontmatter": void;
+  "table.row.add": void;
+  "table.row.addAbove": void;
+  "table.row.delete": void;
+  "table.row.moveUp": void;
+  "table.row.moveDown": void;
+  "table.column.add": void;
+  "table.column.addLeft": void;
+  "table.column.delete": void;
+  "table.column.moveLeft": void;
+  "table.column.moveRight": void;
+  "table.delete": void;
+  "table.align.left": void;
+  "table.align.center": void;
+  "table.align.right": void;
+  "table.format": void;
   "file.new": void;
   "file.open": void;
   "file.save": void;
@@ -67,56 +96,45 @@ export type CommandArgs = {
   "editor.undo": void;
   "editor.redo": void;
   "editor.find": void;
+  "editor.followLink": void;
   "file.exportHtml": void;
   "file.exportPdf": void;
-};
+} & { [Theme in ThemeName as `theme.${Theme}`]: void };
 
 export type CommandCategory =
-  | "File"
-  | "App"
-  | "Format"
-  | "Insert"
-  | "Theme"
-  | "Edit";
+  "File" | "App" | "Format" | "Insert" | "Theme" | "Edit" | "Table";
 
-export type CommandDefinition<ID extends CommandId = CommandId> = {
-  [K in ID]: {
-    id: K;
-    title: string;
-    category: CommandCategory;
-    description?: string;
-    /**
-     * Default binding in Bedrock normalized form (e.g. "mod+shift+x").
-     * If omitted, the command has no keyboard shortcut by default.
-     */
-    defaultBinding?: string;
-    /**
-     * If set, the command will use the binding from UserSettings.keyBindings[settingsKey]
-     * if it exists, overriding the defaultBinding.
-     */
-    settingsKey?: KeyBindingAction;
-    /**
-     * If true, the command requires an active CodeMirror editor view.
-     * The runner will automatically check this and return false if missing.
-     */
-    requiresEditor?: boolean;
-    /**
-     * If true, this command can be triggered via a global window-level shortcut
-     * even if the editor isn't focused.
-     */
-    isGlobal?: boolean;
-    /**
-     * Run the command.
-     *
-     * - Return true if handled.
-     * - Return false if it could not run.
-     */
-    run: (
-      ctx: CommandRunContext,
-      args: CommandArgs[K]
-    ) => boolean | Promise<boolean>;
-  };
-}[ID];
+type CommandMetadata = {
+  title: string;
+  category: CommandCategory;
+  description?: string;
+  defaultBinding?: string;
+  alternateBindings?: readonly string[];
+  settingsKey?: KeyBindingAction;
+  requiresEditor?: boolean;
+  isGlobal?: boolean;
+};
+export type CommandDefinition = CommandMetadata &
+  (
+    | {
+        id: Exclude<CommandId, "theme.set" | "insert.attachImages">;
+        run: (ctx: CommandRunContext, args: void) => boolean | Promise<boolean>;
+      }
+    | {
+        id: "insert.attachImages";
+        run: (
+          ctx: CommandRunContext,
+          args: { files: File[] } | undefined,
+        ) => boolean | Promise<boolean>;
+      }
+    | {
+        id: "theme.set";
+        run: (
+          ctx: CommandRunContext,
+          args: { theme: ThemeName },
+        ) => boolean | Promise<boolean>;
+      }
+  );
 
 export type CommandRunContext = {
   getEditorView: () => EditorView | null;
@@ -125,6 +143,15 @@ export type CommandRunContext = {
   saveFile: () => Promise<void>;
   saveFileAs: () => Promise<void>;
   openSettings: () => void;
+  openCommandPalette: () => void;
+  quickOpen: () => void;
+  attachImages: (
+    view: EditorView,
+    source:
+      | { kind: "clipboard" }
+      | { kind: "files"; files: File[] }
+      | { kind: "choose" },
+  ) => Promise<void>;
   setTheme: (theme: ThemeName) => void;
   exportFile: (format: "html" | "pdf") => Promise<void>;
 };
@@ -135,7 +162,7 @@ export type CommandRegistry = {
 };
 
 const byId = <T extends CommandDefinition>(
-  commands: T[]
+  commands: T[],
 ): Map<CommandId, T> => {
   const map = new Map<CommandId, T>();
   for (const cmd of commands) {
@@ -188,7 +215,231 @@ const editorCommands = {
 } as const;
 
 export const createCommandRegistry = (): CommandRegistry => {
+  const formatting: Array<{
+    id: Exclude<CommandId, "theme.set" | "insert.attachImages">;
+    title: string;
+    category: CommandCategory;
+    run: (view: EditorView) => boolean;
+  }> = [
+    {
+      id: "format.heading1",
+      title: "Heading 1",
+      category: "Format",
+      run: headingCommand(1),
+    },
+    {
+      id: "format.heading2",
+      title: "Heading 2",
+      category: "Format",
+      run: headingCommand(2),
+    },
+    {
+      id: "format.heading3",
+      title: "Heading 3",
+      category: "Format",
+      run: headingCommand(3),
+    },
+    {
+      id: "format.heading4",
+      title: "Heading 4",
+      category: "Format",
+      run: headingCommand(4),
+    },
+    {
+      id: "format.heading5",
+      title: "Heading 5",
+      category: "Format",
+      run: headingCommand(5),
+    },
+    {
+      id: "format.heading6",
+      title: "Heading 6",
+      category: "Format",
+      run: headingCommand(6),
+    },
+    {
+      id: "format.paragraph",
+      title: "Paragraph",
+      category: "Format",
+      run: headingCommand(0),
+    },
+    {
+      id: "format.highlight",
+      title: "Highlight",
+      category: "Format",
+      run: createWrapSelectionOrWordCommand({
+        before: "==",
+        after: "==",
+        nodeName: "Highlight",
+      }),
+    },
+    {
+      id: "insert.image",
+      title: "Image link",
+      category: "Insert",
+      run: insertImageCommand,
+    },
+    {
+      id: "insert.table",
+      title: "Table",
+      category: "Insert",
+      run: insertTable,
+    },
+    {
+      id: "insert.footnote",
+      title: "Footnote",
+      category: "Insert",
+      run: insertFootnoteCommand,
+    },
+    {
+      id: "insert.math",
+      title: "Math expression",
+      category: "Insert",
+      run: createSnippetCommand("$e^{i\\pi} + 1 = 0$", 1),
+    },
+    {
+      id: "insert.frontmatter",
+      title: "Frontmatter",
+      category: "Insert",
+      run: (view) => {
+        const exists =
+          syntaxTree(view.state).topNode.firstChild?.name === "Frontmatter";
+        view.dispatch({
+          changes: exists
+            ? undefined
+            : { from: 0, insert: "---\ntitle: \ntags: []\n---\n\n" },
+          selection: { anchor: exists ? 4 : 11 },
+          userEvent: "input",
+          scrollIntoView: true,
+        });
+        view.focus();
+        return true;
+      },
+    },
+    ...(
+      [
+        "row.add",
+        "row.addAbove",
+        "row.delete",
+        "row.moveUp",
+        "row.moveDown",
+        "column.add",
+        "column.addLeft",
+        "column.delete",
+        "column.moveLeft",
+        "column.moveRight",
+        "delete",
+        "align.left",
+        "align.center",
+        "align.right",
+        "format",
+      ] as const
+    ).map((action) => ({
+      id: `table.${action}` as const,
+      title: {
+        "row.add": "Add row below",
+        "row.addAbove": "Add row above",
+        "row.delete": "Delete row",
+        "row.moveUp": "Move row up",
+        "row.moveDown": "Move row down",
+        "column.add": "Add column right",
+        "column.addLeft": "Add column left",
+        "column.delete": "Delete column",
+        "column.moveLeft": "Move column left",
+        "column.moveRight": "Move column right",
+        delete: "Delete table",
+        "align.left": "Align column left",
+        "align.center": "Align column center",
+        "align.right": "Align column right",
+        format: "Format table",
+      }[action],
+      category: "Table" as const,
+      run: tableCommand(action),
+    })),
+  ];
   const commands: CommandDefinition[] = [
+    ...themeOptions.map((theme) => ({
+      id: `theme.${theme}` as const,
+      title: `${themeDisplayName[theme]} theme`,
+      category: "Theme" as const,
+      run: (ctx: CommandRunContext) => {
+        ctx.setTheme(theme);
+        return true;
+      },
+    })),
+    {
+      id: "editor.followLink",
+      title: "Follow link",
+      category: "Edit",
+      requiresEditor: true,
+      defaultBinding: "mod+enter",
+      run: (ctx) => {
+        const view = ctx.getEditorView();
+        return view ? followSourceLink(activeTableCell(view) ?? view) : false;
+      },
+    },
+    ...formatting.map((item) => ({
+      id: item.id,
+      title: item.title,
+      category: item.category,
+      requiresEditor: true,
+      run: (ctx: CommandRunContext) => {
+        const view = ctx.getEditorView();
+        return view ? item.run(view) : false;
+      },
+    })),
+    {
+      id: "file.quickOpen",
+      title: "Quick open…",
+      category: "File",
+      defaultBinding: "mod+p",
+      settingsKey: "quickOpen",
+      isGlobal: true,
+      run: (ctx) => {
+        ctx.quickOpen();
+        return true;
+      },
+    },
+    {
+      id: "insert.attachImages",
+      title: "Attach images…",
+      category: "Insert",
+      requiresEditor: true,
+      run: async (ctx, args) => {
+        const view = ctx.getEditorView();
+        if (!view) return false;
+        await ctx.attachImages(
+          view,
+          args ? { kind: "files", files: args.files } : { kind: "choose" },
+        );
+        return true;
+      },
+    },
+    {
+      id: "insert.pasteImage",
+      title: "Paste image",
+      category: "Insert",
+      requiresEditor: true,
+      run: async (ctx) => {
+        const view = ctx.getEditorView();
+        if (!view) return false;
+        await ctx.attachImages(view, { kind: "clipboard" });
+        return true;
+      },
+    },
+    {
+      id: "app.commandPalette",
+      title: "Command palette",
+      category: "App",
+      defaultBinding: "mod+k",
+      alternateBindings: ["ctrl+k"],
+      settingsKey: "commandPalette",
+      isGlobal: true,
+      run: (ctx) => {
+        ctx.openCommandPalette();
+        return true;
+      },
+    },
     {
       id: "file.new",
       title: "New",
@@ -217,6 +468,7 @@ export const createCommandRegistry = (): CommandRegistry => {
     },
     {
       id: "file.save",
+      requiresEditor: true,
       title: "Save",
       category: "File",
       description: "Save the current file to disk.",
@@ -230,6 +482,7 @@ export const createCommandRegistry = (): CommandRegistry => {
     },
     {
       id: "file.saveAs",
+      requiresEditor: true,
       title: "Save As…",
       category: "File",
       description: "Save the current file with a new name.",
@@ -311,7 +564,7 @@ export const createCommandRegistry = (): CommandRegistry => {
       title: "Insert link",
       category: "Insert",
       description: "Create a Markdown link from the selection.",
-      defaultBinding: "mod+k",
+      defaultBinding: "mod+shift+k",
       settingsKey: "link",
       requiresEditor: true,
       run: (ctx) => {
@@ -447,7 +700,9 @@ export const createCommandRegistry = (): CommandRegistry => {
         if (!view) return false;
 
         // Toggle logic: if the search panel is already visible in this view, close it.
-        const isPanelVisible = view.dom.querySelector(".cm-search-panel-container");
+        const isPanelVisible = view.dom.querySelector(
+          ".cm-search-panel-container",
+        );
         if (isPanelVisible) {
           closeSearchPanel(view);
         } else {
@@ -458,6 +713,7 @@ export const createCommandRegistry = (): CommandRegistry => {
     },
     {
       id: "file.exportHtml",
+      requiresEditor: true,
       title: "Export to HTML",
       category: "File",
       description: "Save the current file as a styled HTML document.",
@@ -468,6 +724,7 @@ export const createCommandRegistry = (): CommandRegistry => {
     },
     {
       id: "file.exportPdf",
+      requiresEditor: true,
       title: "Export to PDF",
       category: "File",
       description: "Save the current file as a PDF document.",
@@ -505,7 +762,7 @@ export const createCommandRegistry = (): CommandRegistry => {
 export const resolveCommandBinding = (
   registry: CommandRegistry,
   id: CommandId,
-  settings: UserSettings
+  settings: UserSettings,
 ): string | null => {
   const cmd = registry.get(id);
   const raw = cmd.settingsKey
@@ -519,7 +776,7 @@ export const resolveCommandBinding = (
 export const resolveCommandShortcutLabel = (
   registry: CommandRegistry,
   id: CommandId,
-  settings: UserSettings
+  settings: UserSettings,
 ): string | null => {
   const binding = resolveCommandBinding(registry, id, settings);
   return binding ? formatBindingShortcut(binding) : null;
@@ -528,7 +785,7 @@ export const resolveCommandShortcutLabel = (
 export const resolveCommandCodeMirrorKey = (
   registry: CommandRegistry,
   id: CommandId,
-  settings: UserSettings
+  settings: UserSettings,
 ): string | null => {
   const binding = resolveCommandBinding(registry, id, settings);
   return binding ? bindingToCodeMirrorKey(binding) : null;
@@ -536,40 +793,138 @@ export const resolveCommandCodeMirrorKey = (
 
 export const createCommandRunner = (
   registry: CommandRegistry,
-  ctx: CommandRunContext
+  ctx: CommandRunContext,
 ) => {
-  const run = async <ID extends CommandId>(
-    id: ID,
-    ...args: CommandArgs[ID] extends void ? [] : [CommandArgs[ID]]
-  ): Promise<boolean> => {
-    const cmd = registry.get(id) as CommandDefinition<ID>;
-
-    // Automatic editor check
-    if (cmd.requiresEditor && !ctx.getEditorView()) {
-      return false;
+  const inlineCommands = new Set<CommandId>([
+    "format.bold",
+    "format.italic",
+    "format.strikethrough",
+    "format.highlight",
+    "format.inlineCode",
+    "insert.link",
+    "insert.image",
+    "insert.attachImages",
+    "insert.pasteImage",
+    "insert.math",
+  ]);
+  const canRun = (id: CommandId, view = ctx.getEditorView()): boolean => {
+    const cmd = registry.get(id);
+    if (cmd.requiresEditor && !view) return false;
+    if (!view) return !id.startsWith("table.");
+    const outer = tableCellOwners.get(view) ?? view;
+    if (id === "editor.followLink")
+      return sourceLink(activeTableCell(outer) ?? view) !== null;
+    const table = tableAt(outer);
+    if (id.startsWith("table.")) {
+      if (!table) return false;
+      if (id === "table.row.delete" && table.row < 2) return false;
+      if (id === "table.row.moveUp" && table.row <= 2) return false;
+      if (
+        id === "table.row.moveDown" &&
+        (table.row < 2 || table.row === table.rows.length - 1)
+      )
+        return false;
+      if (id === "table.column.moveLeft" && table.column === 0) return false;
+      if (
+        id === "table.column.moveRight" &&
+        table.column === table.rows[0].cells.length - 1
+      )
+        return false;
+      if (id === "table.column.delete" && table.rows[0].cells.length < 2)
+        return false;
+      return true;
     }
-
-    return await cmd.run(
-      ctx,
-      (args[0] as CommandArgs[ID]) ?? (undefined as CommandArgs[ID])
-    );
+    const structural =
+      id.startsWith("format.heading") ||
+      [
+        "format.paragraph",
+        "insert.unorderedList",
+        "insert.orderedList",
+        "insert.taskList",
+        "insert.taskCheck",
+        "insert.blockquote",
+        "insert.codeBlock",
+        "insert.horizontalRule",
+        "insert.table",
+        "insert.frontmatter",
+      ].includes(id);
+    if (
+      structural ||
+      ((inlineCommands.has(id) || id === "insert.footnote") &&
+        !activeTableCell(outer))
+    ) {
+      let overlaps = !!table;
+      const range = outer.state.selection.main;
+      syntaxTree(outer.state).iterate({
+        from: range.from,
+        to: range.to,
+        enter(node) {
+          if (node.name === "Table") {
+            overlaps = true;
+            return false;
+          }
+        },
+      });
+      if (overlaps) return false;
+    }
+    return true;
   };
-
-  const runWithView = async <ID extends CommandId>(
+  const execute = async (
+    context: CommandRunContext,
+    id: CommandId,
+    args?: unknown,
+  ): Promise<boolean> => {
+    const view = context.getEditorView();
+    if (!canRun(id, view)) return false;
+    const outer = view ? (tableCellOwners.get(view) ?? view) : null;
+    const inline = inlineCommands.has(id);
+    const target = outer && inline ? (activeTableCell(outer) ?? view) : outer;
+    context = { ...context, getEditorView: () => target };
+    const cmd = registry.get(id);
+    if (cmd.requiresEditor && !context.getEditorView()) return false;
+    if (cmd.id === "insert.attachImages") {
+      if (args === undefined) return cmd.run(context, undefined);
+      if (
+        !args ||
+        typeof args !== "object" ||
+        !("files" in args) ||
+        !Array.isArray(args.files) ||
+        !args.files.every((file) => file instanceof File)
+      )
+        return false;
+      return cmd.run(context, { files: args.files });
+    }
+    if (cmd.id === "theme.set") {
+      if (
+        !args ||
+        typeof args !== "object" ||
+        !("theme" in args) ||
+        typeof args.theme !== "string" ||
+        !isThemeName(args.theme)
+      )
+        return false;
+      return cmd.run(context, { theme: args.theme });
+    }
+    return cmd.run(context, undefined);
+  };
+  const run = <ID extends CommandId>(
+    id: ID,
+    ...args: undefined extends CommandArgs[ID]
+      ? [args?: CommandArgs[ID]]
+      : [CommandArgs[ID]]
+  ) => execute(ctx, id, args[0]);
+  const runWithView = <ID extends CommandId>(
     id: ID,
     view: EditorView,
-    ...args: CommandArgs[ID] extends void ? [] : [CommandArgs[ID]]
-  ): Promise<boolean> => {
-    const cmd = registry.get(id) as CommandDefinition<ID>;
-
-    return await cmd.run(
-      {
-        ...ctx,
-        getEditorView: () => view,
-      },
-      (args[0] as CommandArgs[ID]) ?? (undefined as CommandArgs[ID])
+    ...args: undefined extends CommandArgs[ID]
+      ? [args?: CommandArgs[ID]]
+      : [CommandArgs[ID]]
+  ) =>
+    execute(
+      { ...ctx, getEditorView: () => (ctx.getEditorView() ? view : null) },
+      id,
+      args[0],
     );
-  };
 
   const buildCodeMirrorKeymap = (settings: UserSettings): KeyBinding[] => {
     const keymap: KeyBinding[] = [];
@@ -598,7 +953,7 @@ export const createCommandRunner = (
 
   const findByBinding = (
     binding: string,
-    settings: UserSettings
+    settings: UserSettings,
   ): CommandId | null => {
     const normalized = normalizeBinding(binding);
     for (const cmd of registry.list()) {
@@ -606,6 +961,14 @@ export const createCommandRunner = (
       if (cmdBinding && cmdBinding === normalized) {
         return cmd.id;
       }
+    }
+    for (const cmd of registry.list()) {
+      if (
+        cmd.alternateBindings?.some(
+          (alias) => normalizeBinding(alias) === normalized,
+        )
+      )
+        return cmd.id;
     }
     return null;
   };
@@ -615,6 +978,7 @@ export const createCommandRunner = (
     runWithView,
     buildCodeMirrorKeymap,
     findByBinding,
+    canRun,
   };
 };
 

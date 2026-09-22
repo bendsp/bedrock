@@ -1,3 +1,4 @@
+import { redactTelemetry } from "../shared/telemetryPrivacy";
 import { app } from "electron";
 import * as Sentry from "@sentry/electron/main";
 import { BedrockRuntimeInfo } from "../shared/types";
@@ -18,7 +19,8 @@ const resolveEnvironment = (): string => {
 export const buildRuntimeInfo = (): BedrockRuntimeInfo => {
   const appVersion = app.getVersion();
   const environment = resolveEnvironment();
-  const sentryDsn = process.env.BEDROCK_E2E === "1" ? null : process.env.SENTRY_DSN ?? null;
+  const sentryDsn =
+    process.env.BEDROCK_E2E === "1" ? null : (process.env.SENTRY_DSN ?? null);
   const release = `bedrock@${appVersion}`;
 
   return {
@@ -39,6 +41,25 @@ export const initializeMainTelemetry = (): BedrockRuntimeInfo => {
   }
 
   Sentry.init({
+    sendDefaultPii: false,
+    attachScreenshot: false,
+    // Native dumps and local-variable capture can contain private note text.
+    integrations: (defaults) =>
+      defaults.filter(
+        (integration) =>
+          ![
+            "SentryMinidump",
+            "ElectronMinidump",
+            "Screenshots",
+            "LocalVariables",
+            "ContextLines",
+            "AdditionalContext",
+          ].includes(integration.name),
+      ),
+    beforeSend: (event, hint) => {
+      hint.attachments = [];
+      return redactTelemetry(event);
+    },
     dsn: runtimeInfo.sentryDsn ?? undefined,
     release: runtimeInfo.release,
     environment: runtimeInfo.environment,
@@ -55,7 +76,7 @@ export const initializeMainTelemetry = (): BedrockRuntimeInfo => {
 
 export const captureMainTelemetryMessage = (
   message: string,
-  extra?: Record<string, unknown>
+  extra?: Record<string, unknown>,
 ) => {
   const runtimeInfo = buildRuntimeInfo();
   if (!runtimeInfo.telemetryEnabled || runtimeInfo.e2eMode) {
@@ -73,7 +94,7 @@ export const captureMainTelemetryMessage = (
 
 export const captureMainTelemetryException = (
   error: unknown,
-  extra?: Record<string, unknown>
+  extra?: Record<string, unknown>,
 ) => {
   const runtimeInfo = buildRuntimeInfo();
   if (!runtimeInfo.telemetryEnabled || runtimeInfo.e2eMode) {

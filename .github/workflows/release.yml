@@ -6,112 +6,154 @@ on:
       - "*"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.ref_name }}
+
 jobs:
-  release:
-    runs-on: windows-latest
-    permissions:
-      contents: write
-
+  prepare:
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
-          fetch-depth: 0
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.32.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: "pnpm"
-
-      - name: Update version from tag (local build only)
-        run: pnpm version ${{ github.ref_name }} --no-git-tag-version
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build Windows App
-        run: pnpm build
+          node-version: 22.23.2
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Validate release tag
+        run: node scripts/release-version.mjs
+      - name: Refuse to modify a published release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Windows Installer
-        shell: bash
+          GH_TOKEN: ${{ github.token }}
         run: |
-          find out/make -name "Bedrock.exe" | xargs -I {} gh release upload ${{ github.ref_name }} "{}" --clobber
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          if gh release view "$RELEASE_TAG" --json isDraft > release.json; then
+            node -e 'if (!require("./release.json").isDraft) throw new Error("This release is already published")'
+          else
+            # Distinguish a missing release from authentication or network failures.
+            gh api "repos/$GITHUB_REPOSITORY/releases" > /dev/null
+          fi
 
-  release-mac:
-    runs-on: macos-latest
+  checks:
+    needs: prepare
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: checks
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
+          - os: macos-latest
+            platform: darwin
+            arch: x64
+          - os: windows-latest
+            platform: win32
+            arch: x64
+    runs-on: ${{ matrix.os }}
     environment: Build
-    permissions:
-      contents: write
-
+    timeout-minutes: 45
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
-          fetch-depth: 0
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.32.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: "pnpm"
-
-      - name: Update version from tag (local build only)
-        run: pnpm version ${{ github.ref_name }} --no-git-tag-version
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
+          node-version: 22.23.2
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Set version for this build only
+        run: node scripts/release-version.mjs
       - name: Import Apple Developer ID certificate
+        if: matrix.platform == 'darwin'
         uses: apple-actions/import-codesign-certs@v3
         with:
           p12-file-base64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
           p12-password: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-
-      - name: Write App Store Connect API key (.p8)
+      - name: Write notarization key
+        if: matrix.platform == 'darwin'
         shell: bash
-        run: |
-          python3 - <<'PY'
-          import base64
-          import os
-          from pathlib import Path
-
-          key_b64 = os.environ["APPLE_API_KEY_P8_BASE64"]
-          out = Path(os.environ["RUNNER_TEMP"]) / "appstoreconnect" / "AuthKey.p8"
-          out.parent.mkdir(parents=True, exist_ok=True)
-          out.write_bytes(base64.b64decode(key_b64))
-          out.chmod(0o600)
-          PY
         env:
           APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
-
-      - name: Build macOS app (signed + notarized)
-        run: pnpm make:mac
+        run: |
+          python3 - <<'PY'
+          import base64, os
+          from pathlib import Path
+          key = Path(os.environ['RUNNER_TEMP']) / 'AuthKey.p8'
+          key.write_bytes(base64.b64decode(os.environ['APPLE_API_KEY_P8_BASE64'], validate=True))
+          key.chmod(0o600)
+          PY
+      - name: Build macOS app and installers
+        if: matrix.platform == 'darwin'
+        run: pnpm exec electron-forge make --platform=darwin --arch=${{ matrix.arch }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BEDROCK_RELEASE: "1"
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_IDENTITY: ${{ secrets.APPLE_IDENTITY }}
-          APPLE_API_KEY: ${{ runner.temp }}/appstoreconnect/AuthKey.p8
+          APPLE_API_KEY: ${{ runner.temp }}/AuthKey.p8
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
-
-      - name: Upload macOS artifacts (.dmg, .zip)
+      - name: Verify macOS signature and stapled tickets
+        if: matrix.platform == 'darwin'
         shell: bash
         run: |
-          find out/make -name "*.dmg" -o -name "*.zip" | xargs -I {} gh release upload ${{ github.ref_name }} "{}" --clobber
+          APP="out/Bedrock-darwin-${{ matrix.arch }}/Bedrock.app"
+          codesign --verify --deep --strict "$APP"
+          spctl --assess --type execute --verbose "$APP"
+          xcrun stapler validate "$APP"
+          while IFS= read -r -d '' dmg; do
+            xcrun stapler validate "$dmg"
+          done < <(find out/make -name '*.dmg' -print0)
+      - name: Build Windows installer
+        if: matrix.platform == 'win32'
+        run: pnpm exec electron-forge make --platform=win32 --arch=x64
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BEDROCK_RELEASE: "1"
+      - name: Collect artifacts with unique names
+        shell: bash
+        env:
+          BUILD_PLATFORM: ${{ matrix.platform }}
+          BUILD_ARCH: ${{ matrix.arch }}
+        run: node scripts/release-artifacts.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}-${{ matrix.arch }}
+          path: release-artifacts/*
+          if-no-files-found: error
+      - name: Remove notarization key
+        if: always() && matrix.platform == 'darwin'
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/AuthKey.p8"
+
+  draft:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: artifacts
+      - name: Upload complete build to draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$RELEASE_TAG" --json isDraft > release.json; then
+            node -e 'if (!require("./release.json").isDraft) throw new Error("Refusing to change a published release")'
+          else
+            PRERELEASE=()
+            if [[ "$RELEASE_TAG" == *-* ]]; then PRERELEASE=(--prerelease); fi
+            gh release create "$RELEASE_TAG" --verify-tag --draft --generate-notes "${PRERELEASE[@]}"
+          fi
+          gh release upload "$RELEASE_TAG" artifacts/* --clobber

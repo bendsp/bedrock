@@ -1,6 +1,6 @@
-import type { Configuration } from "webpack";
+import { DefinePlugin, type Configuration } from "webpack";
 
-import { rules } from "./webpack.rules";
+import { rules, nativeRules } from "./webpack.rules";
 import { plugins } from "./webpack.plugins";
 
 export const mainConfig: Configuration = {
@@ -11,9 +11,11 @@ export const mainConfig: Configuration = {
   entry: "./src/main/index.ts",
   // Put your normal webpack config below here
   module: {
-    rules,
+    rules: [...nativeRules, ...rules, { test: /\.css$/, type: "asset/source" }],
   },
-  plugins,
+  plugins: [...plugins, new DefinePlugin({
+    BEDROCK_LOCAL_BUILD: JSON.stringify(process.env.BEDROCK_LOCAL_BUILD === "1"),
+  })],
   resolve: {
     extensions: [".js", ".ts", ".jsx", ".tsx", ".css", ".json"],
   },

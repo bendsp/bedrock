@@ -3,3 +3,17 @@ allowBuilds:
   electron-winstaller: true
   fs-xattr: true
   macos-alias: true
+
+# Forge 7 still pins older transitive packages. These retain the APIs Forge uses.
+overrides:
+  '@electron/rebuild>tar': ^7.5.21
+  'external-editor>tmp': ^0.2.6
+  '@electron-forge/plugin-webpack>webpack-dev-server': ^5.2.6
+  'express>qs': ^6.16.0
+  '@electron/node-gyp>tar': ^7.5.21
+  'body-parser>qs': ^6.16.0
+  'sockjs>uuid': ^11.1.1
+  'cacache>tar': ^7.5.21
+
+# Match the release and CI runtime, independent of the global Node installation.
+useNodeVersion: 22.23.2

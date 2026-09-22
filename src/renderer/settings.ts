@@ -2,6 +2,8 @@ import { ThemeName, isThemeName } from "./theme";
 import { RenderMode } from "../shared/types";
 
 export type KeyBindingAction =
+  | "quickOpen"
+  | "commandPalette"
   | "new"
   | "open"
   | "save"
@@ -34,6 +36,7 @@ export type UserSettings = {
   systemLightTheme: ThemeName;
   systemDarkTheme: ThemeName;
   renderMode: RenderMode;
+  /** Legacy setting retained when reading old profiles; startup now opens Home. */
   openLastFileOnStartup: boolean;
   lastOpenedFilePath: string | null;
 };
@@ -41,6 +44,8 @@ export type UserSettings = {
 const STORAGE_KEY = "bedrock:settings";
 
 export const defaultKeyBindings: KeyBindings = {
+  commandPalette: "mod+k",
+  quickOpen: "mod+p",
   new: "mod+n",
   open: "mod+o",
   save: "mod+s",
@@ -48,7 +53,7 @@ export const defaultKeyBindings: KeyBindings = {
   openSettings: "mod+,",
   bold: "mod+b",
   italic: "mod+i",
-  link: "mod+k",
+  link: "mod+shift+k",
   inlineCode: "mod+`",
   strikethrough: "mod+shift+x",
   undo: "mod+z",
@@ -71,14 +76,22 @@ export const defaultSettings: UserSettings = {
   systemLightTheme: "light",
   systemDarkTheme: "dark",
   renderMode: "hybrid",
-  openLastFileOnStartup: true,
+  openLastFileOnStartup: false,
   lastOpenedFilePath: null,
 };
 
 const normalizeKeyBindings = (
-  stored: Partial<KeyBindings> | undefined
+  stored: Partial<KeyBindings> | undefined,
 ): KeyBindings => {
   return {
+    quickOpen:
+      typeof stored?.quickOpen === "string"
+        ? stored.quickOpen
+        : defaultKeyBindings.quickOpen,
+    commandPalette:
+      typeof stored?.commandPalette === "string"
+        ? stored.commandPalette
+        : defaultKeyBindings.commandPalette,
     new:
       stored?.new && typeof stored.new === "string"
         ? stored.new
@@ -105,7 +118,9 @@ const normalizeKeyBindings = (
         : defaultKeyBindings.italic,
     link:
       stored?.link && typeof stored.link === "string"
-        ? stored.link
+        ? !stored.commandPalette && stored.link === "mod+k"
+          ? defaultKeyBindings.link
+          : stored.link
         : defaultKeyBindings.link,
     inlineCode:
       stored?.inlineCode && typeof stored.inlineCode === "string"

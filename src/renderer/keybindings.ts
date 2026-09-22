@@ -37,11 +37,11 @@ export const isModifierKey = (key: string): boolean => {
 export const normalizeBinding = (binding: string): string => {
   const rawParts = binding.split("+").map(normalizePart).filter(Boolean);
   const keyPart = rawParts.find(
-    (part) => !order.includes(part as (typeof order)[number])
+    (part) => !order.includes(part as (typeof order)[number]),
   );
 
   const modifiers = rawParts.filter((part) =>
-    order.includes(part as (typeof order)[number])
+    order.includes(part as (typeof order)[number]),
   );
 
   const sortedModifiers = order.filter((mod) => modifiers.includes(mod));
@@ -50,7 +50,7 @@ export const normalizeBinding = (binding: string): string => {
 };
 
 export const eventToBinding = (
-  event: KeyboardEvent | React.KeyboardEvent
+  event: KeyboardEvent | React.KeyboardEvent,
 ): string | null => {
   const key = event.key.toLowerCase();
 
@@ -65,9 +65,11 @@ export const eventToBinding = (
   }
 
   const parts: string[] = [];
-  if (event.metaKey || event.ctrlKey) {
+  const isMac = getPlatform().includes("Mac");
+  if (event.metaKey || (event.ctrlKey && !isMac)) {
     parts.push("mod");
   }
+  if (event.ctrlKey && isMac) parts.push("ctrl");
   if (event.altKey) {
     parts.push("alt");
   }
@@ -167,6 +169,8 @@ export const bindingToCodeMirrorKey = (binding: string): string => {
 };
 
 export const keyBindingLabels: Record<KeyBindingAction, string> = {
+  commandPalette: "Command palette",
+  quickOpen: "Quick open",
   new: "New file",
   open: "Open file",
   save: "Save file",
@@ -188,6 +192,8 @@ export const keyBindingLabels: Record<KeyBindingAction, string> = {
 };
 
 export const clampKeyBindings = (bindings: KeyBindings): KeyBindings => ({
+  commandPalette: normalizeBinding(bindings.commandPalette),
+  quickOpen: normalizeBinding(bindings.quickOpen),
   new: normalizeBinding(bindings.new),
   open: normalizeBinding(bindings.open),
   save: normalizeBinding(bindings.save),
@@ -213,7 +219,7 @@ export type KeyBindingConflicts = Partial<
 >;
 
 export const findKeyBindingConflicts = (
-  bindings: KeyBindings
+  bindings: KeyBindings,
 ): KeyBindingConflicts => {
   const groups = new Map<string, KeyBindingAction[]>();
 

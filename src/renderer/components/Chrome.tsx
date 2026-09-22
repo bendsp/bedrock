@@ -9,6 +9,7 @@ import {
   Share,
   FileCode,
   FileText,
+  House,
 } from "lucide-react";
 
 import { Button } from "./ui/button";
@@ -27,6 +28,9 @@ import {
 import type { SelectionStats } from "../../shared/types";
 
 export type ChromeProps = {
+  isHome: boolean;
+  busy: boolean;
+  onHome: () => void;
   title: string;
   stats: {
     words: number;
@@ -47,6 +51,9 @@ export type ChromeProps = {
 };
 
 export function Chrome({
+  isHome,
+  busy,
+  onHome,
   title,
   stats,
   selectionStats,
@@ -83,12 +90,21 @@ export function Chrome({
             <aside className="w-8 shrink-0 bg-transparent text-sidebar-foreground flex flex-col items-center py-2 gap-2">
               <Tooltip>
                 <TooltipTrigger asChild>
+                  <Button size="icon" variant={isHome ? "secondary" : "ghost"} className="size-8" aria-label="Home" aria-current={isHome ? "page" : undefined} disabled={busy} onClick={onHome}>
+                    <House />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Home</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
                   <Button
                     type="button"
                     size="icon"
                     variant="ghost"
                     className="h-8 w-8"
                     aria-label="New"
+                    disabled={busy}
                     onClick={onNew}
                   >
                     <FilePlus className="size-4" />
@@ -107,6 +123,7 @@ export function Chrome({
                     variant="ghost"
                     className="h-8 w-8"
                     aria-label="Open…"
+                    disabled={busy}
                     onClick={onOpen}
                   >
                     <FolderOpen className="size-4" />
@@ -117,6 +134,7 @@ export function Chrome({
                 </TooltipContent>
               </Tooltip>
 
+              {!isHome ? <>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -125,6 +143,7 @@ export function Chrome({
                     variant="ghost"
                     className="h-8 w-8"
                     aria-label="Save"
+                    disabled={busy}
                     onClick={onSave}
                   >
                     <Save className="size-4" />
@@ -143,6 +162,7 @@ export function Chrome({
                     variant="ghost"
                     className="h-8 w-8"
                     aria-label="Save As…"
+                    disabled={busy}
                     onClick={onSaveAs}
                   >
                     <SaveAll className="size-4" />
@@ -201,6 +221,7 @@ export function Chrome({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              </> : null}
 
               <div className="flex-1" />
               <Tooltip>
@@ -228,7 +249,7 @@ export function Chrome({
                   <div className="flex-1 min-h-0">{children}</div>
                 </div>
               </div>
-              <footer className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border px-4 text-xs tabular-nums text-muted-foreground">
+              {!isHome ? <footer className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border px-4 text-xs tabular-nums text-muted-foreground">
                 <span className="min-w-0 truncate">
                   {selectionStats?.hasSelection
                     ? `selection: ${selectionStats.words} words / ${selectionStats.chars} chars`
@@ -240,7 +261,7 @@ export function Chrome({
                   <span>{stats.chars} chars</span>
                   <span>{stats.readingMinutes} min read</span>
                 </div>
-              </footer>
+              </footer> : null}
             </div>
           </div>
         </div>

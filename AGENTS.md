@@ -4,7 +4,7 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
 
 ### What Bedrock Is
 
-- **Electron + React** text editor.
+- **Electron + React** local Markdown workspace with Home and a configurable root folder.
 - **Single-window** app.
 - The editor surface is **CodeMirror 6** (not a custom textarea editor).
 - Node integration is disabled in the renderer; all privileged work happens in the **main** process.
@@ -30,17 +30,24 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
 ### Renderer Composition
 
 - **App** (`src/renderer/app.tsx`)
-  - Owns app state: `doc`, file path, dirty state, settings, and theme.
+  - Owns Home/editor navigation, workspace info, document sessions, saved-content baseline, settings, and theme.
+  - Document-replacing operations lock editing; each opened document mounts a fresh editor state to isolate undo history.
   - Wires global shortcuts (open/save/settings) and updates the window title.
   - Passes a CodeMirror keymap + formatting helpers into the editor.
 - **Editor host component** (`src/renderer/components/CodeMirrorEditor.tsx`)
-  - Mounts an `EditorView` once.
+  - Mounts an `EditorView` once per document session.
   - Reconfigures compartments for render mode, theme, and keymap.
   - Synchronizes controlled `value` (string) with the CodeMirror document.
 - **CodeMirror implementation** (`src/renderer/editor/codemirror/*`)
   - `extensions.ts`: builds the extension bundle + update listeners.
-  - `hybridMarkdown.ts`: hybrid Markdown decorations (line + marker hiding).
-  - `commands.ts`: formatting commands (wrap selection/word, markdown link).
+  - `markdownLanguage.ts`: CommonMark/GFM plus highlight, footnote, math, and frontmatter syntax.
+  - `markdownDecorations.ts` / `markdownWidgets.ts`: visible syntax styling and cached safe previews.
+  - `richTables.ts` / `tables.ts`: always-rendered tables, one active cell editor, source-preserving row edits, shared undo.
+  - `markdownContext.ts`: cached document references and footnote numbering shared with cells.
+  - `documentText.ts`: LF editor state with original BOM and line-ending serialization.
+  - `hybridMarkdown.ts`: composes hybrid decorations. Tables remain outside the raw/hybrid compartment.
+  - `commands.ts`: source formatting operations.
+  - `src/renderer/commands/commandSystem.ts`: declared commands, availability, palette, shortcuts, and context menus.
   - `theme.ts`: CodeMirror theme bridge.
 
 ### Shared Types
@@ -93,6 +100,8 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
 ## Quick File Map
 
 - `src/main/index.ts`: Electron app bootstrap, menus, IPC, file IO.
+- `src/main/workspace.ts`: selected root pointer, exclusive note creation, and per-root recent-file JSON.
+- `src/renderer/components/Home.tsx`: first-use root setup and recently opened notes.
 - `src/main/preload.ts`: `window.electronAPI` bridge.
 - `src/renderer/renderer.ts`: renderer entrypoint.
 - `src/renderer/app.tsx`: React app root.
@@ -106,6 +115,20 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
 ---
 
 ## Scratchpad — Features & Changes
+
+- 2026-09-22: Replaced the placeholder with Ben's Icon Composer folder mark, preserving its sharp notch. Source is `src/assets/bedrock.icon`; `scripts/generate-icons.py` regenerates PNG, ICNS, and ICO. The Windows installer also uses the approved icon.
+
+- 2026-09-08: Added isolated `pnpm install:local` packaging and installation of Bedrock Dev with its own bundle ID and user data. CI is reusable and runs on main; releases require valid tags and passing checks, build both macOS architectures, validate signing/notarization, and upload a complete draft with checksums. Published releases are protected. See `docs/releases.md`; automatic updates and Windows signing remain unimplemented.
+
+- 2026-09-08: Added Cmd/Ctrl+P quick-open for workspace filenames, paths, and contents, plus paste/drop/attach image commands. `src/main/workspaceFiles.ts` owns bounded search and exclusive attachment writes; `QuickOpen.tsx` owns the search dialog. Images live in root `Attachments/` with links relative to the canonical note path. All entry points use the command registry. Added filesystem and Electron tests for portability, aliases, table-cell paste, dirty-state navigation, and IPC boundaries.
+
+- 2026-09-08: Added arrow entry/exit and cell navigation for rendered tables, including quotes, wrapped text, and virtual cells in short rows. Table spacing now uses measured padding to preserve cursor geometry below tables. Reference definitions retain paragraph boundaries and indentation; the command palette groups categories with a compact search layout. Follow-up coverage: `tests/e2e/navigation.e2e.spec.ts`.
+
+- 2026-09-08: Markdown core pass added persistent active heading styles, nested inline formatting, parser-based lists/tasks/rules/fences, images, references, footnotes, math, safe HTML, frontmatter, and a shared command palette. Tables stay rendered in both modes and support cell editing, spreadsheet paste, row/column operations, and shared undo. File writes and exports are atomic, external edits are protected, original text encoding markers/line endings/permissions are preserved, IPC is restricted to the trusted frame, Electron is updated, and telemetry omits private note data. See `docs/quality/core-pass.md` for validation and remaining release constraints.
+
+- 2026-09-07: Forge selects available renderer and logger development ports starting at 3000 and 9000 so other local servers do not block startup.
+
+- 2026-09-06: Added first-use root selection with Documents/Bedrock suggestion, Settings → Files, root-scoped note creation and recent-file data, and Home as the normal start screen. Root switches preserve existing files. Document sessions isolate undo; saved-content comparison protects identical-content opens; navigation locks editing and serializes Finder opens. Added workspace persistence/failure and Electron workflow tests.
 
 - 2025-11-10: Created `AGENTS.md` with architecture overview and contribution rules.
 - 2025-11-10: Added scratchpad section and rule to keep it updated.

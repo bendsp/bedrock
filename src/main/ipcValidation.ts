@@ -1,7 +1,13 @@
 import { ExportFilePayload, SaveFilePayload } from "../shared/types";
 
-export const MAX_MARKDOWN_FILE_BYTES = 10 * 1024 * 1024;
-export const MAX_EXPORT_HTML_BYTES = 25 * 1024 * 1024;
+import {
+  MAX_MARKDOWN_FILE_BYTES,
+  MAX_EXPORT_HTML_BYTES,
+} from "../shared/limits";
+export {
+  MAX_MARKDOWN_FILE_BYTES,
+  MAX_EXPORT_HTML_BYTES,
+} from "../shared/limits";
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === "object" && value !== null;
@@ -12,12 +18,11 @@ const hasOwn = (value: Record<string, unknown>, key: string): boolean => {
 };
 
 type ValidationResult<T> =
-  | { ok: true; payload: T }
-  | { ok: false; message: string };
+  { ok: true; payload: T } | { ok: false; message: string };
 
 export const hasReasonableContentSize = (
   content: unknown,
-  maxBytes: number
+  maxBytes: number,
 ): content is string => {
   return (
     typeof content === "string" &&
@@ -26,14 +31,14 @@ export const hasReasonableContentSize = (
 };
 
 export const normalizeSaveFilePayload = (
-  payload: unknown
+  payload: unknown,
 ): SaveFilePayload | null => {
   const result = validateSaveFilePayload(payload);
   return result.ok ? result.payload : null;
 };
 
 export const validateSaveFilePayload = (
-  payload: unknown
+  payload: unknown,
 ): ValidationResult<SaveFilePayload> => {
   if (!isRecord(payload)) {
     return { ok: false, message: "Invalid save payload." };
@@ -71,14 +76,14 @@ export const validateSaveFilePayload = (
 };
 
 export const normalizeExportFilePayload = (
-  payload: unknown
+  payload: unknown,
 ): ExportFilePayload | null => {
   const result = validateExportFilePayload(payload);
   return result.ok ? result.payload : null;
 };
 
 export const validateExportFilePayload = (
-  payload: unknown
+  payload: unknown,
 ): ValidationResult<ExportFilePayload> => {
   if (!isRecord(payload)) {
     return { ok: false, message: "Invalid export payload." };
@@ -123,7 +128,7 @@ export const validateExportFilePayload = (
 };
 
 export const safeExportBaseName = (
-  defaultFileName: string | undefined
+  defaultFileName: string | undefined,
 ): string => {
   const rawName = defaultFileName || "Exported";
   const lastSegment = rawName.split(/[\\/]/).pop() ?? "";
@@ -131,7 +136,7 @@ export const safeExportBaseName = (
   const reservedCharacters = '<>:"|?*';
   const sanitized = [...withoutExtension]
     .map((char) =>
-      char.charCodeAt(0) < 32 || reservedCharacters.includes(char) ? "-" : char
+      char.charCodeAt(0) < 32 || reservedCharacters.includes(char) ? "-" : char,
     )
     .join("")
     .replace(/[ .]+$/g, "");

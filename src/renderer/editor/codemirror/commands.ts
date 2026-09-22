@@ -1,3 +1,4 @@
+import { EditorSelection, ChangeSpec } from "@codemirror/state";
 import { KeyBinding } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import type { SyntaxNode } from "@lezer/common";
@@ -36,255 +37,120 @@ const findNodeInRange = (
   view: import("@codemirror/view").EditorView,
   from: number,
   to: number,
-  nodeName: string
+  name: string,
 ): SyntaxNode | null => {
-  const tree = syntaxTree(view.state);
-  // Check a bit inside the range to avoid boundary issues,
-  // but also handle empty selections.
-  const pos = from === to ? from : from + 1;
-  let node = tree.resolveInner(pos, 1);
+  let node: SyntaxNode | null = syntaxTree(view.state).resolveInner(
+    from === to ? from : from + 1,
+    1,
+  );
   while (node) {
-    if (node.name === nodeName) {
-      // Check if this node encompasses our selection/word range
-      if (node.from <= from && node.to >= to) {
-        return node;
-      }
-    }
+    if (node.name === name && node.from <= from && node.to >= to) return node;
     node = node.parent;
   }
   return null;
 };
 
-/**
- * Wraps the current selection with a prefix/suffix. If there's no selection,
- * inserts a snippet and places the cursor inside it.
- */
-export const createWrapSelectionCommand =
-  ({
-    before,
-    after,
-    nodeName,
-    emptySnippet = `${before}${after}`,
-    emptyCursorOffset = before.length,
-  }: WrapSelectionOptions) =>
+const wrap =
+  (options: WrapSelectionOptions, word: boolean) =>
   (view: import("@codemirror/view").EditorView): boolean => {
-    let { from, to } = view.state.selection.main;
-
-    // Toggle logic if nodeName is provided
-    if (nodeName) {
-      const node = findNodeInRange(view, from, to, nodeName);
-      if (node) {
-        // Find the markers. We assume they are at the very start and end of the node.
-        // For standard markdown, this is usually true.
-        const content = view.state.doc.sliceString(node.from, node.to);
-        // We need to determine how many chars to remove from start and end.
-        // If it's StrongEmphasis, it's usually 2. If Emphasis, it's 1.
-        // We can use before.length and after.length as a guide.
-        const markerBeforeLen = before.length;
-        const markerAfterLen = after.length;
-
-        const newText = content.slice(
-          markerBeforeLen,
-          content.length - markerAfterLen
-        );
+    const state = view.state;
+    let { from, to } = state.selection.main;
+    const node = options.nodeName
+      ? findNodeInRange(view, from, to, options.nodeName)
+      : null;
+    if (node) {
+      const first = node.firstChild,
+        last = node.lastChild;
+      if (
+        first &&
+        last &&
+        first !== last &&
+        /Mark$/.test(first.name) &&
+        /Mark$/.test(last.name)
+      ) {
+        const content = state.doc.sliceString(first.to, last.from);
+        const padding =
+          options.nodeName === "InlineCode" &&
+          content.startsWith(" ") &&
+          content.endsWith(" ") &&
+          content.trim()
+            ? 1
+            : 0;
+        const changes = state.changes([
+          { from: first.from, to: first.to + padding },
+          { from: last.from - padding, to: last.to },
+        ]);
         view.dispatch({
-          changes: { from: node.from, to: node.to, insert: newText },
-          selection: {
-            anchor: node.from,
-            head: node.from + newText.length,
-          },
+          changes,
+          selection: state.selection.map(changes),
           scrollIntoView: true,
+          userEvent: "input.format",
         });
         return true;
       }
     }
-
+    if (from === to && word) {
+      const range =
+        state.wordAt(from) ?? (from ? state.wordAt(from - 1) : null);
+      if (range) {
+        from = range.from;
+        to = range.to;
+      }
+    }
     if (from === to) {
+      const snippet =
+        options.emptySnippet ?? `${options.before}${options.after}`;
       view.dispatch({
-        changes: { from, to, insert: emptySnippet },
-        selection: { anchor: from + emptyCursorOffset },
-        scrollIntoView: true,
-      });
-      return true;
-    }
-
-    let selectedText = view.state.doc.sliceString(from, to);
-
-    // Trim whitespace from the selection so that markers "stick" to the text.
-    const trimmedStart = selectedText.length - selectedText.trimStart().length;
-    const trimmedEnd = selectedText.length - selectedText.trimEnd().length;
-
-    // Only apply trimming if there's actual text remaining
-    if (trimmedStart + trimmedEnd < selectedText.length) {
-      from += trimmedStart;
-      to -= trimmedEnd;
-      selectedText = selectedText.trim();
-    }
-
-    const insert = `${before}${selectedText}${after}`;
-
-    view.dispatch({
-      changes: { from, to, insert },
-      selection: {
-        anchor: from + before.length,
-        head: from + before.length + selectedText.length,
-      },
-      scrollIntoView: true,
-    });
-    return true;
-  };
-
-type WrapSelectionOrWordOptions = WrapSelectionOptions & {
-  /**
-   * When there is no selection, try to expand to the word at/near the cursor.
-   * If no word is found, falls back to inserting `emptySnippet`.
-   *
-   * Defaults to true.
-   */
-  wrapWordWhenEmpty?: boolean;
-};
-
-const isWordChar = (ch: string): boolean => /[A-Za-z0-9_]/.test(ch);
-
-const getWordRangeAt = (
-  view: import("@codemirror/view").EditorView,
-  pos: number
-): { from: number; to: number } | null => {
-  const doc = view.state.doc;
-  const line = doc.lineAt(pos);
-  const text = line.text;
-  if (text.length === 0) {
-    return null;
-  }
-
-  let idx = pos - line.from;
-  // If the cursor is on whitespace/punctuation, but just after a word,
-  // prefer the word immediately to the left (common when right-clicking).
-  if ((idx >= text.length || !isWordChar(text[idx] ?? "")) && idx > 0) {
-    if (isWordChar(text[idx - 1] ?? "")) {
-      idx = idx - 1;
-    }
-  }
-
-  if (idx < 0 || idx >= text.length || !isWordChar(text[idx] ?? "")) {
-    return null;
-  }
-
-  let start = idx;
-  let end = idx + 1;
-  while (start > 0 && isWordChar(text[start - 1] ?? "")) {
-    start--;
-  }
-  while (end < text.length && isWordChar(text[end] ?? "")) {
-    end++;
-  }
-
-  return { from: line.from + start, to: line.from + end };
-};
-
-/**
- * Wraps the current selection with a prefix/suffix. If there's no selection,
- * tries to wrap the word at/near the cursor; if none, inserts `emptySnippet`.
- */
-export const createWrapSelectionOrWordCommand =
-  ({
-    before,
-    after,
-    nodeName,
-    emptySnippet = `${before}${after}`,
-    emptyCursorOffset = before.length,
-    wrapWordWhenEmpty = true,
-  }: WrapSelectionOrWordOptions) =>
-  (view: import("@codemirror/view").EditorView): boolean => {
-    let { from, to } = view.state.selection.main;
-
-    // Toggle logic if nodeName is provided
-    if (nodeName) {
-      // First check if the selection is already within the node
-      let node = findNodeInRange(view, from, to, nodeName);
-
-      // If no selection and we should wrap word, check if the word is already within the node
-      if (!node && from === to && wrapWordWhenEmpty) {
-        const wordRange = getWordRangeAt(view, from);
-        if (wordRange) {
-          node = findNodeInRange(view, wordRange.from, wordRange.to, nodeName);
-        }
-      }
-
-      if (node) {
-        const content = view.state.doc.sliceString(node.from, node.to);
-        const markerBeforeLen = before.length;
-        const markerAfterLen = after.length;
-        const newText = content.slice(
-          markerBeforeLen,
-          content.length - markerAfterLen
-        );
-        view.dispatch({
-          changes: { from: node.from, to: node.to, insert: newText },
-          selection: {
-            anchor: node.from,
-            head: node.from + newText.length,
-          },
-          scrollIntoView: true,
-        });
-        return true;
-      }
-    }
-
-    if (from !== to) {
-      let selectedText = view.state.doc.sliceString(from, to);
-
-      // Trim whitespace from the selection so that markers "stick" to the text.
-      const trimmedStart =
-        selectedText.length - selectedText.trimStart().length;
-      const trimmedEnd = selectedText.length - selectedText.trimEnd().length;
-
-      // Only apply trimming if there's actual text remaining
-      if (trimmedStart + trimmedEnd < selectedText.length) {
-        from += trimmedStart;
-        to -= trimmedEnd;
-        selectedText = selectedText.trim();
-      }
-
-      const insert = `${before}${selectedText}${after}`;
-      view.dispatch({
-        changes: { from, to, insert },
+        changes: { from, to, insert: snippet },
         selection: {
-          anchor: from + before.length,
-          head: from + before.length + selectedText.length,
+          anchor: from + (options.emptyCursorOffset ?? options.before.length),
         },
         scrollIntoView: true,
+        userEvent: "input.format",
       });
       return true;
     }
-
-    if (wrapWordWhenEmpty) {
-      const wordRange = getWordRangeAt(view, from);
-      if (wordRange) {
-        const word = view.state.doc.sliceString(wordRange.from, wordRange.to);
-        const insert = `${before}${word}${after}`;
-        view.dispatch({
-          changes: { from: wordRange.from, to: wordRange.to, insert },
-          selection: {
-            anchor: wordRange.from + before.length,
-            head: wordRange.from + before.length + word.length,
-          },
-          scrollIntoView: true,
-        });
-        return true;
-      }
+    let text = state.doc.sliceString(from, to);
+    if (text.trim()) {
+      from += text.length - text.trimStart().length;
+      to -= text.length - text.trimEnd().length;
+      text = text.trim();
     }
-
+    let before = options.before,
+      after = options.after;
+    if (options.nodeName === "InlineCode") {
+      const longest = Math.max(
+        0,
+        ...(text.match(/`+/g) ?? []).map((run) => run.length),
+      );
+      const fence = "`".repeat(longest + 1);
+      const pad =
+        /^`|`$/.test(text) ||
+        (text.startsWith(" ") && text.endsWith(" ") && text.trim())
+          ? " "
+          : "";
+      before = fence + pad;
+      after = pad + fence;
+    }
     view.dispatch({
-      changes: { from, to, insert: emptySnippet },
-      selection: { anchor: from + emptyCursorOffset },
+      changes: { from, to, insert: `${before}${text}${after}` },
+      selection: {
+        anchor: from + before.length,
+        head: from + before.length + text.length,
+      },
       scrollIntoView: true,
+      userEvent: "input.format",
     });
     return true;
   };
+export const createWrapSelectionCommand = (options: WrapSelectionOptions) =>
+  wrap(options, false);
+export const createWrapSelectionOrWordCommand = (
+  options: WrapSelectionOptions & { wrapWordWhenEmpty?: boolean },
+) => wrap(options, options.wrapWordWhenEmpty !== false);
 
 export const createMarkdownLinkCommand = (
-  view: import("@codemirror/view").EditorView
+  view: import("@codemirror/view").EditorView,
 ): boolean => {
   let { from, to } = view.state.selection.main;
   const urlPlaceholder = "https://";
@@ -324,7 +190,7 @@ export const createMarkdownLinkCommand = (
 };
 
 export const insertHorizontalRuleCommand = (
-  view: import("@codemirror/view").EditorView
+  view: import("@codemirror/view").EditorView,
 ): boolean => {
   const { from } = view.state.selection.main;
   const line = view.state.doc.lineAt(from);
@@ -380,217 +246,134 @@ type LinePrefixOptions = {
   prefixForLine: (lineIndex: number) => string;
 };
 
-const isFenceDelimiterLine = (text: string): boolean => {
-  return /^```/.test(text.trim());
-};
-
-const isInsideFencedCode = (
-  doc: import("@codemirror/state").Text,
-  lineNumber: number
-): boolean => {
-  let inFence = false;
-  for (let currentLine = 1; currentLine < lineNumber; currentLine += 1) {
-    if (isFenceDelimiterLine(doc.line(currentLine).text)) {
-      inFence = !inFence;
-    }
-  }
-  return inFence;
-};
-
-const previousNonBlankLineText = (
-  doc: import("@codemirror/state").Text,
-  lineNumber: number
-): string | null => {
-  for (let currentLine = lineNumber - 1; currentLine >= 1; currentLine -= 1) {
-    const text = doc.line(currentLine).text;
-    if (text.trim() !== "") {
-      return text;
-    }
-  }
-  return null;
-};
-
-const isLikelyIndentedCodeLine = (
-  doc: import("@codemirror/state").Text,
-  lineNumber: number,
-  indent: string
-): boolean => {
-  if (indent.length < 4) {
-    return false;
-  }
-  const previousLine = previousNonBlankLineText(doc, lineNumber);
-  return previousLine === null || !/^\s*(?:[-*+]|\d+[.)])\s+/.test(previousLine);
-};
-
 const getSelectedLineNumbers = (
-  view: import("@codemirror/view").EditorView
-): { start: number; end: number } => {
+  view: import("@codemirror/view").EditorView,
+) => {
   const { from, to } = view.state.selection.main;
-  const doc = view.state.doc;
-  const start = doc.lineAt(from).number;
-  const endPos = to > from ? to - 1 : to;
-  const end = doc.lineAt(Math.max(0, endPos)).number;
-  return { start, end };
+  return {
+    start: view.state.doc.lineAt(from).number,
+    end: view.state.doc.lineAt(to > from ? to - 1 : to).number,
+  };
 };
+
+function dispatchLineChanges(
+  view: import("@codemirror/view").EditorView,
+  specs: ChangeSpec,
+) {
+  const changes = view.state.changes(specs);
+  const selection = EditorSelection.create(
+    view.state.selection.ranges.map((range) =>
+      EditorSelection.range(
+        changes.mapPos(range.anchor, 1),
+        changes.mapPos(range.head, 1),
+      ),
+    ),
+    view.state.selection.mainIndex,
+  );
+  view.dispatch({
+    changes,
+    selection,
+    scrollIntoView: true,
+    userEvent: "input.format",
+  });
+}
+
+/** Container markers belong to the quote/list, not to the text being formatted. */
+function lineContentStart(
+  view: import("@codemirror/view").EditorView,
+  number: number,
+  includeList = true,
+): number {
+  const line = view.state.doc.line(number);
+  let start = line.from + (line.text.match(/^[ \t]*/)?.[0].length ?? 0);
+  syntaxTree(view.state).iterate({
+    from: line.from,
+    to: line.to,
+    enter(node) {
+      if (
+        node.from >= line.from &&
+        node.to <= line.to &&
+        (node.name === "QuoteMark" || (includeList && node.name === "ListMark"))
+      )
+        start = Math.max(start, node.to);
+    },
+  });
+  while (
+    start < line.to &&
+    /[ \t]/.test(view.state.doc.sliceString(start, start + 1))
+  )
+    start++;
+  return start;
+}
 
 const toggleLinePrefix = (
   view: import("@codemirror/view").EditorView,
-  options: LinePrefixOptions
+  options: LinePrefixOptions,
 ): boolean => {
   const { start, end } = getSelectedLineNumbers(view);
+  const quote = options.prefixForLine(0) === "> ";
   const lines = [];
-  for (let lineNumber = start; lineNumber <= end; lineNumber += 1) {
-    const line = view.state.doc.line(lineNumber);
-    lines.push(line);
+  for (let n = start; n <= end; n++) {
+    const line = view.state.doc.line(n);
+    let node: SyntaxNode | null = syntaxTree(view.state).resolveInner(
+      line.to,
+      -1,
+    );
+    while (
+      node &&
+      !["FencedCode", "CodeBlock", "Frontmatter"].includes(node.name)
+    )
+      node = node.parent;
+    if (node) continue;
+    // Quote toggles operate on the outermost quote; lists keep all quote markers.
+    const from = quote
+      ? line.from + (line.text.match(/^[ \t]*/)?.[0].length ?? 0)
+      : lineContentStart(view, n, false);
+    if (line.text.trim() || start === end)
+      lines.push({
+        line,
+        from,
+        text: view.state.doc.sliceString(from, line.to),
+      });
   }
-
-  const actionableLines = lines.filter((line) => line.text.trim() !== "");
-  if (actionableLines.length === 0) {
-    const line = view.state.doc.line(start);
-    const indent = line.text.match(/^\s*/)?.[0] ?? "";
-    view.dispatch({
-      changes: {
-        from: line.from,
-        to: line.from + indent.length,
-        insert: `${indent}${options.prefixForLine(0)}`,
-      },
-      scrollIntoView: true,
-    });
-    return true;
-  }
-
-  const allPrefixed = actionableLines.every((line) =>
-    options.match.test(line.text)
-  );
-
-  const changes = actionableLines.map((line, index) => {
-    const match = line.text.match(options.match);
-    if (allPrefixed && match) {
-      const markerStart = line.text.match(/^\s*/)?.[0].length ?? 0;
+  if (!lines.length) return false;
+  const remove = lines.every((item) => options.match.test(item.text));
+  dispatchLineChanges(
+    view,
+    lines.map((item, index) => {
+      const marker = remove
+        ? item.text.match(options.match)
+        : quote
+          ? null
+          : item.text.match(/^(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?/);
       return {
-        from: line.from + markerStart,
-        to: line.from + match[0].length,
-        insert: "",
+        from: item.from,
+        to: item.from + (marker?.[0].length ?? 0),
+        insert: remove ? "" : options.prefixForLine(index),
       };
-    }
-
-    const indent = line.text.match(/^\s*/)?.[0] ?? "";
-    return {
-      from: line.from + indent.length,
-      to: line.from + indent.length,
-      insert: options.prefixForLine(index),
-    };
-  });
-
-  view.dispatch({
-    changes,
-    scrollIntoView: true,
-  });
-
+    }),
+  );
   return true;
 };
 
 export const toggleUnorderedListCommand = (
-  view: import("@codemirror/view").EditorView
+  view: import("@codemirror/view").EditorView,
 ): boolean =>
   toggleLinePrefix(view, {
-    match: /^\s*(?:[-*+]\s+)/,
+    match: /^\s*(?:[-*+]\s+)(?!\[[ xX]\]\s)/,
     prefixForLine: () => "- ",
   });
 
-export const continueUnorderedListCommand = (
-  view: import("@codemirror/view").EditorView
-): boolean => {
-  const { from, to } = view.state.selection.main;
-  if (from !== to) {
-    return false;
-  }
-
-  const line = view.state.doc.lineAt(from);
-  const match = line.text.match(/^(\s*)([-*+])\s+(.*)$/);
-  if (!match) {
-    return false;
-  }
-
-  const [, indent, marker, content] = match;
-  if (
-    /^(\s*)[-*+]\s+\[[ xX]\]\s+/.test(line.text) ||
-    isInsideFencedCode(view.state.doc, line.number) ||
-    isLikelyIndentedCodeLine(view.state.doc, line.number, indent)
-  ) {
-    return false;
-  }
-
-  if (content.trim() === "") {
-    view.dispatch({
-      changes: {
-        from: line.from,
-        to: line.to,
-        insert: indent,
-      },
-      selection: { anchor: line.from + indent.length },
-      scrollIntoView: true,
-    });
-    return true;
-  }
-
-  const insert = `\n${indent}${marker} `;
-  view.dispatch({
-    changes: { from, to, insert },
-    selection: { anchor: from + insert.length },
-    scrollIntoView: true,
-  });
-  return true;
-};
-
 export const toggleOrderedListCommand = (
-  view: import("@codemirror/view").EditorView
+  view: import("@codemirror/view").EditorView,
 ): boolean =>
   toggleLinePrefix(view, {
     match: /^\s*(?:\d+[.)]\s+)/,
     prefixForLine: (lineIndex) => `${lineIndex + 1}. `,
   });
 
-export const continueOrderedListCommand = (
-  view: import("@codemirror/view").EditorView
-): boolean => {
-  const { from, to } = view.state.selection.main;
-  if (from !== to) {
-    return false;
-  }
-
-  const line = view.state.doc.lineAt(from);
-  const match = line.text.match(/^(\s*)(\d+)([.)])\s+(.*)$/);
-  if (!match) {
-    return false;
-  }
-
-  const [, indent, numberText, delimiter, content] = match;
-  if (content.trim() === "") {
-    view.dispatch({
-      changes: {
-        from: line.from,
-        to: line.to,
-        insert: indent,
-      },
-      selection: { anchor: line.from + indent.length },
-      scrollIntoView: true,
-    });
-    return true;
-  }
-
-  const nextNumber = Number.parseInt(numberText, 10) + 1;
-  const insert = `\n${indent}${nextNumber}${delimiter} `;
-  view.dispatch({
-    changes: { from, to, insert },
-    selection: { anchor: from + insert.length },
-    scrollIntoView: true,
-  });
-  return true;
-};
-
 export const toggleTaskListCommand = (
-  view: import("@codemirror/view").EditorView
+  view: import("@codemirror/view").EditorView,
 ): boolean =>
   toggleLinePrefix(view, {
     match: /^\s*(?:[-*+]\s+\[[ xX]\]\s+)/,
@@ -598,147 +381,109 @@ export const toggleTaskListCommand = (
   });
 
 export const toggleTaskCheckCommand = (
-  view: import("@codemirror/view").EditorView
+  view: import("@codemirror/view").EditorView,
+  from?: number,
+  to = from,
 ): boolean => {
-  const { start, end } = getSelectedLineNumbers(view);
-  const taskLines = [];
-
-  for (let lineNumber = start; lineNumber <= end; lineNumber += 1) {
-    const line = view.state.doc.line(lineNumber);
-    const match = line.text.match(/^(\s*[-*+]\s+\[)([ xX])(\]\s+)/);
-    if (match) {
-      taskLines.push({ line, match });
-    }
-  }
-
-  if (taskLines.length === 0) {
-    return false;
-  }
-
-  const shouldUncheck = taskLines.every(({ match }) =>
-    /[xX]/.test(match[2])
-  );
-  const changes = taskLines.map(({ line, match }) => {
-    const markerOffset = match[1].length;
-    return {
-      from: line.from + markerOffset,
-      to: line.from + markerOffset + 1,
-      insert: shouldUncheck ? " " : "x",
-    };
+  const { start, end } =
+    from === undefined
+      ? getSelectedLineNumbers(view)
+      : {
+          start: view.state.doc.lineAt(from).number,
+          end: view.state.doc.lineAt(to ?? from).number,
+        };
+  const markers: Array<{ from: number; to: number; checked: boolean }> = [];
+  syntaxTree(view.state).iterate({
+    from: view.state.doc.line(start).from,
+    to: view.state.doc.line(end).to,
+    enter(node) {
+      if (node.name === "TaskMarker")
+        markers.push({
+          from: node.from + 1,
+          to: node.to - 1,
+          checked: /[xX]/.test(view.state.doc.sliceString(node.from, node.to)),
+        });
+    },
   });
-
+  if (!markers.length) return false;
+  const checked = !markers.every((marker) => marker.checked);
   view.dispatch({
-    changes,
-    scrollIntoView: true,
+    changes: markers.map((marker) => ({
+      from: marker.from,
+      to: marker.to,
+      insert: checked ? "x" : " ",
+    })),
+    userEvent: "input.format",
   });
   return true;
 };
 
 export const toggleBlockquoteCommand = (
-  view: import("@codemirror/view").EditorView
+  view: import("@codemirror/view").EditorView,
 ): boolean =>
   toggleLinePrefix(view, {
     match: /^\s*(?:>\s?)/,
     prefixForLine: () => "> ",
   });
 
-export const continueBlockquoteCommand = (
-  view: import("@codemirror/view").EditorView
-): boolean => {
-  const { from, to } = view.state.selection.main;
-  if (from !== to) {
-    return false;
-  }
-
-  const line = view.state.doc.lineAt(from);
-  const match = line.text.match(/^(\s*(?:>\s*)+)(.*)$/);
-  if (!match) {
-    return false;
-  }
-
-  const [, marker, content] = match;
-  const indent = line.text.match(/^\s*/)?.[0] ?? "";
-  if (indent.length >= 4 || isInsideFencedCode(view.state.doc, line.number)) {
-    return false;
-  }
-
-  if (content.trim() === "") {
-    view.dispatch({
-      changes: {
-        from: line.from,
-        to: line.to,
-        insert: indent,
-      },
-      selection: { anchor: line.from + indent.length },
-      scrollIntoView: true,
-    });
-    return true;
-  }
-
-  const insert = `\n${marker}`;
-  view.dispatch({
-    changes: { from, to, insert },
-    selection: { anchor: from + insert.length },
-    scrollIntoView: true,
-  });
-  return true;
-};
-
 export const toggleFencedCodeBlockCommand = (
-  view: import("@codemirror/view").EditorView
+  view: import("@codemirror/view").EditorView,
 ): boolean => {
   const { from, to } = view.state.selection.main;
-  const { start, end } = getSelectedLineNumbers(view);
+  let node: SyntaxNode | null = syntaxTree(view.state).resolveInner(from, 1);
+  while (node && node.name !== "FencedCode") node = node.parent;
   const doc = view.state.doc;
-  const firstLine = doc.line(start);
-  const lastLine = doc.line(end);
-  const hasFenceWrapper =
-    start < end &&
-    firstLine.text.trim().startsWith("```") &&
-    lastLine.text.trim().startsWith("```");
-
-  if (hasFenceWrapper) {
-    const innerFrom = Math.min(firstLine.to + 1, doc.length);
-    const innerTo = Math.max(innerFrom, lastLine.from - 1);
-    const inner = doc.sliceString(innerFrom, innerTo);
-
-    view.dispatch({
-      changes: { from: firstLine.from, to: lastLine.to, insert: inner },
-      scrollIntoView: true,
-    });
-    return true;
+  if (node && node.to >= to) {
+    const marks = node.getChildren("CodeMark");
+    if (marks.length === 2) {
+      const first = doc.lineAt(marks[0].from),
+        last = doc.lineAt(marks[1].from);
+      const innerFrom = Math.min(first.to + 1, doc.length),
+        innerTo = Math.max(innerFrom, last.from - 1);
+      const firstPrefix = doc.sliceString(first.from, marks[0].from);
+      const lastPrefix = doc.sliceString(last.from, marks[1].from);
+      const lines = doc.sliceString(innerFrom, innerTo).split("\n");
+      if (lines[0]?.startsWith(lastPrefix))
+        lines[0] = firstPrefix + lines[0].slice(lastPrefix.length);
+      else if (firstPrefix) lines[0] = firstPrefix + lines[0];
+      const inner = lines.join("\n");
+      view.dispatch({
+        changes: { from: first.from, to: last.to, insert: inner },
+        selection: { anchor: first.from, head: first.from + inner.length },
+        scrollIntoView: true,
+        userEvent: "input.format",
+      });
+      return true;
+    }
   }
-
-  if (from === to && firstLine.text.trim() === "") {
-    const indent = firstLine.text.match(/^\s*/)?.[0] ?? "";
-    const snippet = `${indent}\`\`\`\n${indent}\n${indent}\`\`\``;
-    const cursor = firstLine.from + indent.length + 4 + indent.length;
-    view.dispatch({
-      changes: { from: firstLine.from, to: firstLine.to, insert: snippet },
-      selection: { anchor: cursor },
-      scrollIntoView: true,
-    });
-    return true;
-  }
-
-  const before = firstLine.from;
-  const after = lastLine.to;
-
+  const { start, end } = getSelectedLineNumbers(view);
+  const first = doc.line(start),
+    last = doc.line(end);
+  const text = doc.sliceString(first.from, last.to);
+  const size = Math.max(
+    3,
+    ...(text.match(/`+/g) ?? []).map((run) => run.length + 1),
+  );
+  const fence = "`".repeat(size);
+  const indent = first.text.match(/^\s*/)?.[0] ?? "";
+  const content = text.trim() ? text : indent;
+  const before = `${indent}${fence}\n`;
+  const insert = `${before}${content}\n${indent}${fence}`;
   view.dispatch({
-    changes: [
-      { from: before, to: before, insert: "```\n" },
-      { from: after, to: after, insert: "\n```" },
-    ],
+    changes: { from: first.from, to: last.to, insert },
+    selection: {
+      anchor: first.from + before.length + (text.trim() ? 0 : indent.length),
+    },
     scrollIntoView: true,
+    userEvent: "input.format",
   });
-
   return true;
 };
 
 export const snippetKeyBinding = (
   key: string,
   snippet: string,
-  cursorOffset: number
+  cursorOffset: number,
 ): KeyBinding => ({
   key,
   preventDefault: true,
@@ -747,9 +492,102 @@ export const snippetKeyBinding = (
 
 export const wrapSelectionKeyBinding = (
   key: string,
-  options: WrapSelectionOptions
+  options: WrapSelectionOptions,
 ): KeyBinding => ({
   key,
   preventDefault: true,
   run: createWrapSelectionCommand(options),
 });
+
+export const headingCommand =
+  (level: 0 | 1 | 2 | 3 | 4 | 5 | 6) =>
+  (view: import("@codemirror/view").EditorView): boolean => {
+    const { start, end } = getSelectedLineNumbers(view);
+    const doc = view.state.doc;
+    const changes: ChangeSpec[] = [];
+    const handled = new Set<number>();
+    for (let n = start; n <= end; n++) {
+      const line = doc.line(n);
+      let node: SyntaxNode | null = syntaxTree(view.state).resolveInner(
+        line.to,
+        -1,
+      );
+      while (
+        node &&
+        !/^(?:ATX|Setext)Heading|^(?:Paragraph|FencedCode|CodeBlock|Frontmatter)$/.test(
+          node.name,
+        )
+      )
+        node = node.parent;
+      if (
+        node?.name === "FencedCode" ||
+        node?.name === "CodeBlock" ||
+        node?.name === "Frontmatter"
+      )
+        continue;
+      if (node && /^(ATX|Setext)Heading/.test(node.name)) {
+        if (handled.has(node.from)) continue;
+        handled.add(node.from);
+        const newLevel = Number(node.name.slice(-1)) === level ? 0 : level;
+        const prefix = newLevel ? "#".repeat(newLevel) + " " : "";
+        const marks = node.getChildren("HeaderMark");
+        if (node.name.startsWith("Setext")) {
+          const first = doc.lineAt(node.from),
+            underline = doc.lineAt(marks[0].from);
+          const parts: string[] = [];
+          for (let row = first.number; row < underline.number; row++)
+            parts.push(
+              doc.sliceString(lineContentStart(view, row), doc.line(row).to),
+            );
+          changes.push({
+            from: node.from,
+            to: node.to,
+            insert: prefix + parts.join(" "),
+          });
+        } else {
+          let to = marks[0].to;
+          while (to < line.to && /[ \t]/.test(doc.sliceString(to, to + 1)))
+            to++;
+          changes.push({ from: node.from, to, insert: prefix });
+          if (marks.length > 1) {
+            let from = marks[1].from;
+            while (from > to && /[ \t]/.test(doc.sliceString(from - 1, from)))
+              from--;
+            changes.push({ from, to: marks[1].to, insert: "" });
+          }
+        }
+      } else if (level) {
+        const from = lineContentStart(view, n);
+        changes.push({ from, to: from, insert: "#".repeat(level) + " " });
+      }
+    }
+    if (!changes.length) return false;
+    dispatchLineChanges(view, changes);
+    return true;
+  };
+export const insertImageCommand = createSnippetCommand(
+  "![Image description](image.png)",
+  2,
+);
+export const insertFootnoteCommand = (
+  view: import("@codemirror/view").EditorView,
+): boolean => {
+  const doc = view.state.doc.toString();
+  let id = 1;
+  while (doc.includes(`[^${id}]`)) id++;
+  const { from, to } = view.state.selection.main;
+  const reference = `[^${id}]`;
+  const suffix = `\n\n${reference}: Footnote text\n`;
+  const changes = view.state.changes([
+    { from, to, insert: reference },
+    { from: doc.length, insert: suffix },
+  ]);
+  const start = changes.newLength - "Footnote text\n".length;
+  view.dispatch({
+    changes,
+    selection: { anchor: start, head: start + 13 },
+    scrollIntoView: true,
+    userEvent: "input",
+  });
+  return true;
+};

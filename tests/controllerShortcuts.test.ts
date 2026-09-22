@@ -1,8 +1,13 @@
+import { EditorState, TransactionSpec } from "@codemirror/state";
+import {
+  markdown,
+  insertNewlineContinueMarkup as continueUnorderedListCommand,
+  insertNewlineContinueMarkup as continueOrderedListCommand,
+  insertNewlineContinueMarkup as continueBlockquoteCommand,
+} from "@codemirror/lang-markdown";
+import { GFM } from "@lezer/markdown";
 import { strict as assert } from "assert";
 import {
-  continueBlockquoteCommand,
-  continueOrderedListCommand,
-  continueUnorderedListCommand,
   createSnippetCommand,
   toggleBlockquoteCommand,
   toggleFencedCodeBlockCommand,
@@ -14,86 +19,25 @@ import {
 import type { EditorView } from "@codemirror/view";
 
 type Selection = { from: number; to: number };
-type FakeLine = { number: number; from: number; to: number; text: string };
-
-class FakeDoc {
-  constructor(private readonly getText: () => string) {}
-
-  get length(): number {
-    return this.getText().length;
-  }
-
-  get lines(): number {
-    return this.buildLines().length;
-  }
-
-  line(lineNumber: number): FakeLine {
-    return this.buildLines()[lineNumber - 1];
-  }
-
-  lineAt(pos: number): FakeLine {
-    const safePos = Math.max(0, Math.min(pos, this.length));
-    return (
-      this.buildLines().find(
-        (line) => safePos >= line.from && safePos <= line.to
-      ) ?? this.line(this.lines)
-    );
-  }
-
-  sliceString(from: number, to: number): string {
-    return this.getText().slice(from, to);
-  }
-
-  private buildLines(): FakeLine[] {
-    const text = this.getText();
-    const parts = text.split("\n");
-    let offset = 0;
-    return parts.map((part, index) => {
-      const line = {
-        number: index + 1,
-        from: offset,
-        to: offset + part.length,
-        text: part,
-      };
-      offset = line.to + 1;
-      return line;
+class FakeView {
+  state: EditorState;
+  constructor(text: string, selection: Selection = { from: 0, to: 0 }) {
+    this.state = EditorState.create({
+      doc: text,
+      selection: { anchor: selection.from, head: selection.to },
+      extensions: [markdown({ extensions: [GFM] })],
     });
   }
-}
-
-class FakeView {
-  public text: string;
-  public state: { selection: { main: Selection }; doc: FakeDoc };
-
-  constructor(text: string, selection: Selection = { from: 0, to: 0 }) {
-    this.text = text;
-    this.state = {
-      selection: { main: selection },
-      doc: new FakeDoc(() => this.text),
-    };
+  get text() {
+    return this.state.doc.toString();
   }
-
-  dispatch(spec: {
-    changes:
-      | { from: number; to?: number; insert: string }
-      | Array<{ from: number; to?: number; insert: string }>;
-    selection?: { anchor: number; head?: number };
-    scrollIntoView?: boolean;
-  }): void {
-    const changes = Array.isArray(spec.changes)
-      ? spec.changes
-      : [spec.changes];
-    [...changes]
-      .sort((left, right) => right.from - left.from)
-      .forEach(({ from, to = from, insert }) => {
-        this.text = `${this.text.slice(0, from)}${insert}${this.text.slice(to)}`;
-      });
-    if (spec.selection) {
-      this.state.selection.main = {
-        from: spec.selection.anchor,
-        to: spec.selection.head ?? spec.selection.anchor,
-      };
-    }
+  dispatch = (spec: TransactionSpec) => {
+    this.state = this.state.update(spec).state;
+  };
+  select(selection: Selection) {
+    this.dispatch({
+      selection: { anchor: selection.from, head: selection.to },
+    });
   }
 }
 
@@ -115,7 +59,7 @@ runTest("bold shortcut inserts paired asterisks and centers cursor", () => {
   run(view as unknown as EditorView);
 
   assert.equal(view.text, "****");
-  assert.deepEqual(view.state.selection.main, { from: 2, to: 2 });
+  assert.equal(view.state.selection.main.from, 2);
 });
 
 runTest("italic shortcut inserts double asterisks and centers cursor", () => {
@@ -125,7 +69,7 @@ runTest("italic shortcut inserts double asterisks and centers cursor", () => {
   run(view as unknown as EditorView);
 
   assert.equal(view.text, "**");
-  assert.deepEqual(view.state.selection.main, { from: 1, to: 1 });
+  assert.equal(view.state.selection.main.from, 1);
 });
 
 runTest(
@@ -137,8 +81,8 @@ runTest(
     run(view as unknown as EditorView);
 
     assert.equal(view.text, "[](url)");
-    assert.deepEqual(view.state.selection.main, { from: 1, to: 1 });
-  }
+    assert.equal(view.state.selection.main.from, 1);
+  },
 );
 
 runTest("unordered list command toggles selected lines", () => {
@@ -147,7 +91,7 @@ runTest("unordered list command toggles selected lines", () => {
   toggleUnorderedListCommand(view as unknown as EditorView);
   assert.equal(view.text, "- one\n- two");
 
-  view.state.selection.main = { from: 0, to: view.text.length };
+  view.select({ from: 0, to: view.text.length });
   toggleUnorderedListCommand(view as unknown as EditorView);
   assert.equal(view.text, "one\ntwo");
 });
@@ -159,7 +103,7 @@ runTest("enter continues unordered list markers", () => {
 
   assert.equal(handled, true);
   assert.equal(view.text, "- first\n- ");
-  assert.deepEqual(view.state.selection.main, { from: 10, to: 10 });
+  assert.equal(view.state.selection.main.from, 10);
 });
 
 runTest("enter exits an empty unordered list item", () => {
@@ -168,8 +112,8 @@ runTest("enter exits an empty unordered list item", () => {
   const handled = continueUnorderedListCommand(view as unknown as EditorView);
 
   assert.equal(handled, true);
-  assert.equal(view.text, "  ");
-  assert.deepEqual(view.state.selection.main, { from: 2, to: 2 });
+  assert.equal(view.text, "");
+  assert.equal(view.state.selection.main.from, 0);
 });
 
 runTest("enter falls through outside unordered lists", () => {
@@ -181,15 +125,6 @@ runTest("enter falls through outside unordered lists", () => {
   assert.equal(view.text, "plain");
 });
 
-runTest("enter falls through for task list items", () => {
-  const view = new FakeView("- [ ] task", { from: 10, to: 10 });
-
-  const handled = continueUnorderedListCommand(view as unknown as EditorView);
-
-  assert.equal(handled, false);
-  assert.equal(view.text, "- [ ] task");
-});
-
 runTest("enter falls through for fenced code lines shaped like bullets", () => {
   const view = new FakeView("```\n- flag\n```", { from: 10, to: 10 });
 
@@ -199,14 +134,17 @@ runTest("enter falls through for fenced code lines shaped like bullets", () => {
   assert.equal(view.text, "```\n- flag\n```");
 });
 
-runTest("enter falls through for indented code lines shaped like bullets", () => {
-  const view = new FakeView("    - flag", { from: 10, to: 10 });
+runTest(
+  "enter falls through for indented code lines shaped like bullets",
+  () => {
+    const view = new FakeView("    - flag", { from: 10, to: 10 });
 
-  const handled = continueUnorderedListCommand(view as unknown as EditorView);
+    const handled = continueUnorderedListCommand(view as unknown as EditorView);
 
-  assert.equal(handled, false);
-  assert.equal(view.text, "    - flag");
-});
+    assert.equal(handled, false);
+    assert.equal(view.text, "    - flag");
+  },
+);
 
 runTest("line prefix commands preserve indentation when toggled off", () => {
   const view = new FakeView("  - nested", { from: 0, to: 10 });
@@ -231,7 +169,7 @@ runTest("enter continues ordered list numbers", () => {
 
   assert.equal(handled, true);
   assert.equal(view.text, "7. first\n8. ");
-  assert.deepEqual(view.state.selection.main, { from: 12, to: 12 });
+  assert.equal(view.state.selection.main.from, 12);
 });
 
 runTest("enter preserves ordered list delimiter style", () => {
@@ -249,8 +187,8 @@ runTest("enter exits an empty ordered list item", () => {
   const handled = continueOrderedListCommand(view as unknown as EditorView);
 
   assert.equal(handled, true);
-  assert.equal(view.text, "  ");
-  assert.deepEqual(view.state.selection.main, { from: 2, to: 2 });
+  assert.equal(view.text, "");
+  assert.equal(view.state.selection.main.from, 0);
 });
 
 runTest("task list command toggles checklist markers", () => {
@@ -259,7 +197,7 @@ runTest("task list command toggles checklist markers", () => {
   toggleTaskListCommand(view as unknown as EditorView);
   assert.equal(view.text, "- [ ] one\n- [ ] two");
 
-  view.state.selection.main = { from: 0, to: view.text.length };
+  view.select({ from: 0, to: view.text.length });
   toggleTaskListCommand(view as unknown as EditorView);
   assert.equal(view.text, "one\ntwo");
 });
@@ -297,7 +235,7 @@ runTest("blockquote command toggles selected lines", () => {
   toggleBlockquoteCommand(view as unknown as EditorView);
   assert.equal(view.text, "> one\n> two");
 
-  view.state.selection.main = { from: 0, to: view.text.length };
+  view.select({ from: 0, to: view.text.length });
   toggleBlockquoteCommand(view as unknown as EditorView);
   assert.equal(view.text, "one\ntwo");
 });
@@ -309,7 +247,7 @@ runTest("enter continues blockquotes", () => {
 
   assert.equal(handled, true);
   assert.equal(view.text, "> quote\n> ");
-  assert.deepEqual(view.state.selection.main, { from: 10, to: 10 });
+  assert.equal(view.state.selection.main.from, 10);
 });
 
 runTest("enter preserves spaced nested blockquote markers", () => {
@@ -319,17 +257,13 @@ runTest("enter preserves spaced nested blockquote markers", () => {
 
   assert.equal(handled, true);
   assert.equal(view.text, "> > nested\n> > ");
-  assert.deepEqual(view.state.selection.main, { from: 15, to: 15 });
+  assert.equal(view.state.selection.main.from, 15);
 });
 
-runTest("enter exits an empty blockquote", () => {
-  const view = new FakeView("  >   ", { from: 6, to: 6 });
-
-  const handled = continueBlockquoteCommand(view as unknown as EditorView);
-
-  assert.equal(handled, true);
-  assert.equal(view.text, "  ");
-  assert.deepEqual(view.state.selection.main, { from: 2, to: 2 });
+runTest("two empty quote lines exit the blockquote", () => {
+  const view = new FakeView("> first\n> \n> ", { from: 13, to: 13 });
+  assert.equal(continueBlockquoteCommand(view as unknown as EditorView), true);
+  assert.equal(view.text, "> first\n\n");
 });
 
 runTest("enter falls through for fenced code lines shaped like quotes", () => {
@@ -341,14 +275,17 @@ runTest("enter falls through for fenced code lines shaped like quotes", () => {
   assert.equal(view.text, "```\n> flag\n```");
 });
 
-runTest("enter falls through for indented code lines shaped like quotes", () => {
-  const view = new FakeView("    > flag", { from: 10, to: 10 });
+runTest(
+  "enter falls through for indented code lines shaped like quotes",
+  () => {
+    const view = new FakeView("    > flag", { from: 10, to: 10 });
 
-  const handled = continueBlockquoteCommand(view as unknown as EditorView);
+    const handled = continueBlockquoteCommand(view as unknown as EditorView);
 
-  assert.equal(handled, false);
-  assert.equal(view.text, "    > flag");
-});
+    assert.equal(handled, false);
+    assert.equal(view.text, "    > flag");
+  },
+);
 
 runTest("enter falls through outside blockquotes", () => {
   const view = new FakeView("plain", { from: 5, to: 5 });
@@ -365,7 +302,7 @@ runTest("code block command wraps and unwraps selected lines", () => {
   toggleFencedCodeBlockCommand(view as unknown as EditorView);
   assert.equal(view.text, "```\nconst x = 1;\n```");
 
-  view.state.selection.main = { from: 0, to: view.text.length };
+  view.select({ from: 0, to: view.text.length });
   toggleFencedCodeBlockCommand(view as unknown as EditorView);
   assert.equal(view.text, "const x = 1;");
 });
@@ -376,17 +313,20 @@ runTest("code block command inserts editable empty fenced block", () => {
   toggleFencedCodeBlockCommand(view as unknown as EditorView);
 
   assert.equal(view.text, "```\n\n```");
-  assert.deepEqual(view.state.selection.main, { from: 4, to: 4 });
+  assert.equal(view.state.selection.main.from, 4);
 });
 
-runTest("code block command preserves indentation for empty fenced blocks", () => {
-  const view = new FakeView("  ", { from: 2, to: 2 });
+runTest(
+  "code block command preserves indentation for empty fenced blocks",
+  () => {
+    const view = new FakeView("  ", { from: 2, to: 2 });
 
-  toggleFencedCodeBlockCommand(view as unknown as EditorView);
+    toggleFencedCodeBlockCommand(view as unknown as EditorView);
 
-  assert.equal(view.text, "  ```\n  \n  ```");
-  assert.deepEqual(view.state.selection.main, { from: 8, to: 8 });
-});
+    assert.equal(view.text, "  ```\n  \n  ```");
+    assert.equal(view.state.selection.main.from, 8);
+  },
+);
 
 if (process.exitCode && process.exitCode !== 0) {
   throw new Error("One or more tests failed.");

@@ -1,5 +1,15 @@
+import { promises as fs } from "node:fs";
+import {
+  isWithin,
+  searchWorkspace,
+  workspaceNote,
+  parseImageBatch,
+  importImages,
+} from "./workspaceFiles";
+import githubMarkdownCss from "github-markdown-css/github-markdown.css";
 import {
   app,
+  clipboard,
   BrowserWindow,
   dialog,
   ipcMain,
@@ -7,8 +17,16 @@ import {
   MenuItemConstructorOptions,
   shell,
 } from "electron";
-import { promises as fs } from "fs";
 import windowStateKeeper from "electron-window-state";
+import { WorkspaceStore } from "./workspace";
+import {
+  atomicWriteNote,
+  atomicWriteFile,
+  readNote,
+  readImage,
+  resolveNoteResource,
+  revision,
+} from "./noteFiles";
 import * as path from "path";
 import {
   BedrockTestConfig,
@@ -19,7 +37,6 @@ import {
   SaveFileResult,
 } from "../shared/types";
 import {
-  MAX_MARKDOWN_FILE_BYTES,
   safeExportBaseName,
   validateExportFilePayload,
   validateSaveFilePayload,
@@ -31,6 +48,14 @@ import {
   flushMainTelemetry,
   initializeMainTelemetry,
 } from "./observability";
+
+declare const BEDROCK_LOCAL_BUILD: boolean;
+if (BEDROCK_LOCAL_BUILD) {
+  app.setName("Bedrock Dev");
+  app.setPath("userData", path.join(app.getPath("appData"), "Bedrock Dev"));
+  process.env.BEDROCK_ENV = "development";
+  delete process.env.SENTRY_DSN;
+}
 
 const MARKDOWN_DIALOG_FILTER = {
   name: "Markdown Files",
@@ -53,8 +78,28 @@ const isE2EMode = runtimeInfo.e2eMode;
 const pendingExternalOpenFiles: OpenSpecificFilePayload[] = [];
 let mainWindow: BrowserWindow | null = null;
 let rendererReady = false;
+let openedDocument: string | null = null;
+const openedRevisions = new Map<string, string>();
+const approvedOpenPaths = new Set<string>();
+const trustedSender = (
+  event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent,
+) =>
+  !!mainWindow &&
+  !mainWindow.isDestroyed() &&
+  event.sender === mainWindow.webContents &&
+  event.senderFrame === mainWindow.webContents.mainFrame &&
+  event.senderFrame.url === new URL(MAIN_WINDOW_WEBPACK_ENTRY).href;
+const handle: typeof ipcMain.handle = (channel, listener) =>
+  ipcMain.handle(channel, (event, ...args) => {
+    if (!trustedSender(event)) throw new Error("Untrusted IPC sender.");
+    if (channel.startsWith("test:") && !isE2EMode)
+      throw new Error("Test API is disabled.");
+    return listener(event, ...args);
+  });
 
 const testState: BedrockTestState = {
+  workspaceDelayMs: 0,
+  nextRootPath: null,
   nextOpenPath: null,
   nextSavePath: null,
   discardResponse: null,
@@ -62,7 +107,7 @@ const testState: BedrockTestState = {
 };
 
 const applyTestConfig = (
-  config: BedrockTestConfig = {}
+  config: BedrockTestConfig = {},
 ): BedrockTestState | null => {
   if (!isE2EMode) {
     return null;
@@ -71,6 +116,16 @@ const applyTestConfig = (
   if ("nextOpenPath" in config) {
     testState.nextOpenPath = config.nextOpenPath ?? null;
   }
+  if ("nextRootPath" in config)
+    testState.nextRootPath = config.nextRootPath ?? null;
+  if (
+    typeof config.workspaceDelayMs === "number" &&
+    Number.isFinite(config.workspaceDelayMs)
+  )
+    testState.workspaceDelayMs = Math.max(
+      0,
+      Math.min(2000, config.workspaceDelayMs),
+    );
   if ("nextSavePath" in config) {
     testState.nextSavePath = config.nextSavePath ?? null;
   }
@@ -87,6 +142,8 @@ const resetTestState = (): BedrockTestState | null => {
   }
 
   testState.nextOpenPath = null;
+  testState.nextRootPath = null;
+  testState.workspaceDelayMs = 0;
   testState.nextSavePath = null;
   testState.discardResponse = null;
   testState.lastDiscardPrompt = null;
@@ -108,7 +165,9 @@ const resolveNextSavePath = (): string | null => {
     return null;
   }
 
-  const filePath = ensureMarkdownExtension(path.resolve(testState.nextSavePath));
+  const filePath = ensureMarkdownExtension(
+    path.resolve(testState.nextSavePath),
+  );
   testState.nextSavePath = null;
   return filePath;
 };
@@ -120,6 +179,7 @@ const getDiscardDescription = (action: DiscardAction): string => {
   if (action === "new") {
     return "create a new file";
   }
+  if (action === "home") return "go to Home";
   return "close this window";
 };
 
@@ -136,24 +196,22 @@ const normalizeMarkdownFilePath = (filePath: unknown): string | null => {
 };
 
 const readMarkdownFile = async (
-  filePath: string
+  filePath: string,
 ): Promise<OpenFileResult | null> => {
   const normalizedPath = normalizeMarkdownFilePath(filePath);
   if (!normalizedPath) {
     return null;
   }
 
-  const stat = await fs.stat(normalizedPath);
-  if (!stat.isFile() || stat.size > MAX_MARKDOWN_FILE_BYTES) {
-    return null;
-  }
-
-  const content = await fs.readFile(normalizedPath, "utf-8");
+  const content = await readNote(normalizedPath);
+  openedDocument = normalizedPath;
+  openedRevisions.clear();
+  openedRevisions.set(normalizedPath, revision(content));
   return { filePath: normalizedPath, content };
 };
 
 const normalizeExternalOpenPath = (
-  filePath: unknown
+  filePath: unknown,
 ): OpenSpecificFilePayload | null => {
   if (typeof filePath !== "string" || filePath.trim() === "") {
     return null;
@@ -176,12 +234,17 @@ const deliverExternalOpenFile = (payload: OpenSpecificFilePayload): boolean => {
   return true;
 };
 
-const handleExternalOpenPath = (filePath: unknown): boolean => {
+const handleExternalOpenPath = (
+  filePath: unknown,
+  fragment?: string,
+): boolean => {
   const payload = normalizeExternalOpenPath(filePath);
   if (!payload) {
     return false;
   }
+  if (fragment) payload.fragment = fragment;
 
+  approvedOpenPaths.add(payload.filePath);
   if (!deliverExternalOpenFile(payload)) {
     pendingExternalOpenFiles.push(payload);
 
@@ -196,7 +259,7 @@ const handleExternalOpenPath = (filePath: unknown): boolean => {
 const confirmDiscardChanges = async (
   browserWindow: BrowserWindow | null,
   action: DiscardAction,
-  fileName?: string
+  fileName?: string,
 ): Promise<boolean> => {
   if (isE2EMode) {
     testState.lastDiscardPrompt = { action, fileName };
@@ -219,14 +282,17 @@ const confirmDiscardChanges = async (
   return response === 1;
 };
 
-ipcMain.handle("file:open", async (): Promise<OpenFileResult | null> => {
+handle("file:open", async (): Promise<OpenFileResult | null> => {
   try {
     const nextOpenPath = resolveNextOpenPath();
     if (nextOpenPath) {
-      return await readMarkdownFile(nextOpenPath);
+      const result = await readMarkdownFile(nextOpenPath);
+      if (result) await rememberFile(result.filePath);
+      return result;
     }
 
     const { canceled, filePaths } = await dialog.showOpenDialog({
+      defaultPath: await workspace().defaultDirectory(),
       filters: [MARKDOWN_DIALOG_FILTER],
       properties: ["openFile"],
     });
@@ -236,27 +302,39 @@ ipcMain.handle("file:open", async (): Promise<OpenFileResult | null> => {
     }
 
     const filePath = filePaths[0];
-    return await readMarkdownFile(filePath);
+    const result = await readMarkdownFile(filePath);
+    if (result) await rememberFile(result.filePath);
+    return result;
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "An unknown error occurred.";
     captureMainTelemetryException(error, { operation: "file:open" });
-    dialog.showErrorBox("Unable to open file", message);
-    return null;
+    throw new Error(message);
   }
 });
 
-ipcMain.handle(
+handle(
   "file:read",
   async (_event, filePath: string): Promise<OpenFileResult | null> => {
     try {
-      const result = await readMarkdownFile(filePath);
+      const normalizedPath = normalizeMarkdownFilePath(filePath);
+      if (!normalizedPath) throw new Error("Choose a Markdown file.");
+      const recent = (await workspace().getInfo()).recentFiles;
+      if (
+        normalizedPath !== openedDocument &&
+        !approvedOpenPaths.has(normalizedPath) &&
+        !recent.some((file) => file.filePath === normalizedPath)
+      )
+        throw new Error("Open this note using the Open dialog first.");
+      const result = await readMarkdownFile(normalizedPath);
+      approvedOpenPaths.delete(normalizedPath);
       if (!result) {
         console.error(
-          `Rejected attempt to read non-markdown file: ${filePath}`
+          `Rejected attempt to read non-markdown file: ${filePath}`,
         );
         return null;
       }
+      if (result) await rememberFile(result.filePath);
       return result;
     } catch (error) {
       const message =
@@ -266,16 +344,16 @@ ipcMain.handle(
         filePath,
       });
       console.error(`Unable to read file "${filePath}": ${message}`);
-      return null;
+      throw new Error(message);
     }
-  }
+  },
 );
 
-ipcMain.handle("file:consume-pending-external-open", () => {
+handle("file:consume-pending-external-open", () => {
   return pendingExternalOpenFiles.splice(0);
 });
 
-ipcMain.handle(
+handle(
   "file:save",
   async (event, args: unknown): Promise<SaveFileResult | null> => {
     let telemetryFilePath: string | undefined;
@@ -300,8 +378,11 @@ ipcMain.handle(
             BrowserWindow.fromWebContents(event.sender) ?? undefined,
             {
               filters: [MARKDOWN_DIALOG_FILTER],
-              defaultPath: "Untitled.md",
-            }
+              defaultPath: path.join(
+                await workspace().defaultDirectory(),
+                "Untitled.md",
+              ),
+            },
           );
 
           if (canceled || !filePath) {
@@ -312,7 +393,22 @@ ipcMain.handle(
         }
       }
 
-      await fs.writeFile(targetPath, payload.content, "utf-8");
+      if (
+        payload.filePath &&
+        (targetPath !== openedDocument || !openedRevisions.has(targetPath))
+      )
+        throw new Error(
+          "This note is not the active document. Use Save As to choose a destination.",
+        );
+      await atomicWriteNote(
+        targetPath,
+        payload.content,
+        payload.filePath ? openedRevisions.get(targetPath) : undefined,
+      );
+      openedDocument = targetPath;
+      openedRevisions.clear();
+      openedRevisions.set(targetPath, revision(payload.content));
+      await rememberFile(targetPath);
       return { filePath: targetPath };
     } catch (error) {
       const message =
@@ -321,17 +417,16 @@ ipcMain.handle(
         operation: "file:save",
         filePath: telemetryFilePath,
       });
-      dialog.showErrorBox("Unable to save file", message);
-      return null;
+      throw new Error(message);
     }
-  }
+  },
 );
 
-ipcMain.handle(
+handle(
   "dialog:confirm-discard",
   async (
     event,
-    args: { action: DiscardAction; fileName?: string }
+    args: { action: DiscardAction; fileName?: string },
   ): Promise<boolean> => {
     try {
       const browserWindow = BrowserWindow.fromWebContents(event.sender);
@@ -339,39 +434,45 @@ ipcMain.handle(
     } catch {
       return false;
     }
-  }
+  },
 );
 
 ipcMain.on("file:dirty-state-changed", (event, isDirty: boolean) => {
-  windowDirtyState.set(event.sender.id, isDirty);
+  if (trustedSender(event) && typeof isDirty === "boolean")
+    windowDirtyState.set(event.sender.id, isDirty);
 });
 
 ipcMain.on("devtools:open", (event) => {
+  if (!trustedSender(event)) return;
   const window = BrowserWindow.fromWebContents(event.sender);
   window?.webContents.openDevTools({ mode: "detach" });
 });
 
 ipcMain.on("app:renderer-ready", (event) => {
-  if (mainWindow && event.sender.id === mainWindow.webContents.id) {
+  if (trustedSender(event)) {
     rendererReady = true;
   }
 });
 
-ipcMain.handle("app:get-version", (): string => {
+handle("app:get-version", (): string => {
   return app.getVersion();
 });
 
-ipcMain.handle("app:get-runtime-info", () => {
+handle("app:get-runtime-info", () => {
   return buildRuntimeInfo();
 });
 
-ipcMain.handle("shell:open-external", async (_event, rawUrl: string) => {
+handle("shell:open-external", async (_event, rawUrl: string) => {
   if (typeof rawUrl !== "string") {
     return;
   }
   try {
     const url = new URL(rawUrl);
-    if (url.protocol !== "http:" && url.protocol !== "https:") {
+    if (
+      url.protocol !== "http:" &&
+      url.protocol !== "https:" &&
+      url.protocol !== "mailto:"
+    ) {
       return;
     }
     await shell.openExternal(url.toString());
@@ -380,73 +481,60 @@ ipcMain.handle("shell:open-external", async (_event, rawUrl: string) => {
   }
 });
 
-ipcMain.handle("test:configure", (_event, config: BedrockTestConfig) => {
+handle("test:configure", (_event, config: BedrockTestConfig) => {
   return applyTestConfig(config);
 });
 
-ipcMain.handle("test:get-state", () => {
+handle("test:get-state", () => {
   return isE2EMode ? { ...testState } : null;
 });
 
-ipcMain.handle("test:reset-state", () => {
+handle("test:reset-state", () => {
   return resetTestState();
 });
 
-ipcMain.handle("test:simulate-external-open", (_event, filePath: string) => {
+handle("test:simulate-external-open", (_event, filePath: string) => {
   return handleExternalOpenPath(filePath);
 });
 
-ipcMain.handle(
-  "file:export",
-  async (event, args: unknown): Promise<boolean> => {
-    let telemetryFormat: string | undefined;
-    try {
-      const validation = validateExportFilePayload(args);
-      if (validation.ok === false) {
-        throw new Error(validation.message);
-      }
-      const payload = validation.payload;
-      const { content, format, defaultFileName } = payload;
-      telemetryFormat = format;
+handle("file:export", async (event, args: unknown): Promise<boolean> => {
+  let telemetryFormat: string | undefined;
+  try {
+    const validation = validateExportFilePayload(args);
+    if (validation.ok === false) {
+      throw new Error(validation.message);
+    }
+    const payload = validation.payload;
+    const { content, format, defaultFileName } = payload;
+    telemetryFormat = format;
 
-      const extension = format === "html" ? "html" : "pdf";
-      const filters =
-        format === "html"
-          ? [{ name: "HTML Files", extensions: ["html"] }]
-          : [{ name: "PDF Files", extensions: ["pdf"] }];
+    const extension = format === "html" ? "html" : "pdf";
+    const filters =
+      format === "html"
+        ? [{ name: "HTML Files", extensions: ["html"] }]
+        : [{ name: "PDF Files", extensions: ["pdf"] }];
 
-      const baseName = safeExportBaseName(defaultFileName);
+    const baseName = safeExportBaseName(defaultFileName);
 
-      const { canceled, filePath } = await dialog.showSaveDialog(
-        BrowserWindow.fromWebContents(event.sender) ?? undefined,
-        {
-          filters,
-          defaultPath: `${baseName}.${extension}`,
-        }
-      );
+    const { canceled, filePath } = await dialog.showSaveDialog(
+      BrowserWindow.fromWebContents(event.sender) ?? undefined,
+      {
+        filters,
+        defaultPath: `${baseName}.${extension}`,
+      },
+    );
 
-      if (canceled || !filePath) {
-        return false;
-      }
-      const targetPath = ensureExtension(filePath, extension);
+    if (canceled || !filePath) {
+      return false;
+    }
+    const targetPath = ensureExtension(filePath, extension);
 
-      // Load GitHub Markdown CSS
-      let css = "";
-      try {
-        const cssPath = path.join(
-          app.getAppPath(),
-          "node_modules/github-markdown-css/github-markdown.css"
-        );
-        css = await fs.readFile(cssPath, "utf-8");
-      } catch (e) {
-        console.error("Failed to load github-markdown-css", e);
-      }
-
-      const fullHtml = `
+    const fullHtml = `
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="utf-8">
+          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: https:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
           <style>
             body {
               box-sizing: border-box;
@@ -460,7 +548,7 @@ ipcMain.handle(
                 padding: 15px;
               }
             }
-            ${css}
+            ${githubMarkdownCss}
           </style>
         </head>
         <body class="markdown-body">
@@ -469,48 +557,55 @@ ipcMain.handle(
         </html>
       `;
 
-      if (format === "html") {
-        await fs.writeFile(targetPath, fullHtml, "utf-8");
-        return true;
-      } else {
-        // PDF Export
-        const win = new BrowserWindow({
-          show: false,
-          webPreferences: {
-            nodeIntegration: false,
+    if (format === "html") {
+      await atomicWriteFile(targetPath, fullHtml);
+      return true;
+    } else {
+      // PDF Export
+      const win = new BrowserWindow({
+        show: false,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          sandbox: true,
+          javascript: false,
+        },
+      });
+      win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+      win.webContents.on("will-navigate", (event) => event.preventDefault());
+      win.webContents.on("will-frame-navigate", (event) =>
+        event.preventDefault(),
+      );
+      win.webContents.on("will-redirect", (event) => event.preventDefault());
+      try {
+        await win.loadURL(
+          `data:text/html;charset=utf-8,${encodeURIComponent(fullHtml)}`,
+        );
+        const data = await win.webContents.printToPDF({
+          printBackground: true,
+          margins: {
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
           },
         });
-        try {
-          await win.loadURL(
-            `data:text/html;charset=utf-8,${encodeURIComponent(fullHtml)}`
-          );
-          const data = await win.webContents.printToPDF({
-            printBackground: true,
-            margins: {
-              top: 0,
-              bottom: 0,
-              left: 0,
-              right: 0,
-            },
-          });
-          await fs.writeFile(targetPath, data);
-        } finally {
-          win.destroy();
-        }
-        return true;
+        await atomicWriteFile(targetPath, data);
+      } finally {
+        win.destroy();
       }
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "An unknown error occurred.";
-      captureMainTelemetryException(error, {
-        operation: "file:export",
-        format: telemetryFormat,
-      });
-      dialog.showErrorBox("Unable to export file", message);
-      return false;
+      return true;
     }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred.";
+    captureMainTelemetryException(error, {
+      operation: "file:export",
+      format: telemetryFormat,
+    });
+    throw new Error(message);
   }
-);
+});
 
 // This allows TypeScript to pick up the magic constants that's auto-generated by Forge's Webpack
 // plugin that tells the Electron app where to look for the Webpack-bundled app code (depending on
@@ -526,6 +621,117 @@ if (require("electron-squirrel-startup")) {
 if (process.env.BEDROCK_USER_DATA_DIR) {
   app.setPath("userData", path.resolve(process.env.BEDROCK_USER_DATA_DIR));
 }
+
+let workspaceStore: WorkspaceStore | null = null;
+const workspace = (): WorkspaceStore => {
+  if (!workspaceStore) {
+    workspaceStore = new WorkspaceStore(
+      app.getPath("userData"),
+      isE2EMode
+        ? path.join(app.getPath("userData"), "Documents", "Bedrock")
+        : path.join(app.getPath("documents"), "Bedrock"),
+    );
+  }
+  return workspaceStore;
+};
+
+// A history-write failure must never report a successful note save as failed.
+const rememberFile = async (filePath: string): Promise<void> => {
+  try {
+    await workspace().rememberFile(filePath);
+  } catch (error) {
+    console.error("Unable to update recent files:", error);
+  }
+};
+
+handle("workspace:get", async () => {
+  if (isE2EMode && testState.workspaceDelayMs) {
+    await new Promise<void>((resolve) =>
+      setTimeout(resolve, testState.workspaceDelayMs),
+    );
+  }
+  return workspace().getInfo();
+});
+let workspaceSearchSequence = 0;
+handle("workspace:search", async (_event, query: unknown) => {
+  if (typeof query !== "string" || query.length > 200)
+    throw new Error("Search is limited to 200 characters.");
+  const sequence = ++workspaceSearchSequence;
+  const info = await workspace().getInfo();
+  if (!info.rootPath) throw new Error("Choose your Bedrock folder first.");
+  return searchWorkspace(
+    info.rootPath,
+    query,
+    info.recentFiles.map((file) => file.filePath),
+    () => sequence !== workspaceSearchSequence,
+  );
+});
+handle("workspace:open-note", async (_event, relativePath: unknown) => {
+  const target = await workspaceNote(
+    await workspace().defaultDirectory(),
+    relativePath,
+  );
+  const note = await readMarkdownFile(target);
+  if (!note) throw new Error("Unable to open this note.");
+  await rememberFile(note.filePath);
+  return note;
+});
+async function storeImages(documentPath: unknown, images: unknown) {
+  if (
+    typeof documentPath !== "string" ||
+    documentPath !== openedDocument ||
+    !openedRevisions.has(documentPath)
+  )
+    throw new Error("Open a note before adding images.");
+  const batch = parseImageBatch(images);
+  const root = await workspace().defaultDirectory();
+  if (documentPath !== openedDocument)
+    throw new Error("The active note changed. Paste the image again.");
+  return importImages(root, documentPath, batch);
+}
+handle("workspace:import-images", async (_event, raw: unknown) => {
+  if (
+    !raw ||
+    typeof raw !== "object" ||
+    !("documentPath" in raw) ||
+    !("images" in raw)
+  )
+    throw new Error("Invalid image request.");
+  return storeImages(raw.documentPath, raw.images);
+});
+handle("workspace:paste-image", async (_event, documentPath: unknown) => {
+  const image = clipboard.readImage();
+  if (image.isEmpty()) throw new Error("There is no image on the clipboard.");
+  return storeImages(documentPath, [
+    { name: "Pasted image.png", bytes: image.toPNG() },
+  ]);
+});
+handle("workspace:create-note", async () => {
+  const note = await workspace().createNote();
+  openedDocument = note.filePath;
+  openedRevisions.clear();
+  openedRevisions.set(note.filePath, revision(note.content));
+  return note;
+});
+handle("workspace:select-root", async (_event, choice: unknown) => {
+  if (choice !== "default" && choice !== "choose")
+    throw new Error("Invalid folder selection.");
+  if (choice === "default")
+    return workspace().selectRoot(workspace().suggestedRootPath);
+  let selectedPath: string | null = null;
+  if (isE2EMode && testState.nextRootPath) {
+    selectedPath = testState.nextRootPath;
+    testState.nextRootPath = null;
+  } else {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: "Choose your Bedrock root folder",
+      defaultPath: workspace().suggestedRootPath,
+      properties: ["openDirectory", "createDirectory"],
+    });
+    if (!canceled) selectedPath = filePaths[0] ?? null;
+  }
+  return selectedPath ? workspace().selectRoot(selectedPath) : null;
+});
 
 process.on("unhandledRejection", (reason) => {
   captureMainTelemetryException(reason, { event: "unhandledRejection" });
@@ -561,16 +767,23 @@ const installApplicationMenu = () => {
               { type: "separator" },
               {
                 label: "Find",
-                accelerator: "CmdOrCtrl+F",
                 click: (menuItem, browserWindow) => {
                   (browserWindow as BrowserWindow)?.webContents.send(
-                    "editor:find"
+                    "editor:find",
                   );
                 },
               },
             ],
           },
-          { role: "viewMenu" },
+          {
+            label: "View",
+            submenu: [
+              { role: "resetZoom" },
+              { role: "zoomIn" },
+              { role: "zoomOut" },
+              { role: "togglefullscreen" },
+            ],
+          },
           { role: "windowMenu" },
         ] as MenuItemConstructorOptions[])
       : ([
@@ -591,16 +804,23 @@ const installApplicationMenu = () => {
               { type: "separator" },
               {
                 label: "Find",
-                accelerator: "CmdOrCtrl+F",
                 click: (menuItem, browserWindow) => {
                   (browserWindow as BrowserWindow)?.webContents.send(
-                    "editor:find"
+                    "editor:find",
                   );
                 },
               },
             ],
           },
-          { role: "viewMenu" },
+          {
+            label: "View",
+            submenu: [
+              { role: "resetZoom" },
+              { role: "zoomIn" },
+              { role: "zoomOut" },
+              { role: "togglefullscreen" },
+            ],
+          },
           { role: "windowMenu" },
         ] as MenuItemConstructorOptions[])),
   ];
@@ -628,9 +848,25 @@ const createWindow = (): void => {
       : {}),
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
     },
   });
   mainWindow = window;
+  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  window.webContents.on("will-navigate", (event) => event.preventDefault());
+  window.webContents.on("will-frame-navigate", (event) =>
+    event.preventDefault(),
+  );
+  window.webContents.on("before-input-event", (event, input) => {
+    if ((input.control || input.meta) && input.key.toLowerCase() === "r")
+      event.preventDefault();
+  });
+  window.webContents.session.setPermissionRequestHandler(
+    (_contents, _permission, callback) => callback(false),
+  );
+  window.webContents.session.setPermissionCheckHandler(() => false);
   rendererReady = false;
 
   // Let us register listeners on the window, so we can update the state
@@ -713,7 +949,7 @@ app.on("ready", () => {
   if (isE2EMode) {
     try {
       const seededPaths = JSON.parse(
-        process.env.BEDROCK_E2E_INITIAL_EXTERNAL_OPEN_PATHS ?? "[]"
+        process.env.BEDROCK_E2E_INITIAL_EXTERNAL_OPEN_PATHS ?? "[]",
       ) as unknown;
       if (Array.isArray(seededPaths)) {
         seededPaths.forEach((filePath) => {
@@ -762,3 +998,30 @@ app.on("activate", () => {
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
+
+async function localResource(raw: unknown) {
+  if (!openedDocument || typeof raw !== "string")
+    throw new Error("Open a note before resolving resources.");
+  const root = await workspace().defaultDirectory();
+  const documentPath = await fs.realpath(openedDocument);
+  const canonicalRoot = await fs.realpath(root);
+  const allowed = isWithin(canonicalRoot, documentPath)
+    ? canonicalRoot
+    : path.dirname(documentPath);
+  return resolveNoteResource(documentPath, allowed, raw);
+}
+handle("file:resolve-image", async (_event, raw: unknown) => {
+  try {
+    return await readImage(await localResource(raw));
+  } catch {
+    return null;
+  }
+});
+handle("file:open-note-link", async (_event, raw: unknown) => {
+  const resolved = await localResource(raw);
+  const hash = typeof raw === "string" ? raw.indexOf("#") : -1;
+  return handleExternalOpenPath(
+    resolved,
+    typeof raw === "string" && hash >= 0 ? raw.slice(hash) : undefined,
+  );
+});

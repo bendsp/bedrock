@@ -1,10 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { EditorView } from "@codemirror/view";
-import {
-  RenderMode,
-  CursorPosition,
-  SelectionStats,
-} from "../../shared/types";
+import { documentText, editorText } from "../editor/codemirror/documentText";
+import { RenderMode, CursorPosition, SelectionStats } from "../../shared/types";
 import { ThemeName } from "../theme";
 import type { CommandRegistry, CommandRunner } from "../commands/commandSystem";
 import type { UserSettings } from "../settings";
@@ -83,8 +80,8 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
     if (onReady) {
       onReady(view);
     }
-    // Focus the editor when it mounts so typing works immediately.
-    requestAnimationFrame(() => view.focus());
+    // The host restores focus after any document-replacement lock is released.
+    if (!onReady) view.focus();
 
     return () => {
       view.destroy();
@@ -98,11 +95,15 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
     if (!view) {
       return;
     }
-    if (value === view.state.doc.toString()) {
+    if (value === documentText(view.state)) {
       return;
     }
     view.dispatch({
-      changes: { from: 0, to: view.state.doc.length, insert: value },
+      changes: {
+        from: 0,
+        to: view.state.doc.length,
+        insert: editorText(value),
+      },
     });
   }, [value]);
 
@@ -114,7 +115,7 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
     }
     view.dispatch({
       effects: bundle.compartments.renderMode.reconfigure(
-        renderModeExtension(renderMode)
+        renderModeExtension(renderMode),
       ),
     });
   }, [renderMode]);
@@ -127,7 +128,7 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
     }
     view.dispatch({
       effects: bundle.compartments.theme.reconfigure(
-        buildThemeExtension(theme, textSize)
+        buildThemeExtension(theme, textSize),
       ),
     });
   }, [theme, textSize]);
@@ -140,7 +141,7 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
     }
     view.dispatch({
       effects: bundle.compartments.keymap.reconfigure(
-        keymapExtension(keyBindings, buildBaseKeymap())
+        keymapExtension(keyBindings, buildBaseKeymap()),
       ),
     });
   }, [keyBindings]);
@@ -152,7 +153,63 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
       commandRegistry={commandRegistry}
       settings={settings}
     >
-      <div ref={containerRef} className={className} />
+      <div
+        ref={containerRef}
+        className={className}
+        onPasteCapture={(event) => {
+          const files = Array.from(event.clipboardData.files).filter((file) =>
+            file.type.startsWith("image/"),
+          );
+          if (!files.length) return;
+          event.preventDefault();
+          event.stopPropagation();
+          const element =
+            event.target instanceof Element
+              ? event.target.closest(".cm-editor")
+              : null;
+          const view = element
+            ? EditorView.findFromDOM(element as HTMLElement)
+            : viewRef.current;
+          if (view)
+            void commands.runWithView("insert.attachImages", view, { files });
+        }}
+        onDragOver={(event) => {
+          if (
+            Array.from(event.dataTransfer.items).some(
+              (item) => item.kind === "file" && item.type.startsWith("image/"),
+            )
+          )
+            event.preventDefault();
+        }}
+        onDropCapture={(event) => {
+          const files = Array.from(event.dataTransfer.files).filter((file) =>
+            file.type.startsWith("image/"),
+          );
+          if (!files.length) return;
+          event.preventDefault();
+          event.stopPropagation();
+          if (event.target instanceof HTMLElement)
+            event.target.closest<HTMLElement>(".cm-table-cell")?.focus();
+          const element =
+            event.target instanceof Element
+              ? (event.target
+                  .closest(".cm-table-cell")
+                  ?.querySelector<HTMLElement>(".cm-editor") ??
+                event.target.closest<HTMLElement>(".cm-editor"))
+              : null;
+          const view = element
+            ? EditorView.findFromDOM(element)
+            : viewRef.current;
+          if (!view) return;
+          const position = view.posAtCoords({
+            x: event.clientX,
+            y: event.clientY,
+          });
+          if (position !== null)
+            view.dispatch({ selection: { anchor: position } });
+          void commands.runWithView("insert.attachImages", view, { files });
+        }}
+      />
     </EditorContextMenu>
   );
 };

@@ -1,3 +1,10 @@
+import { richTables } from "./richTables";
+import {
+  documentFormat,
+  detectDocumentFormat,
+  documentText,
+  editorText,
+} from "./documentText";
 import { EditorState, Compartment, Extension } from "@codemirror/state";
 import {
   EditorView,
@@ -7,9 +14,10 @@ import {
 } from "@codemirror/view";
 import { history } from "@codemirror/commands";
 import { search, searchKeymap } from "@codemirror/search";
-import { markdown } from "@codemirror/lang-markdown";
+import { markdownLanguage } from "./markdownLanguage";
+import { markdownKeymap } from "@codemirror/lang-markdown";
 import { indentUnit } from "@codemirror/language";
-import { GFM } from "@lezer/markdown";
+import { navigateTable } from "./tables";
 import {
   CursorPosition,
   RenderMode,
@@ -20,12 +28,8 @@ import { getSelectionStats } from "../../lib/documentStats";
 import { buildThemeExtension } from "./theme";
 import { hybridMarkdown } from "./hybridMarkdown";
 import { linkClickHandler } from "./links";
+import { editingLock } from "./editingLock";
 import { createReactSearchPanel } from "./searchPanel";
-import {
-  continueBlockquoteCommand,
-  continueOrderedListCommand,
-  continueUnorderedListCommand,
-} from "./commands";
 
 type ExtensionOptions = {
   renderMode: RenderMode;
@@ -47,22 +51,16 @@ export type ExtensionBundle = {
   };
 };
 
-export const buildBaseKeymap =
-  (): import("@codemirror/view").KeyBinding[] => [
-    {
-      key: "Enter",
-      preventDefault: true,
-      run: (view) =>
-        continueUnorderedListCommand(view) ||
-        continueOrderedListCommand(view) ||
-        continueBlockquoteCommand(view),
-    },
-    ...searchKeymap,
-  ];
+export const buildBaseKeymap = (): import("@codemirror/view").KeyBinding[] => [
+  { key: "Tab", run: navigateTable(1) },
+  { key: "Shift-Tab", run: navigateTable(-1) },
+  ...markdownKeymap,
+  ...searchKeymap,
+];
 
 const selectionStatsEqual = (
   left: SelectionStats,
-  right: SelectionStats | null
+  right: SelectionStats | null,
 ): boolean => {
   return (
     right !== null &&
@@ -81,11 +79,11 @@ export const renderModeExtension = (mode: RenderMode): Extension => {
 
 export const keymapExtension = (
   bindings: import("@codemirror/view").KeyBinding[],
-  base: import("@codemirror/view").KeyBinding[]
-): Extension => keymap.of([...base, ...bindings]);
+  base: import("@codemirror/view").KeyBinding[],
+): Extension => keymap.of([...bindings, ...base]);
 
 export const createCmExtensions = (
-  options: ExtensionOptions
+  options: ExtensionOptions,
 ): ExtensionBundle => {
   const themeCompartment = new Compartment();
   const keymapCompartment = new Compartment();
@@ -94,7 +92,7 @@ export const createCmExtensions = (
 
   const updateListener = EditorView.updateListener.of((update) => {
     if (update.docChanged) {
-      options.onDocChange(update.state.doc.toString());
+      options.onDocChange(documentText(update.state));
     }
     if (options.onCursorChange && update.selectionSet) {
       const cursor = update.state.doc.lineAt(update.state.selection.main.head);
@@ -122,9 +120,10 @@ export const createCmExtensions = (
   const baseKeys = buildBaseKeymap();
 
   const extensions: Extension[] = [
+    editingLock,
     drawSelection(),
     history(),
-    markdown({ extensions: [GFM] }),
+    markdownLanguage(),
     indentUnit.of("  "),
     EditorView.lineWrapping,
     search({
@@ -135,6 +134,7 @@ export const createCmExtensions = (
     linkClickHandler,
     keymapCompartment.of(keymapExtension(options.keyBindings, baseKeys)),
     themeCompartment.of(buildThemeExtension(options.theme, options.textSize)),
+    richTables,
     renderModeCompartment.of(renderModeExtension(options.renderMode)),
   ];
 
@@ -154,10 +154,13 @@ export const createCmExtensions = (
 
 export const createState = (
   doc: string,
-  bundle: ExtensionBundle
+  bundle: ExtensionBundle,
 ): EditorState => {
   return EditorState.create({
-    doc,
-    extensions: bundle.extensions,
+    doc: editorText(doc),
+    extensions: [
+      ...bundle.extensions,
+      documentFormat.of(detectDocumentFormat(doc)),
+    ],
   });
 };

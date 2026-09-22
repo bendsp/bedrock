@@ -12,7 +12,19 @@ export interface SelectionStats {
 export type RenderMode = "hybrid" | "raw";
 
 // File Operation Types
-export type DiscardAction = "open" | "close" | "new";
+export type DiscardAction = "open" | "close" | "new" | "home";
+
+export interface RecentFile {
+  filePath: string;
+  openedAt: string;
+}
+
+export interface WorkspaceInfo {
+  warning?: string;
+  rootPath: string | null;
+  suggestedRootPath: string;
+  recentFiles: RecentFile[];
+}
 
 export interface OpenFileResult {
   filePath: string;
@@ -21,6 +33,7 @@ export interface OpenFileResult {
 
 export interface OpenSpecificFilePayload {
   filePath: string;
+  fragment?: string;
 }
 
 export interface SaveFilePayload {
@@ -47,6 +60,8 @@ export interface BedrockRuntimeInfo {
 }
 
 export interface BedrockTestConfig {
+  workspaceDelayMs?: number;
+  nextRootPath?: string | null;
   nextOpenPath?: string | null;
   nextSavePath?: string | null;
   discardResponse?: boolean | null;
@@ -64,7 +79,31 @@ export interface ExportFilePayload {
   defaultFileName?: string;
 }
 
+export interface ImportedImage {
+  relativePath: string;
+  alt: string;
+}
+export interface WorkspaceSearchResult {
+  files: Array<{ relativePath: string; name: string; excerpt?: string }>;
+  truncated: boolean;
+}
+export interface ImageImportRequest {
+  documentPath: string;
+  images: Array<{ name: string; bytes: Uint8Array }>;
+}
+
 export interface IElectronAPI {
+  searchWorkspace: (query: string) => Promise<WorkspaceSearchResult>;
+  openWorkspaceNote: (relativePath: string) => Promise<OpenFileResult>;
+  importImages: (request: ImageImportRequest) => Promise<ImportedImage[]>;
+  pasteImage: (documentPath: string) => Promise<ImportedImage[]>;
+  resolveImage: (path: string) => Promise<string | null>;
+  openNoteLink: (path: string) => Promise<boolean>;
+  getWorkspace: () => Promise<WorkspaceInfo>;
+  selectRootFolder: (
+    choice: "default" | "choose",
+  ) => Promise<WorkspaceInfo | null>;
+  createNote: () => Promise<OpenFileResult>;
   openFile: () => Promise<OpenFileResult | null>;
   saveFile: (payload: SaveFilePayload) => Promise<SaveFileResult | null>;
   confirmDiscardChanges: (payload: DiscardPromptPayload) => Promise<boolean>;
@@ -78,7 +117,7 @@ export interface IElectronAPI {
   readFile: (filePath: string) => Promise<OpenFileResult | null>;
   consumePendingExternalOpenFiles: () => Promise<OpenSpecificFilePayload[]>;
   onExternalOpenFile: (
-    callback: (payload: OpenSpecificFilePayload) => void
+    callback: (payload: OpenSpecificFilePayload) => void,
   ) => () => void;
   notifyRendererReady: () => void;
   test?: {

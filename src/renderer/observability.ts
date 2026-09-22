@@ -1,3 +1,4 @@
+import { redactTelemetry } from "../shared/telemetryPrivacy";
 import * as Sentry from "@sentry/electron/renderer";
 
 let initialized = false;
@@ -13,6 +14,8 @@ export const initializeRendererTelemetry = async (): Promise<void> => {
   }
 
   Sentry.init({
+    sendDefaultPii: false,
+    beforeSend: event => redactTelemetry(event),
     dsn: runtimeInfo.sentryDsn,
     release: runtimeInfo.release,
     environment: runtimeInfo.environment,

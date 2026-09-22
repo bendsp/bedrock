@@ -3,3 +3,8 @@ import "./documentStats.test";
 import "./ipcValidation.test";
 import "./keybindings.test";
 import "./themeSettings.test";
+import "./workspace.test";
+import "./markdownCore.test";
+import "./noteFiles.test";
+import "./telemetryPrivacy.test";
+import "./workspaceFiles.test";

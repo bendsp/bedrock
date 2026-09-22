@@ -1,0 +1,136 @@
+{
+  "actions": [],
+  "advisories": {
+    "1138808": {
+      "findings": [
+        {
+          "version": "0.7.5",
+          "paths": [
+            ".>@electron-forge/maker-dmg>electron-installer-dmg>appdmg>image-size"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://nvd.nist.gov/vuln/detail/CVE-2025-71330\n- https://joshua.hu/image-size-infinite-loop-dos-vulnerabilities\n- https://web.archive.org/web/20260224152152/https://github.com/image-size/image-size/pull/439\n- https://www.vulncheck.com/advisories/image-size-denial-of-service-via-malformed-icns-image-parsing\n- https://github.com/advisories/GHSA-w3rx-r6r6-pgpr",
+      "created": "2026-06-10T15:31:30.000Z",
+      "id": 1138808,
+      "npm_advisory_id": null,
+      "overview": "image-size through 2.0.2 contains a denial of service vulnerability that allows remote attackers to permanently block the Node.js event loop by supplying a specially crafted ICNS image buffer. Attackers can craft an ICNS buffer containing valid magic bytes and a zero-valued entry length field to trigger an infinite loop in the ICNS parser, as the offset is never incremented when the entry length field is 0, causing the while loop condition to remain true indefinitely.",
+      "reported_by": null,
+      "title": "image-size: ICNS parser allows denial of service through an infinite loop",
+      "metadata": null,
+      "cves": [
+        "CVE-2025-71330"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "image-size",
+      "vulnerable_versions": "<=2.0.2",
+      "github_advisory_id": "GHSA-w3rx-r6r6-pgpr",
+      "recommendation": "None",
+      "patched_versions": "<0.0.0",
+      "updated": "2026-08-07T20:55:24.000Z",
+      "cvss": {
+        "score": 7.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-835"
+      ],
+      "url": "https://github.com/advisories/GHSA-w3rx-r6r6-pgpr"
+    },
+    "1138809": {
+      "findings": [
+        {
+          "version": "0.7.5",
+          "paths": [
+            ".>@electron-forge/maker-dmg>electron-installer-dmg>appdmg>image-size"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://nvd.nist.gov/vuln/detail/CVE-2025-71329\n- https://joshua.hu/image-size-infinite-loop-dos-vulnerabilities\n- https://web.archive.org/web/20260224152152/https://github.com/image-size/image-size/pull/439\n- https://www.vulncheck.com/advisories/image-size-denial-of-service-via-infinite-loop-in-jxl-heif-parser\n- https://github.com/advisories/GHSA-5p2g-fcmc-qvqq",
+      "created": "2026-06-10T15:31:30.000Z",
+      "id": 1138809,
+      "npm_advisory_id": null,
+      "overview": "image-size through 2.0.2 contains a denial of service vulnerability that allows remote attackers to permanently block the Node.js event loop by supplying a specially crafted image buffer with a zero-valued size field in a recognized box-type. Attackers can trigger an infinite loop in the JXL or HEIF image parsers by providing a crafted image containing a box with a size of zero, causing the offset to never advance and permanently hanging the application.",
+      "reported_by": null,
+      "title": "image-size: JXL and HEIF parsers allow denial of service through infinite loops",
+      "metadata": null,
+      "cves": [
+        "CVE-2025-71329"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "image-size",
+      "vulnerable_versions": "<=2.0.2",
+      "github_advisory_id": "GHSA-5p2g-fcmc-qvqq",
+      "recommendation": "None",
+      "patched_versions": "<0.0.0",
+      "updated": "2026-08-07T20:54:42.000Z",
+      "cvss": {
+        "score": 7.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-835"
+      ],
+      "url": "https://github.com/advisories/GHSA-5p2g-fcmc-qvqq"
+    },
+    "1139346": {
+      "findings": [
+        {
+          "version": "2.0.1",
+          "paths": [
+            ".>@electron-forge/cli>@electron-forge/core>@electron/packager>extract-zip"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/ziad626/extract-zip-security-research/security/advisories/GHSA-x7jf-2287-qcpf\n- https://nvd.nist.gov/vuln/detail/CVE-2026-56876\n- https://raw.githubusercontent.com/cisagov/CSAF/develop/csaf_files/IT/white/2026/va-26-177-01.json\n- https://www.cve.org/CVERecord?id=CVE-2026-56876\n- https://github.com/advisories/GHSA-jmr9-qjv8-65gv",
+      "created": "2026-06-26T18:34:00.000Z",
+      "id": 1139346,
+      "npm_advisory_id": null,
+      "overview": "extract-zip does not validate symlink targets when extracting zip archives. When processing a malicious zip file containing a symlink with a relative path like '../../../../etc/passwd', extract-zip will extract the symlink without validation, allowing it to point outside the extraction directory. Depending on how extract-zip is used, an attacker could read or write to arbitrary files.",
+      "reported_by": null,
+      "title": "extract-zip unvalidated symlink path traversal",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-56876"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "extract-zip",
+      "vulnerable_versions": "<=2.0.1",
+      "github_advisory_id": "GHSA-jmr9-qjv8-65gv",
+      "recommendation": "None",
+      "patched_versions": "<0.0.0",
+      "updated": "2026-08-12T19:22:04.000Z",
+      "cvss": {
+        "score": 8.1,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:N"
+      },
+      "cwe": [
+        "CWE-22"
+      ],
+      "url": "https://github.com/advisories/GHSA-jmr9-qjv8-65gv"
+    }
+  },
+  "muted": [],
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 3,
+      "critical": 0
+    },
+    "dependencies": 1179,
+    "devDependencies": 0,
+    "optionalDependencies": 0,
+    "totalDependencies": 1179
+  }
+}

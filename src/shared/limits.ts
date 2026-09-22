@@ -1,0 +1,2 @@
+export const MAX_MARKDOWN_FILE_BYTES = 10 * 1024 * 1024;
+export const MAX_EXPORT_HTML_BYTES = 25 * 1024 * 1024;

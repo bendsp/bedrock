@@ -2,12 +2,9 @@
 <html>
   <head>
     <meta charset="UTF-8" />
+    <meta name="referrer" content="no-referrer" />
     <title>Bedrock</title>
-    <script>
-      var __dirname = decodeURIComponent(
-        new URL(".", window.location.href).pathname.replace(/\/$/, "")
-      );
-    </script>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
   </head>
   <body>
     <div id="root"></div>

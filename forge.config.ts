@@ -109,6 +109,7 @@ const createConfig = (port: number, loggerPort: number): ForgeConfig => ({
   makers: [
     new MakerSquirrel({
       setupExe: "Bedrock.exe",
+      setupIcon: "./src/assets/icon.ico",
     }),
     new MakerZIP({}, ["darwin"]),
     new MakerDMG(

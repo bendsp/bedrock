@@ -116,6 +116,8 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
 
 ## Scratchpad — Features & Changes
 
+- 2026-09-22: Replaced the placeholder with Ben's Icon Composer folder mark, preserving its sharp notch. Source is `src/assets/bedrock.icon`; `scripts/generate-icons.py` regenerates PNG, ICNS, and ICO. The Windows installer also uses the approved icon.
+
 - 2026-09-08: Added isolated `pnpm install:local` packaging and installation of Bedrock Dev with its own bundle ID and user data. CI is reusable and runs on main; releases require valid tags and passing checks, build both macOS architectures, validate signing/notarization, and upload a complete draft with checksums. Published releases are protected. See `docs/releases.md`; automatic updates and Windows signing remain unimplemented.
 
 - 2026-09-08: Added Cmd/Ctrl+P quick-open for workspace filenames, paths, and contents, plus paste/drop/attach image commands. `src/main/workspaceFiles.ts` owns bounded search and exclusive attachment writes; `QuickOpen.tsx` owns the search dialog. Images live in root `Attachments/` with links relative to the canonical note path. All entry points use the command registry. Added filesystem and Electron tests for portability, aliases, table-cell paste, dirty-state navigation, and IPC boundaries.

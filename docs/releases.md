@@ -82,3 +82,12 @@ confirmed the installed Dev app loads its Home screen without IPC errors. Reinst
 while Dev was running exercised graceful quit and replacement. The production app's
 `app.asar` SHA-256 remained unchanged. Local Dev builds use ad-hoc signing; this is not
 proof of Apple notarization or a production auto-update.
+
+## App icon
+
+The approved source is `src/assets/bedrock.icon`, including the original Lucide
+folder-pen artwork and its license. The filled shape and sharp notch are intentional.
+Run `python3 scripts/generate-icons.py` on macOS with Xcode and Pillow to export
+Icon Composer's macOS rendition and generate the committed PNG, ICNS, and ICO.
+The app About screen uses the PNG; app bundles, DMGs, and Windows installers use
+the platform formats. Keep the website icon synchronized with this PNG.

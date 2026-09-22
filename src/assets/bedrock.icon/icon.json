@@ -1,0 +1,53 @@
+{
+  "fill" : {
+    "automatic-gradient" : "display-p3:0.00000,0.00000,0.00000,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "fill" : {
+            "linear-gradient" : [
+              "display-p3:0.86809,1.00000,0.44218,1.00000",
+              "display-p3:0.42390,1.00000,0.33739,1.00000"
+            ],
+            "orientation" : {
+              "start" : {
+                "x" : 0.4999999999999998,
+                "y" : 0
+              },
+              "stop" : {
+                "x" : 0.4999999999999998,
+                "y" : 1
+              }
+            }
+          },
+          "glass" : false,
+          "image-name" : "folder-pen.svg",
+          "name" : "folder-pen",
+          "position" : {
+            "scale" : 25,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}

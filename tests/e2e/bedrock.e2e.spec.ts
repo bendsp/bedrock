@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   disposeBedrock,
+  saveBedrockTrace,
   fixturePath,
   shortcutModifier,
   launchBedrock,
@@ -159,6 +160,7 @@ test.describe("Bedrock Electron pipeline", () => {
       path.join(os.tmpdir(), "bedrock-e2e-output-"),
     );
     const savePath = path.join(outputDir, "saved-from-e2e.md");
+    let traceAlreadySaved = false;
 
     try {
       await page.locator(".cm-content").click();
@@ -210,18 +212,18 @@ test.describe("Bedrock Electron pipeline", () => {
       await expect(page.locator(".cm-editor")).toBeVisible();
 
       await configureTestHarness(page, { discardResponse: true });
-      await app.evaluate(({ BrowserWindow }) => {
-        BrowserWindow.getAllWindows()[0]?.close();
-      });
-      await expect
-        .poll(async () => {
-          return app.evaluate(({ BrowserWindow }) => {
-            return BrowserWindow.getAllWindows().length;
-          });
-        })
-        .toBe(0);
+      // Save the trace while Electron is still alive. Linux exits on final close.
+      await saveBedrockTrace(app, userDataDir);
+      traceAlreadySaved = true;
+      await Promise.all([
+        page.waitForEvent("close"),
+        app.evaluate(({ BrowserWindow }) => {
+          BrowserWindow.getAllWindows()[0]?.close();
+        }),
+      ]);
+      expect(page.isClosed()).toBe(true);
     } finally {
-      await disposeBedrock(app, userDataDir);
+      await disposeBedrock(app, userDataDir, { traceAlreadySaved });
       await fs.rm(outputDir, { recursive: true, force: true });
     }
   });

@@ -44,3 +44,22 @@ test('artifact collection requires a complete set and produces unique DMG names 
   assert.match(hashes, /^[a-f0-9]{64}  Bedrock-darwin-arm64-1.0.0.dmg/m);
   assert.equal(hashes.trim().split('\n').length, 2);
 }));
+test('notarization key accepts wrapped Base64 and rejects malformed secrets', () => fixture(async cwd => {
+  const key = '-----BEGIN PRIVATE KEY-----\nfixture-only\n-----END PRIVATE KEY-----\n';
+  const encoded = Buffer.from(key).toString('base64');
+  const wrapped = `  ${encoded.match(/.{1,20}/g).join('\r\n')}\n`;
+  const script = path.join(scripts, 'write-notarization-key.py');
+  const invoke = secret => spawnSync('python3', [script], {
+    env: { ...process.env, RUNNER_TEMP: cwd, APPLE_API_KEY_P8_BASE64: secret }, encoding: 'utf8',
+  });
+  for (const value of [encoded, wrapped]) {
+    const result = invoke(value);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(await fs.readFile(path.join(cwd, 'AuthKey.p8'), 'utf8'), key);
+    assert.equal((await fs.stat(path.join(cwd, 'AuthKey.p8'))).mode & 0o777, 0o600);
+  }
+  for (const value of [encoded + '!', '', Buffer.from('not a PEM key').toString('base64')]) {
+    assert.notEqual(invoke(value).status, 0);
+    assert.equal(await fs.readFile(path.join(cwd, 'AuthKey.p8'), 'utf8'), key);
+  }
+}));

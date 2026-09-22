@@ -102,7 +102,7 @@ export const simulateExternalOpen = async (page: Page, filePath: string) => {
   }, filePath);
 };
 
-export async function disposeBedrock(
+export async function saveBedrockTrace(
   app: ElectronApplication,
   userDataDir: string,
 ): Promise<void> {
@@ -118,6 +118,14 @@ export async function disposeBedrock(
       path: tracePath,
       contentType: "application/zip",
     });
+}
+
+export async function disposeBedrock(
+  app: ElectronApplication,
+  userDataDir: string,
+  options: { traceAlreadySaved?: boolean } = {},
+): Promise<void> {
+  if (!options.traceAlreadySaved) await saveBedrockTrace(app, userDataDir);
   const process = app.process();
   const exited = new Promise<void>((resolve) => {
     if (process.exitCode !== null || process.signalCode !== null) resolve();

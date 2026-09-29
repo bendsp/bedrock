@@ -806,7 +806,14 @@ const App = () => {
           documentDirty={isDirty || busy}
           onInstallUpdate={async () => {
             if (isDirty) throw new Error("Save your changes before restarting to update.");
-            await perform(async () => { await window.electronAPI.installUpdate(); });
+            await perform(async () => {
+              try { await window.electronAPI.installUpdate(); }
+              catch {
+                const status = await window.electronAPI.getUpdateStatus();
+                // The Updates panel already shows native installation failures.
+                if (status.phase !== "disabled") throw new Error(status.message ?? "Unable to restart for the update. Save your changes and try again.");
+              }
+            });
           }}
           workspace={workspace}
           workspaceBusy={busy}

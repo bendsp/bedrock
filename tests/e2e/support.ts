@@ -26,7 +26,7 @@ const findCompiledMainEntry = async (): Promise<string> => {
 
 export const launchBedrock = async (
   options: {
-    updates?: { version: string; failure?: "check" | "download"; delay?: number };
+    updates?: { version: string; failure?: "check" | "download" | "install"; delay?: number };
     initialExternalOpenPaths?: string[];
     setup?: boolean;
     userDataDir?: string;

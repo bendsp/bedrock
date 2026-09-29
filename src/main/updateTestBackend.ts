@@ -3,7 +3,7 @@ import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { UpdateBackend } from "./updateController";
 import { selectRelease } from "./updateReleases";
-export type UpdateTestScenario = { version: string; failure?: "check" | "download"; delay?: number };
+export type UpdateTestScenario = { version: string; failure?: "check" | "download" | "install"; delay?: number };
 /** Only constructed by the explicit Electron test harness; never reads the network or installs an app. */
 export function updateTestBackend(scenario: UpdateTestScenario): UpdateBackend {
   let cancel: (() => void) | null = null;
@@ -27,6 +27,8 @@ export function updateTestBackend(scenario: UpdateTestScenario): UpdateBackend {
       progress(100);
     },
     cancel() { cancel?.(); },
-    install() { writeFileSync(path.join(app.getPath("userData"), "update-test-installed.json"), JSON.stringify({ installed: true })); },
+    install() {
+      if (scenario.failure === "install") throw new Error("Installer failed.");
+      writeFileSync(path.join(app.getPath("userData"), "update-test-installed.json"), JSON.stringify({ installed: true })); },
   };
 }

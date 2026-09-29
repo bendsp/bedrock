@@ -62,3 +62,19 @@ for (const failure of ["check", "download"] as const) {
     } finally { await disposeBedrock(app, userDataDir); }
   });
 }
+
+test("an installation failure releases the editor lock and requires restart before another update", async () => {
+  const { app, page, userDataDir } = await launchBedrock({ updates: { version: "1.5.2", failure: "install" } });
+  try {
+    await updates(page);
+    await select(page, "Nightly");
+    await page.getByRole("button", { name: /Restart with/ }).click();
+    await expect(page.getByText("Installer failed. Restart Bedrock before trying another update.", { exact: true })).toBeVisible();
+    await expect(page.getByText(/Error invoking remote method/)).toHaveCount(0);
+    await expect(page.getByRole("combobox", { name: "Update channel" })).toBeDisabled();
+    await page.keyboard.press("Escape");
+    await page.locator(".cm-content").fill("Editable after failed installation");
+    await expect(page.locator(".cm-content")).toContainText("Editable after failed installation");
+    expect(await fs.stat(path.join(userDataDir, "update-test-installed.json")).then(() => true).catch(() => false)).toBe(false);
+  } finally { await disposeBedrock(app, userDataDir); }
+});

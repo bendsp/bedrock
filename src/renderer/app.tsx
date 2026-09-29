@@ -98,7 +98,12 @@ const App = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsCategory, setSettingsCategory] = useState<"editor" | "updates">("editor");
   const [updateReady, setUpdateReady] = useState(false);
-  useEffect(() => window.electronAPI.onUpdateStatus(status => setUpdateReady(status.phase === "ready")), []);
+  useEffect(() => {
+    let active = true;
+    const unsubscribe = window.electronAPI.onUpdateStatus(status => setUpdateReady(status.phase === "ready"));
+    void window.electronAPI.getUpdateStatus().then(status => { if (active) setUpdateReady(status.phase === "ready"); }).catch((): undefined => undefined);
+    return () => { active = false; unsubscribe(); };
+  }, []);
   const [selectionStats, setSelectionStats] = useState<SelectionStats>({
     hasSelection: false,
     words: 0,

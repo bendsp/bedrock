@@ -20,6 +20,7 @@ export default function UpdatesSettings({ dirty, onInstall }: { dirty: boolean; 
   const busy = ["checking", "downloading", "cancelling", "installing"].includes(status.phase);
   const disabled = status.phase === "disabled";
   const target = status.target;
+  const pendingChannel = channel !== null && channel !== status.channel;
   return <div className="space-y-5">
     <div><p className="font-medium">Bedrock {status.currentVersion}</p><p className="text-sm text-muted-foreground">Following {status.channel === "stable" ? "Stable" : "Nightly"}.</p></div>
     <div className="space-y-2">
@@ -48,10 +49,10 @@ export default function UpdatesSettings({ dirty, onInstall }: { dirty: boolean; 
     </div>
     {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
     <div className="flex flex-wrap gap-2">
-      <Button variant="outline" disabled={busy || disabled || status.phase === "ready"} onClick={() => void run(() => window.electronAPI.checkForUpdates())}>Check for updates</Button>
-      {target && ["available", "error"].includes(status.phase) ? <Button onClick={() => void run(() => window.electronAPI.downloadUpdate())}>Download update</Button> : null}
+      <Button variant="outline" disabled={busy || disabled || pendingChannel || status.phase === "ready"} onClick={() => void run(() => window.electronAPI.checkForUpdates())}>Check for updates</Button>
+      {target && ["available", "error"].includes(status.phase) ? <Button disabled={pendingChannel} onClick={() => void run(() => window.electronAPI.downloadUpdate())}>Download update</Button> : null}
       {status.phase === "downloading" ? <Button variant="outline" onClick={() => void run(() => window.electronAPI.cancelUpdate())}>Cancel download</Button> : null}
-      {status.phase === "ready" ? <Button disabled={dirty} onClick={() => void run(onInstall)}>Restart with {target?.version}</Button> : null}
+      {status.phase === "ready" ? <Button disabled={dirty || pendingChannel} onClick={() => void run(onInstall)}>Restart with {target?.version}</Button> : null}
     </div>
     {dirty && status.phase === "ready" ? <p className="text-sm text-muted-foreground">Save your changes before restarting to update.</p> : null}
     {target ? <Button variant="link" onClick={() => void window.electronAPI.openExternal(target.releaseUrl)}>Release notes</Button> : null}

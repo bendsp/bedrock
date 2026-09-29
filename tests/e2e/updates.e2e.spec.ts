@@ -11,7 +11,7 @@ async function select(page: Page, channel: "Stable" | "Nightly") {
   await page.getByRole("option", { name: channel, exact: true }).click();
   await page.getByRole("button", { name: "Apply channel", exact: true }).click();
 }
-test("switching from nightly to stable downloads a downgrade and protects dirty edits", async ({}, testInfo) => {
+test("switching from nightly to stable downloads a downgrade and protects dirty edits", async () => {
   const { app, page, userDataDir } = await launchBedrock({ updates: { version: "1.5.3-nightly.20260929.1" } });
   try {
     await page.locator(".cm-content").fill("Keep my unsaved work");
@@ -24,7 +24,7 @@ test("switching from nightly to stable downloads a downgrade and protects dirty 
     const rejected = await page.evaluate(async () => { try { await window.electronAPI.installUpdate(); return false; } catch { return true; } });
     expect(rejected).toBe(true);
     expect(JSON.parse(await fs.readFile(path.join(userDataDir, "updates.json"), "utf8")).channel).toBe("stable");
-    await page.screenshot({ path: testInfo.outputPath("updates-downgrade.png") });
+    await page.screenshot({ path: test.info().outputPath("updates-downgrade.png") });
     await page.keyboard.press("Escape");
     await page.keyboard.press(`${mod}+s`);
     await expect(page.locator("header")).not.toContainText("*");

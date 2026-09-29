@@ -88,6 +88,7 @@ test('notarization key accepts wrapped Base64 and rejects malformed secrets', ()
 test('nightly plans retry drafts, skip published commits, and allow fresh manual builds', async () => {
   const { releasePlan } = await import('../scripts/release-plan.mjs');
   const input = { releases: [], sha: 'abc', sourceVersion: '1.5.2', date: '20260929', run: '42', forced: false };
+  assert.equal(releasePlan({ ...input, releases: [{ tag_name: '1.6.0', draft: false, prerelease: false }] }).tag, '1.6.1-nightly.20260929.42');
   const first = releasePlan(input);
   assert.equal(first.tag, '1.5.3-nightly.20260929.42');
   const draft = { tag_name: first.tag, target_commitish: 'abc', draft: true };

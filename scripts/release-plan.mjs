@@ -13,7 +13,9 @@ export function releasePlan({ releases, sha, sourceVersion, tag, forced, date, r
   const published = matching.find(release => !release.draft);
   if (!forced && published) return { tag: published.tag_name, channel: 'nightly', skip: true };
   // A draft reserves the tag across failed jobs, workflow reruns, and scheduled retries.
-  const generated = `${semver.inc(sourceVersion, 'patch')}-nightly.${date}.${run}`;
+  const stableVersions = releases.filter(release => !release.draft && !release.prerelease && semver.valid(release.tag_name)).map(release => semver.clean(release.tag_name));
+  const base = [sourceVersion, ...stableVersions].sort(semver.rcompare)[0];
+  const generated = `${semver.inc(base, 'patch')}-nightly.${date}.${run}`;
   const existing = releases.find(release => release.tag_name === generated) ?? (!forced && matching.find(release => release.draft));
   if (existing && !existing.draft) return { tag: existing.tag_name, channel: 'nightly', skip: true };
   return { tag: existing?.tag_name ?? generated, channel: 'nightly', skip: false, existing };

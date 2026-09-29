@@ -7,6 +7,7 @@ const sha = process.env.GITHUB_SHA;
 const tagged = process.env.GITHUB_REF_TYPE === 'tag';
 if (!tagged && process.env.GITHUB_REF_NAME !== 'main') throw new Error('Nightlies must build main.');
 const releases = JSON.parse(gh('api', `${repository}/releases?per_page=100`));
+if (!tagged) releases.push(JSON.parse(gh('api', `${repository}/releases/latest`)));
 const plan = releasePlan({ releases, sha, sourceVersion: JSON.parse(readFileSync('package.json', 'utf8')).version,
   tag: tagged ? process.env.GITHUB_REF_NAME : null, forced: process.env.GITHUB_EVENT_NAME === 'workflow_dispatch',
   date: new Date().toISOString().slice(0, 10).replaceAll('-', ''), run: process.env.GITHUB_RUN_NUMBER });

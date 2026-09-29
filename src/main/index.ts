@@ -985,7 +985,7 @@ const createWindow = (): void => {
 app.on("ready", () => {
   const updateScenario = isE2EMode && process.env.BEDROCK_E2E_UPDATES ? JSON.parse(process.env.BEDROCK_E2E_UPDATES) : undefined;
   const smokeFeed = updateSmokeFeed();
-  const disabled = !updateScenario && !smokeFeed && (isE2EMode || BEDROCK_LOCAL_BUILD || !app.isPackaged)
+  const disabled = updateScenario || smokeFeed ? null : (isE2EMode || BEDROCK_LOCAL_BUILD || !app.isPackaged)
     ? "In-app updates are available in installed release builds."
     : !["darwin", "win32"].includes(process.platform) ? "In-app updates are available on macOS and Windows." : null;
   updates = createUpdates(status => {

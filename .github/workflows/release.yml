@@ -114,6 +114,7 @@ jobs:
           done < <(find out/make -name '*.dmg' -print0)
       - name: Build Windows installer
         if: matrix.platform == 'win32'
+        shell: bash
         run: |
           pnpm exec electron-forge package --platform=win32 --arch=x64
           pnpm exec electron-builder --prepackaged out/Bedrock-win32-x64 --win nsis --x64 --config electron-builder.windows.json --publish never

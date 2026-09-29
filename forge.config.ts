@@ -1,3 +1,5 @@
+import { version } from "./package.json";
+import { major, minor, patch } from "semver";
 import type { ForgeConfig } from "@electron-forge/shared-types";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -87,6 +89,11 @@ function getOsxNotarizeConfig() {
 const createConfig = (port: number, loggerPort: number): ForgeConfig => ({
   packagerConfig: {
     asar: true,
+    // PE version fields are numeric. The app manifest retains the full nightly SemVer.
+    ...(process.platform === "win32" ? {
+      appVersion: `${major(version)}.${minor(version)}.${patch(version)}`,
+      buildVersion: `${major(version)}.${minor(version)}.${patch(version)}`,
+    } : {}),
     name: localBuild ? "Bedrock Dev" : "Bedrock",
     appBundleId: localBuild ? "com.electron.bedrock.dev" : "com.electron.bedrock",
     icon: "./src/assets/icon",

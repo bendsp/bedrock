@@ -17,7 +17,7 @@
     "make:mac": "electron-forge make --platform=darwin",
     "make:mac:arm64": "electron-forge make --platform=darwin --arch=arm64",
     "make:mac:x64": "electron-forge make --platform=darwin --arch=x64",
-    "make:win": "electron-forge make --platform=win32",
+    "make:win": "electron-forge package --platform=win32 --arch=x64 && electron-builder --prepackaged out/Bedrock-win32-x64 --win nsis --x64 --config electron-builder.windows.json --publish never",
     "publish": "electron-forge publish",
     "publish:mac": "electron-forge publish --platform=darwin",
     "lint": "eslint --ext .ts,.tsx .",

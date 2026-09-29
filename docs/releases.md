@@ -47,7 +47,7 @@ They pass the same gates as stable, then publish automatically as prereleases wi
 
 Each published tag is immutable. CI refuses to replace a published release's
 assets. Downloads include macOS arm64 and x64 DMG/ZIP files, a Windows x64 NSIS
-installer, checksums, and architecture-specific updater metadata. The updater
+installer built with `pnpm make:win`, checksums, and architecture-specific updater metadata. The updater
 pins its download to one tag so a newer nightly cannot change an active download.
 
 The macOS Build environment supplies the Developer ID certificate and App Store
@@ -75,7 +75,7 @@ formats. Any future irreversible migration needs a separate migration design bef
 it can ship on Nightly. The updater never rewrites workspace documents.
 
 Versions before 1.5.2 need one manual installation to gain the updater. On macOS,
-quit Bedrock and replace the app with the downloaded release. On Windows, uninstall
+quit Bedrock and replace the app with the downloaded release. On Windows, quit Bedrock and uninstall
 the old Squirrel installation through Installed Apps before installing the new NSIS
 release. Keep your workspace and `%APPDATA%/Bedrock` settings folder. The two
 installer systems cannot update each other, and leaving both installed can leave

@@ -109,4 +109,4 @@ The renderer only talks to Electron via `window.electronAPI` (typed in `src/shar
 
 See [the core verification record](docs/quality/core-pass.md) for feature coverage, tests, and release constraints.
 
-See [builds and releases](docs/releases.md) for local installation, release tags, signing, and update limitations.
+See [builds and releases](docs/releases.md) for local installation, release tags, signing, and update channels.

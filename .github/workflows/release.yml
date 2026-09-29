@@ -115,9 +115,7 @@ jobs:
       - name: Build Windows installer
         if: matrix.platform == 'win32'
         shell: bash
-        run: |
-          pnpm exec electron-forge package --platform=win32 --arch=x64
-          pnpm exec electron-builder --prepackaged out/Bedrock-win32-x64 --win nsis --x64 --config electron-builder.windows.json --publish never
+        run: pnpm make:win
         env:
           BEDROCK_RELEASE: "1"
       - name: Collect artifacts with unique names

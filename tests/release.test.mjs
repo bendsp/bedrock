@@ -5,6 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { createPackage } from '@electron/asar';
 const scripts = fileURLToPath(new URL('../scripts/', import.meta.url));
 async function fixture(fn) {
   const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'bedrock-release-test-'));
@@ -19,7 +20,7 @@ function run(script, cwd, env) {
   });
 }
 test('version follows a valid tag without changing git state', () => fixture(async cwd => {
-  for (const tag of ['1.5.0', 'v1.5.0-beta.1']) {
+  for (const tag of ['1.5.1', 'v1.5.1-beta.1']) {
     const result = run('release-version.mjs', cwd, { RELEASE_TAG: tag, GITHUB_REF_TYPE: 'tag' });
     assert.equal(result.status, 0, result.stderr);
     assert.equal(JSON.parse(await fs.readFile(path.join(cwd, 'package.json'))).version, tag.replace(/^v/, ''));
@@ -30,6 +31,21 @@ test('release version rejects branches and malformed tags before writing', () =>
     assert.notEqual(run('release-version.mjs', cwd, { RELEASE_TAG: tag, GITHUB_REF_TYPE: type }).status, 0);
     assert.equal(JSON.parse(await fs.readFile(path.join(cwd, 'package.json'))).version, '1.0.0');
   }
+}));
+test('release verification rejects a stale packaged manifest', () => fixture(async cwd => {
+  const source = path.join(cwd, 'app-source');
+  const resources = path.join(cwd, 'out/Bedrock-win32-x64/resources');
+  await fs.mkdir(source, { recursive: true });
+  await fs.mkdir(resources, { recursive: true });
+  const env = { RELEASE_TAG: '1.5.1', BUILD_PLATFORM: 'win32', BUILD_ARCH: 'x64' };
+  await fs.writeFile(path.join(cwd, 'package.json'), JSON.stringify({ version: '1.5.1' }));
+  await fs.writeFile(path.join(source, 'package.json'), JSON.stringify({ version: '1.3.3' }));
+  await createPackage(source, path.join(resources, 'app.asar'));
+  assert.notEqual(run('verify-release-version.mjs', cwd, env).status, 0);
+  await fs.writeFile(path.join(source, 'package.json'), JSON.stringify({ version: '1.5.1' }));
+  await createPackage(source, path.join(resources, 'app.asar'));
+  const result = run('verify-release-version.mjs', cwd, env);
+  assert.equal(result.status, 0, result.stderr);
 }));
 test('artifact collection requires a complete set and produces unique DMG names and checksums', () => fixture(async cwd => {
   const source = path.join(cwd, 'out/make');

@@ -99,6 +99,12 @@ const createConfig = (port: number, loggerPort: number): ForgeConfig => ({
           CFBundleTypeRole: "Editor",
           LSHandlerRank: "Alternate",
         },
+        {
+          CFBundleTypeExtensions: ["txt"],
+          CFBundleTypeName: "Plain Text Document",
+          CFBundleTypeRole: "Editor",
+          LSHandlerRank: "Alternate",
+        },
       ],
     },
     osxSign: !localBuild && process.env.APPLE_IDENTITY

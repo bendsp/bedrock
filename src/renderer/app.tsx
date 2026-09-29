@@ -1,4 +1,5 @@
 import { normalizeDocumentText } from "./editor/codemirror/documentText";
+import { fileKind } from "../shared/fileKind";
 import { revealHeading } from "./editor/codemirror/links";
 import React, {
   useState,
@@ -221,6 +222,7 @@ const App = () => {
   }, [activeTheme]);
 
   const fileName = useMemo(() => getDisplayFileName(filePath), [filePath]);
+  const currentFileKind = fileKind(filePath);
 
   useEffect(() => {
     document.title =
@@ -570,6 +572,7 @@ const App = () => {
 
   const commandContext: CommandRunContext = {
     getEditorView: () => (busyRef.current ? null : editorViewRef.current),
+    isMarkdown: () => currentFileKind === "markdown",
     newFile: handleNew,
     openFile: handleOpen,
     saveFile: handleSave,
@@ -608,6 +611,7 @@ const App = () => {
     () =>
       createCommandRunner(commandRegistry, {
         getEditorView: () => commandContextRef.current.getEditorView(),
+        isMarkdown: () => commandContextRef.current.isMarkdown(),
         newFile: () => commandContextRef.current.newFile(),
         openFile: () => commandContextRef.current.openFile(),
         saveFile: () => commandContextRef.current.saveFile(),
@@ -691,13 +695,15 @@ const App = () => {
   const keyBindings = useMemo<KeyBinding[]>(() => {
     return [
       ...commands.buildCodeMirrorKeymap(settings),
-      { key: "Tab", run: navigateTable(1) },
-      { key: "Shift-Tab", run: navigateTable(-1) },
+      ...(currentFileKind === "markdown" ? [
+        { key: "Tab", run: navigateTable(1) },
+        { key: "Shift-Tab", run: navigateTable(-1) },
+      ] : []),
       indentWithTab,
-      ...markdownKeymap,
+      ...(currentFileKind === "markdown" ? markdownKeymap : []),
       ...defaultKeymap,
     ];
-  }, [commands, settings]);
+  }, [commands, settings, currentFileKind]);
 
   return (
     <>
@@ -713,6 +719,7 @@ const App = () => {
         onSearch={() => void commands.run("editor.find")}
         onExportHtml={() => void commands.run("file.exportHtml")}
         onExportPdf={() => void commands.run("file.exportPdf")}
+        isMarkdown={currentFileKind === "markdown"}
         onOpenSettings={() => void commands.run("app.openSettings")}
         stats={documentStats}
         selectionStats={selectionStats}
@@ -739,8 +746,9 @@ const App = () => {
           />
         ) : (
           <CodeMirrorEditor
-            key={screen.session}
+            key={`${screen.session}-${currentFileKind}`}
             value={doc}
+            fileKind={currentFileKind}
             renderMode={renderMode}
             theme={activeTheme}
             textSize={settings.textSize}

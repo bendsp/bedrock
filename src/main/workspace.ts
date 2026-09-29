@@ -120,10 +120,6 @@ export class WorkspaceStore {
           );
         }
         const filePath = path.resolve(rootPath, entry.path);
-        if (!filePath.toLowerCase().endsWith(".md"))
-          throw new RecentHistoryError(
-            "Recent-file data contains a non-Markdown file.",
-          );
         return { filePath, openedAt: entry.openedAt };
       })
       .slice(0, 20);

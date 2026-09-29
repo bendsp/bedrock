@@ -15,6 +15,7 @@ import {
 import type { CommandRegistry, CommandRunner } from "../commands/commandSystem";
 import { resolveCommandShortcutLabel } from "../commands/commandSystem";
 import type { UserSettings } from "../settings";
+import type { FileKind } from "../../shared/fileKind";
 import { tableAt } from "../editor/codemirror/tables";
 
 export function EditorContextMenu({
@@ -22,12 +23,14 @@ export function EditorContextMenu({
   commands,
   commandRegistry,
   settings,
+  fileKind,
   children,
 }: {
   getView: () => EditorView | null;
   commands: CommandRunner;
   commandRegistry: CommandRegistry;
   settings: UserSettings;
+  fileKind: FileKind;
   children: ReactElement<HTMLAttributes<HTMLElement>>;
 }) {
   const [inTable, setInTable] = useState(false);
@@ -50,7 +53,7 @@ export function EditorContextMenu({
     <ContextMenu>
       <ContextMenuTrigger asChild>{child}</ContextMenuTrigger>
       <ContextMenuContent className="w-64">
-        {(["Format", "Insert", "Table", "Edit", "File", "Theme"] as const).map(
+        {(fileKind === "markdown" ? ["Format", "Insert", "Table", "Edit", "File", "Theme"] : ["Edit", "File", "Theme"] as const).map(
           (category) => (
             <ContextMenuSub key={category}>
               <ContextMenuSubTrigger

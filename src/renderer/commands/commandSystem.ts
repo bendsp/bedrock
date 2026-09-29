@@ -13,7 +13,6 @@ import { openSearchPanel, closeSearchPanel } from "@codemirror/search";
 import type { EditorView, KeyBinding } from "@codemirror/view";
 import {
   headingCommand,
-  insertImageCommand,
   insertFootnoteCommand,
   createSnippetCommand,
   createMarkdownLinkCommand,
@@ -138,6 +137,7 @@ export type CommandDefinition = CommandMetadata &
 
 export type CommandRunContext = {
   getEditorView: () => EditorView | null;
+  isMarkdown: () => boolean;
   newFile: () => Promise<void>;
   openFile: () => Promise<void>;
   saveFile: () => Promise<void>;
@@ -274,12 +274,6 @@ export const createCommandRegistry = (): CommandRegistry => {
       }),
     },
     {
-      id: "insert.image",
-      title: "Image link",
-      category: "Insert",
-      run: insertImageCommand,
-    },
-    {
       id: "insert.table",
       title: "Table",
       category: "Insert",
@@ -401,6 +395,18 @@ export const createCommandRegistry = (): CommandRegistry => {
       },
     },
     {
+      id: "insert.image",
+      title: "Image…",
+      category: "Insert",
+      requiresEditor: true,
+      run: async (ctx) => {
+        const view = ctx.getEditorView();
+        if (!view) return false;
+        await ctx.attachImages(view, { kind: "choose" });
+        return true;
+      },
+    },
+    {
       id: "insert.attachImages",
       title: "Attach images…",
       category: "Insert",
@@ -457,7 +463,7 @@ export const createCommandRegistry = (): CommandRegistry => {
       id: "file.open",
       title: "Open…",
       category: "File",
-      description: "Open a Markdown file from your computer.",
+      description: "Open a UTF-8 text file from your computer.",
       defaultBinding: "mod+o",
       settingsKey: "open",
       isGlobal: true,
@@ -809,6 +815,15 @@ export const createCommandRunner = (
   ]);
   const canRun = (id: CommandId, view = ctx.getEditorView()): boolean => {
     const cmd = registry.get(id);
+    if (
+      !ctx.isMarkdown() &&
+      (cmd.category === "Format" ||
+        cmd.category === "Insert" ||
+        cmd.category === "Table" ||
+        id === "editor.followLink" ||
+        id === "file.exportHtml" ||
+        id === "file.exportPdf")
+    ) return false;
     if (cmd.requiresEditor && !view) return false;
     if (!view) return !id.startsWith("table.");
     const outer = tableCellOwners.get(view) ?? view;
@@ -934,6 +949,8 @@ export const createCommandRunner = (
       // in App.tsx. Adding them here causes double-triggering.
       if (cmd.isGlobal) continue;
 
+      if (!ctx.isMarkdown() &&
+        (cmd.category === "Format" || cmd.category === "Insert" || cmd.category === "Table" || cmd.id === "editor.followLink")) continue;
       const key = resolveCommandCodeMirrorKey(registry, cmd.id, settings);
       if (!key) continue;
 

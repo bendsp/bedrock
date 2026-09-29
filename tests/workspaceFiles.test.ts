@@ -41,6 +41,14 @@ async function run() {
       (await searchWorkspace(root, "", [], () => true)).files.length,
       0,
     );
+    const binaries = path.join(root, "Binary assets");
+    await fs.mkdir(binaries);
+    for (let index = 0; index < 33; index++)
+      await fs.writeFile(path.join(binaries, `${index}.blob`), Buffer.alloc(1024 * 1024, 255));
+    await fs.writeFile(path.join(binaries, "settings.txt"), "needle-in-text");
+    const mixed = await searchWorkspace(root, "needle-in-text", []);
+    assert.deepEqual(mixed.files.map(file => file.name), ["settings.txt"]);
+    assert.equal(mixed.truncated, false);
     await assert.rejects(() => workspaceNote(root, "../Outside.md"));
     await assert.rejects(() => workspaceNote(root, "Linked/Outside.md"));
     console.log(

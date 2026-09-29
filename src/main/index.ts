@@ -22,7 +22,7 @@ import { WorkspaceStore } from "./workspace";
 import {
   atomicWriteNote,
   atomicWriteFile,
-  readNote,
+  readTextFile,
   readImage,
   resolveNoteResource,
   revision,
@@ -57,15 +57,6 @@ if (BEDROCK_LOCAL_BUILD) {
   delete process.env.SENTRY_DSN;
 }
 
-const MARKDOWN_DIALOG_FILTER = {
-  name: "Markdown Files",
-  extensions: ["md"],
-};
-
-const ensureMarkdownExtension = (filePath: string): string => {
-  return filePath.toLowerCase().endsWith(".md") ? filePath : `${filePath}.md`;
-};
-
 const ensureExtension = (filePath: string, extension: string): string => {
   return filePath.toLowerCase().endsWith(`.${extension}`)
     ? filePath
@@ -98,6 +89,8 @@ const handle: typeof ipcMain.handle = (channel, listener) =>
   });
 
 const testState: BedrockTestState = {
+  nextImagePath: null,
+  lastRevealedImagePath: null,
   workspaceDelayMs: 0,
   nextRootPath: null,
   nextOpenPath: null,
@@ -116,6 +109,7 @@ const applyTestConfig = (
   if ("nextOpenPath" in config) {
     testState.nextOpenPath = config.nextOpenPath ?? null;
   }
+  if ("nextImagePath" in config) testState.nextImagePath = config.nextImagePath ?? null;
   if ("nextRootPath" in config)
     testState.nextRootPath = config.nextRootPath ?? null;
   if (
@@ -142,6 +136,8 @@ const resetTestState = (): BedrockTestState | null => {
   }
 
   testState.nextOpenPath = null;
+  testState.nextImagePath = null;
+  testState.lastRevealedImagePath = null;
   testState.nextRootPath = null;
   testState.workspaceDelayMs = 0;
   testState.nextSavePath = null;
@@ -165,9 +161,7 @@ const resolveNextSavePath = (): string | null => {
     return null;
   }
 
-  const filePath = ensureMarkdownExtension(
-    path.resolve(testState.nextSavePath),
-  );
+  const filePath = path.resolve(testState.nextSavePath);
   testState.nextSavePath = null;
   return filePath;
 };
@@ -183,27 +177,23 @@ const getDiscardDescription = (action: DiscardAction): string => {
   return "close this window";
 };
 
-const isMarkdownFilePath = (filePath: string): boolean => {
-  return filePath.toLowerCase().endsWith(".md");
-};
-
-const normalizeMarkdownFilePath = (filePath: unknown): string | null => {
+const normalizeTextFilePath = (filePath: unknown): string | null => {
   if (typeof filePath !== "string" || filePath.trim() === "") {
     return null;
   }
   const resolvedPath = path.resolve(filePath);
-  return isMarkdownFilePath(resolvedPath) ? resolvedPath : null;
+  return resolvedPath;
 };
 
-const readMarkdownFile = async (
+const readEditorFile = async (
   filePath: string,
 ): Promise<OpenFileResult | null> => {
-  const normalizedPath = normalizeMarkdownFilePath(filePath);
+  const normalizedPath = normalizeTextFilePath(filePath);
   if (!normalizedPath) {
     return null;
   }
 
-  const content = await readNote(normalizedPath);
+  const content = await readTextFile(normalizedPath);
   openedDocument = normalizedPath;
   openedRevisions.clear();
   openedRevisions.set(normalizedPath, revision(content));
@@ -217,7 +207,7 @@ const normalizeExternalOpenPath = (
     return null;
   }
 
-  const resolvedPath = normalizeMarkdownFilePath(filePath);
+  const resolvedPath = normalizeTextFilePath(filePath);
   return resolvedPath ? { filePath: resolvedPath } : null;
 };
 
@@ -286,14 +276,14 @@ handle("file:open", async (): Promise<OpenFileResult | null> => {
   try {
     const nextOpenPath = resolveNextOpenPath();
     if (nextOpenPath) {
-      const result = await readMarkdownFile(nextOpenPath);
+      const result = await readEditorFile(nextOpenPath);
       if (result) await rememberFile(result.filePath);
       return result;
     }
 
     const { canceled, filePaths } = await dialog.showOpenDialog({
       defaultPath: await workspace().defaultDirectory(),
-      filters: [MARKDOWN_DIALOG_FILTER],
+      filters: [{ name: "All files", extensions: ["*"] }],
       properties: ["openFile"],
     });
 
@@ -302,7 +292,7 @@ handle("file:open", async (): Promise<OpenFileResult | null> => {
     }
 
     const filePath = filePaths[0];
-    const result = await readMarkdownFile(filePath);
+    const result = await readEditorFile(filePath);
     if (result) await rememberFile(result.filePath);
     return result;
   } catch (error) {
@@ -317,20 +307,20 @@ handle(
   "file:read",
   async (_event, filePath: string): Promise<OpenFileResult | null> => {
     try {
-      const normalizedPath = normalizeMarkdownFilePath(filePath);
-      if (!normalizedPath) throw new Error("Choose a Markdown file.");
+      const normalizedPath = normalizeTextFilePath(filePath);
+      if (!normalizedPath) throw new Error("Choose a text file.");
       const recent = (await workspace().getInfo()).recentFiles;
       if (
         normalizedPath !== openedDocument &&
         !approvedOpenPaths.has(normalizedPath) &&
         !recent.some((file) => file.filePath === normalizedPath)
       )
-        throw new Error("Open this note using the Open dialog first.");
-      const result = await readMarkdownFile(normalizedPath);
+        throw new Error("Open this file using the Open dialog first.");
+      const result = await readEditorFile(normalizedPath);
       approvedOpenPaths.delete(normalizedPath);
       if (!result) {
         console.error(
-          `Rejected attempt to read non-markdown file: ${filePath}`,
+          `Rejected attempt to read file: ${filePath}`,
         );
         return null;
       }
@@ -366,7 +356,7 @@ handle(
       telemetryFilePath = payload.filePath;
 
       let targetPath = payload.filePath
-        ? ensureMarkdownExtension(path.resolve(payload.filePath))
+        ? path.resolve(payload.filePath)
         : payload.filePath;
 
       if (!targetPath) {
@@ -377,10 +367,10 @@ handle(
           const { canceled, filePath } = await dialog.showSaveDialog(
             BrowserWindow.fromWebContents(event.sender) ?? undefined,
             {
-              filters: [MARKDOWN_DIALOG_FILTER],
+              filters: [{ name: "All files", extensions: ["*"] }],
               defaultPath: path.join(
                 await workspace().defaultDirectory(),
-                "Untitled.md",
+                openedDocument ? path.basename(openedDocument) : "Untitled.md",
               ),
             },
           );
@@ -389,7 +379,7 @@ handle(
             return null;
           }
 
-          targetPath = ensureMarkdownExtension(filePath);
+          targetPath = filePath;
         }
       }
 
@@ -398,12 +388,27 @@ handle(
         (targetPath !== openedDocument || !openedRevisions.has(targetPath))
       )
         throw new Error(
-          "This note is not the active document. Use Save As to choose a destination.",
+          "This file is not the active document. Use Save As to choose a destination.",
         );
+      let expectedRevision: string | null | undefined = payload.filePath
+        ? openedRevisions.get(targetPath)
+        : null;
+      if (!payload.filePath) {
+        try {
+          const sameDocument = openedDocument &&
+            (await fs.realpath(targetPath)) === (await fs.realpath(openedDocument));
+          expectedRevision = sameDocument && openedDocument
+            ? openedRevisions.get(openedDocument)
+            : revision(await readTextFile(targetPath));
+        } catch (error) {
+          if (!(error instanceof Error && "code" in error && error.code === "ENOENT"))
+            throw error;
+        }
+      }
       await atomicWriteNote(
         targetPath,
         payload.content,
-        payload.filePath ? openedRevisions.get(targetPath) : undefined,
+        expectedRevision,
       );
       openedDocument = targetPath;
       openedRevisions.clear();
@@ -671,7 +676,7 @@ handle("workspace:open-note", async (_event, relativePath: unknown) => {
     await workspace().defaultDirectory(),
     relativePath,
   );
-  const note = await readMarkdownFile(target);
+  const note = await readEditorFile(target);
   if (!note) throw new Error("Unable to open this note.");
   await rememberFile(note.filePath);
   return note;
@@ -1016,6 +1021,36 @@ handle("file:resolve-image", async (_event, raw: unknown) => {
   } catch {
     return null;
   }
+});
+handle("file:reveal-image", async (_event, raw: unknown) => {
+  const resolved = await localResource(raw);
+  await readImage(resolved);
+  if (isE2EMode) testState.lastRevealedImagePath = resolved;
+  else shell.showItemInFolder(resolved);
+});
+handle("file:choose-image", async (event) => {
+  const documentPath = openedDocument;
+  if (!documentPath) throw new Error("Open a note before replacing an image.");
+  let selected: string | null;
+  if (isE2EMode) {
+    selected = testState.nextImagePath ?? null;
+    testState.nextImagePath = null;
+  } else {
+    const result = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender) ?? undefined, {
+      title: "Replace image",
+      filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp"] }],
+      properties: ["openFile"],
+    });
+    selected = result.canceled ? null : result.filePaths[0];
+  }
+  if (!selected) return null;
+  const data = await readImage(selected);
+  if (documentPath !== openedDocument) throw new Error("The active note changed. Replace the image again.");
+  const note = await fs.realpath(documentPath);
+  const root = await fs.realpath(await workspace().defaultDirectory());
+  const [image] = await importImages(isWithin(root, note) ? root : path.dirname(note), note,
+    [{ name: path.basename(selected), bytes: Buffer.from(data.slice(data.indexOf(",") + 1), "base64") }]);
+  return image;
 });
 handle("file:open-note-link", async (_event, raw: unknown) => {
   const resolved = await localResource(raw);

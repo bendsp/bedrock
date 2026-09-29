@@ -10,7 +10,7 @@ import {
   getMarkdownContext,
 } from "./markdownContext";
 import { tableCellOwners } from "./tableCellContext";
-import { EditorState, StateField, Range } from "@codemirror/state";
+import { EditorState, EditorSelection, StateField, Range } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import {
   Decoration,
@@ -20,6 +20,7 @@ import {
 } from "@codemirror/view";
 import { render as renderMath } from "katex";
 import { safeMarkdownHtml } from "../../lib/markdown";
+import { ImageWidget } from "./imageWidget";
 
 type Preview = {
   from: number;
@@ -31,6 +32,8 @@ type Preview = {
   revealFrom?: number;
   definition?: number;
   label?: string;
+  imageFrom?: number;
+  imageTo?: number;
 };
 class MarkdownWidget extends WidgetType {
   constructor(readonly preview: Preview) {
@@ -140,16 +143,23 @@ function collectPreviews(state: EditorState): Preview[] {
       const covered = inlineHtml[htmlIndex];
       if (covered && covered.from <= node.from && covered.to >= node.to)
         return false;
+      if (node.name === "Link") {
+        const image = node.node.getChild("Image");
+        if (image && state.doc.sliceString(node.from, image.from) === "[" && state.doc.sliceString(image.to, image.to + 1) === "]") {
+          result.push({ kind: "Image", from: node.from, to: node.to,
+            imageFrom: image.from, imageTo: image.to,
+            source: state.doc.sliceString(node.from, node.to), references });
+          return false;
+        }
+      }
       if (node.name === "HTMLBlock" || node.name === "CommentBlock") {
+        const source = state.doc.sliceString(state.doc.lineAt(node.from).from, node.to);
         result.push({
-          kind: "HTML",
+          kind: /^\s*<img\b[^>]*>\s*$/i.test(source) ? "Image" : "HTML",
           block: true,
           from: state.doc.lineAt(node.from).from,
           to: node.to,
-          source: state.doc.sliceString(
-            state.doc.lineAt(node.from).from,
-            node.to,
-          ),
+          source,
           references,
         });
         return false;
@@ -168,7 +178,7 @@ function collectPreviews(state: EditorState): Preview[] {
           if (["br", "wbr", "img"].includes(name) && !stack.length) {
             inlineHtml.push({ from: tag.from, to: tag.to });
             result.push({
-              kind: "HTML",
+              kind: name === "img" ? "Image" : "HTML",
               from: tag.from,
               to: tag.to,
               source: raw,
@@ -273,7 +283,7 @@ function decorate(state: EditorState, previews: Preview[]): DecorationSet {
   const result: Range<Decoration>[] = [];
   for (const preview of previews) {
     if (
-      state.selection.ranges.some(
+      preview.kind !== "Image" && state.selection.ranges.some(
         (range) =>
           range.from <= preview.to &&
           range.to >= (preview.revealFrom ?? preview.from),
@@ -286,7 +296,9 @@ function decorate(state: EditorState, previews: Preview[]): DecorationSet {
     }
     result.push(
       Decoration.replace({
-        widget: new MarkdownWidget(preview),
+        widget: preview.kind === "Image"
+          ? new ImageWidget(preview, state.selection.ranges.some(range => range.from === preview.from && range.to === preview.to))
+          : new MarkdownWidget(preview),
         block: preview.block ?? preview.source.includes("\n"),
       }).range(preview.from, preview.to),
     );
@@ -294,12 +306,12 @@ function decorate(state: EditorState, previews: Preview[]): DecorationSet {
   return Decoration.set(result, true);
 }
 /** Cache structural blocks across cursor moves; direct decorations may replace line breaks. */
-export const blockPreviews = StateField.define<{
+function previewField(images: boolean) { return StateField.define<{
   previews: Preview[];
   decorations: DecorationSet;
 }>({
   create(state) {
-    const previews = collectPreviews(state);
+    const previews = collectPreviews(state).filter(preview => (preview.kind === "Image") === images);
     return { previews, decorations: decorate(state, previews) };
   },
   update(value, tr) {
@@ -308,9 +320,49 @@ export const blockPreviews = StateField.define<{
       syntaxTree(tr.startState) !== syntaxTree(tr.state) ||
       tr.effects.some((effect) => effect.is(refreshMarkdownContext));
     if (!changed && !tr.selection) return value;
-    const previews = changed ? collectPreviews(tr.state) : value.previews;
+    const previews = changed ? collectPreviews(tr.state).filter(preview => (preview.kind === "Image") === images) : value.previews;
     return { previews, decorations: decorate(tr.state, previews) };
   },
-  provide: (field) =>
+  provide: (field) => [
     EditorView.decorations.from(field, (value) => value.decorations),
-});
+    ...(images ? [EditorView.atomicRanges.of(view => view.state.field(field).decorations)] : []),
+  ],
+}); }
+
+export const blockPreviews = previewField(false);
+const imageField = previewField(true);
+export const imagePreviews = [
+  imageField,
+  EditorView.editorAttributes.compute([imageField, "selection"], state => {
+    const selection = state.selection;
+    const selected = selection.ranges.length === 1 && state.field(imageField).previews.some(image =>
+      selection.main.from === image.from && selection.main.to === image.to);
+    return selected ? { class: "cm-image-object-selected" } : {};
+  }),
+  EditorState.transactionFilter.of(tr => {
+    if (!tr.selection || tr.docChanged) return tr;
+    const images = tr.startState.field(imageField).previews;
+    const ranges = tr.newSelection.ranges.map(range => {
+      let { anchor, head } = range;
+      for (const image of images) {
+        if (range.empty && head > image.from && head < image.to) {
+          anchor = head = head - image.from < image.to - head ? image.from : image.to;
+        } else if (!range.empty) {
+          if (anchor > image.from && anchor < image.to) anchor = range.anchor < range.head ? image.from : image.to;
+          if (head > image.from && head < image.to) head = range.anchor < range.head ? image.to : image.from;
+        }
+      }
+      return EditorSelection.range(anchor, head);
+    });
+    const selection = EditorSelection.create(ranges, tr.newSelection.mainIndex);
+    return selection.eq(tr.newSelection) ? tr : [tr, { selection, sequential: true }];
+  }),
+];
+
+export function selectRenderedImage(view: EditorView, index: number): boolean {
+  const preview = view.state.field(imageField).previews[index];
+  if (!preview) return false;
+  view.dispatch({ selection: { anchor: preview.from, head: preview.to } });
+  view.focus();
+  return true;
+}

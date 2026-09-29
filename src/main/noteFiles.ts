@@ -7,6 +7,7 @@ export const revision = (content: string) =>
   createHash("sha256").update(content).digest("hex");
 const errorCode = (error: unknown) =>
   error instanceof Error && "code" in error ? error.code : undefined;
+export class UnsupportedTextFileError extends Error {}
 
 export async function readBoundedText(
   filePath: string,
@@ -39,7 +40,7 @@ export async function readBoundedText(
         buffer.subarray(0, size),
       );
     } catch {
-      throw new Error(
+      throw new UnsupportedTextFileError(
         "This file is not valid UTF-8 text. Convert it to UTF-8 before opening it in Bedrock.",
       );
     }
@@ -48,18 +49,33 @@ export async function readBoundedText(
   }
 }
 
-export const readNote = async (filePath: string) => {
+export const readTextFile = async (filePath: string) => {
   const content = await readBoundedText(
     filePath,
     MAX_MARKDOWN_FILE_BYTES,
-    "This Markdown file exceeds the 10 MB editing limit.",
+    "This file exceeds the 10 MB editing limit.",
   );
-  if (content.includes("\0"))
-    throw new Error(
-      "This file contains binary or UTF-16 data. Convert it to UTF-8 before opening it in Bedrock.",
+  let hasBinaryControls = false;
+  for (const character of content) {
+    const code = character.charCodeAt(0);
+    if (code <= 8 || (code >= 14 && code <= 31) || code === 127) {
+      hasBinaryControls = true;
+      break;
+    }
+  }
+  if (hasBinaryControls)
+    throw new UnsupportedTextFileError(
+      "This file contains binary or UTF-16 data. Bedrock can only edit UTF-8 text files.",
+    );
+  const endings = new Set(content.match(/\r\n|\r|\n/g));
+  if (endings.size > 1)
+    throw new UnsupportedTextFileError(
+      "This file has mixed line endings. Convert it to one line-ending style before editing it in Bedrock.",
     );
   return content;
 };
+
+export const readNote = readTextFile;
 
 /** Replace only after the complete data is synced. Preserve the target of a symlink. */
 export async function atomicWriteFile(
@@ -107,7 +123,7 @@ export async function atomicWriteFile(
 export async function atomicWriteNote(
   filePath: string,
   content: string,
-  expectedRevision?: string,
+  expectedRevision?: string | null,
 ): Promise<void> {
   await atomicWriteFile(
     filePath,
@@ -115,17 +131,26 @@ export async function atomicWriteNote(
     expectedRevision === undefined
       ? undefined
       : async (target) => {
+          if (expectedRevision === null) {
+            try {
+              await fs.lstat(target);
+            } catch (error) {
+              if (errorCode(error) === "ENOENT") return;
+              throw error;
+            }
+            throw new Error("This file appeared while saving. Choose another name.");
+          }
           let current: string;
           try {
-            current = await readNote(target);
+            current = await readTextFile(target);
           } catch {
             throw new Error(
-              "This note changed or became unavailable outside Bedrock. Use Save As to keep your edits, then reopen the original.",
+              "This file changed or became unavailable outside Bedrock. Use Save As to keep your edits, then reopen the original.",
             );
           }
           if (revision(current) !== expectedRevision)
             throw new Error(
-              "This note changed outside Bedrock. Use Save As to keep your edits, then reopen the original.",
+              "This file changed outside Bedrock. Use Save As to keep your edits, then reopen the original.",
             );
         },
   );

@@ -78,6 +78,7 @@ export const getEditorText = async (page: Page): Promise<string> => {
 export const configureTestHarness = async (
   page: Page,
   config: {
+    nextImagePath?: string | null;
     nextOpenPath?: string | null;
     nextSavePath?: string | null;
     discardResponse?: boolean | null;

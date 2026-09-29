@@ -23,16 +23,19 @@ import {
   RenderMode,
   SelectionStats,
 } from "../../../shared/types";
+import type { FileKind } from "../../../shared/fileKind";
 import { ThemeName } from "../../theme";
 import { getSelectionStats } from "../../lib/documentStats";
 import { buildThemeExtension } from "./theme";
 import { hybridMarkdown } from "./hybridMarkdown";
+import { imagePreviews } from "./markdownWidgets";
 import { linkClickHandler } from "./links";
 import { editingLock } from "./editingLock";
 import { createReactSearchPanel } from "./searchPanel";
 
 type ExtensionOptions = {
   renderMode: RenderMode;
+  fileKind: FileKind;
   theme: ThemeName;
   textSize: number;
   keyBindings: import("@codemirror/view").KeyBinding[];
@@ -70,8 +73,8 @@ const selectionStatsEqual = (
   );
 };
 
-export const renderModeExtension = (mode: RenderMode): Extension => {
-  if (mode === "hybrid") {
+export const renderModeExtension = (mode: RenderMode, kind: FileKind = "markdown"): Extension => {
+  if (kind === "markdown" && mode === "hybrid") {
     return hybridMarkdown();
   }
   return [];
@@ -79,7 +82,7 @@ export const renderModeExtension = (mode: RenderMode): Extension => {
 
 export const keymapExtension = (
   bindings: import("@codemirror/view").KeyBinding[],
-  base: import("@codemirror/view").KeyBinding[],
+  base: readonly import("@codemirror/view").KeyBinding[],
 ): Extension => keymap.of([...bindings, ...base]);
 
 export const createCmExtensions = (
@@ -117,13 +120,13 @@ export const createCmExtensions = (
     }
   });
 
-  const baseKeys = buildBaseKeymap();
+  const baseKeys = options.fileKind === "markdown" ? buildBaseKeymap() : searchKeymap;
 
   const extensions: Extension[] = [
     editingLock,
     drawSelection(),
     history(),
-    markdownLanguage(),
+    ...(options.fileKind === "markdown" ? [markdownLanguage()] : []),
     indentUnit.of("  "),
     EditorView.lineWrapping,
     search({
@@ -131,11 +134,12 @@ export const createCmExtensions = (
       createPanel: createReactSearchPanel,
     }),
     updateListener,
-    linkClickHandler,
+    ...(options.fileKind === "markdown" ? [linkClickHandler] : []),
     keymapCompartment.of(keymapExtension(options.keyBindings, baseKeys)),
     themeCompartment.of(buildThemeExtension(options.theme, options.textSize)),
-    richTables,
-    renderModeCompartment.of(renderModeExtension(options.renderMode)),
+    ...(options.fileKind === "markdown" ? [richTables] : []),
+    ...(options.fileKind === "markdown" ? [imagePreviews] : []),
+    renderModeCompartment.of(renderModeExtension(options.renderMode, options.fileKind)),
   ];
 
   if (options.placeholder) {

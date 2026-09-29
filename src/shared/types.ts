@@ -60,6 +60,7 @@ export interface BedrockRuntimeInfo {
 }
 
 export interface BedrockTestConfig {
+  nextImagePath?: string | null;
   workspaceDelayMs?: number;
   nextRootPath?: string | null;
   nextOpenPath?: string | null;
@@ -68,6 +69,7 @@ export interface BedrockTestConfig {
 }
 
 export interface BedrockTestState extends BedrockTestConfig {
+  lastRevealedImagePath: string | null;
   lastDiscardPrompt: DiscardPromptPayload | null;
 }
 
@@ -93,6 +95,8 @@ export interface ImageImportRequest {
 }
 
 export interface IElectronAPI {
+  chooseImage: () => Promise<ImportedImage | null>;
+  revealImage: (relativePath: string) => Promise<void>;
   searchWorkspace: (query: string) => Promise<WorkspaceSearchResult>;
   openWorkspaceNote: (relativePath: string) => Promise<OpenFileResult>;
   importImages: (request: ImageImportRequest) => Promise<ImportedImage[]>;

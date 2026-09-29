@@ -90,14 +90,33 @@ try {
     const log = createWriteStream(path.join(root, 'app.log'), { flags: 'a' });
     const child = spawn(executable, [], { env: { ...process.env, BEDROCK_E2E: '1', BEDROCK_USER_DATA_DIR: userData,
       BEDROCK_UPDATE_SMOKE_FEED: feed }, stdio: ['ignore', 'pipe', 'pipe'] });
-    child.stdout.pipe(log); child.stderr.pipe(log);
+    child.stdout.pipe(log, { end: false }); child.stderr.pipe(log, { end: false });
+    child.on("close", () => log.end());
     child.on('error', error => log.write(String(error)));
     return child;
+  }
+  async function stopTestApps() {
+    // Native installers relaunch without our test environment. Stop only this
+    // disposable installation before starting the next controlled instance.
+    if (platform === 'darwin') {
+      const processes = execFileSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8' });
+      for (const line of processes.split('\n')) {
+        const match = line.trim().match(/^(\d+)\s+(.*)$/);
+        if (match && (match[2] === executable || match[2].startsWith(executable + ' '))) {
+          try { process.kill(Number(match[1]), 'SIGTERM'); } catch { /* Already exited. */ }
+        }
+      }
+    } else {
+      const script = `Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq '${executable.replaceAll("'", "''")}' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`;
+      run('powershell.exe', ['-NoProfile', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')]);
+    }
+    await delay(1000);
   }
   async function installedVersion() {
     try { uncacheAll(); return JSON.parse(extractFile(asar, 'package.json').toString()).version; } catch { return null; }
   }
   async function roundTrip(channel) {
+    await stopTestApps();
     await fs.writeFile(path.join(userData, 'update-smoke-config.json'), JSON.stringify({ channel }));
     launch();
     const deadline = Date.now() + 180000;
@@ -105,6 +124,7 @@ try {
     if (await installedVersion() !== versions[channel]) throw new Error(`Installed version did not become ${versions[channel]}. See ${root}`);
     // Verify the replacement actually starts and reports its runtime version.
     await delay(3000);
+    await stopTestApps();
     await fs.writeFile(path.join(userData, 'update-smoke-config.json'), JSON.stringify({ report: true }));
     const child = launch();
     const exit = await Promise.race([new Promise(resolve => child.on('exit', resolve)), delay(20000).then(() => 'timeout')]);
@@ -124,6 +144,11 @@ try {
   await fs.rm('release-artifacts', { recursive: true, force: true });
   await fs.cp(artifactBackup, 'release-artifacts', { recursive: true });
   await fs.mkdir('update-smoke-results', { recursive: true });
+  if (platform === 'darwin') {
+    const cache = path.join(process.env.HOME, 'Library/Caches/com.electron.bedrock.ShipIt');
+    for (const name of ['ShipIt_stderr.log', 'ShipIt_stdout.log']) await fs.copyFile(path.join(cache, name), path.join('update-smoke-results', name)).catch(() => undefined);
+    await fs.writeFile('update-smoke-results/processes.txt', execFileSync('ps', ['-axo', 'pid=,command=']));
+  }
   for (const name of ['app.log', 'user-data/update-smoke.jsonl']) {
     await fs.copyFile(path.join(root, name), path.join('update-smoke-results', path.basename(name))).catch(() => undefined);
   }

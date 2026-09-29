@@ -90,7 +90,7 @@ const createConfig = (port: number, loggerPort: number): ForgeConfig => ({
     name: localBuild ? "Bedrock Dev" : "Bedrock",
     appBundleId: localBuild ? "com.electron.bedrock.dev" : "com.electron.bedrock",
     icon: "./src/assets/icon",
-    extraResource: ["./src/assets/bedrock.icon/LICENSE"],
+    extraResource: ["./src/assets/bedrock.icon/LICENSE", "./src/assets/app-update.yml"],
     extendInfo: {
       CFBundleDocumentTypes: localBuild ? [] : [
         {

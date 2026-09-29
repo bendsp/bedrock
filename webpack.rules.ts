@@ -31,6 +31,7 @@ export const nativeRules: Required<ModuleOptions>["rules"] = [
   },
   {
     test: /[/\\]node_modules[/\\].+\.(m?js|node)$/,
+    exclude: /[/\\]node_modules[/\\]js-yaml[/\\]/,
     parser: { amd: false },
     use: {
       loader: "@vercel/webpack-asset-relocator-loader",

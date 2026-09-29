@@ -58,7 +58,12 @@ test('artifact collection requires a complete set and produces unique DMG names 
   assert.equal(result.status, 0, result.stderr);
   const hashes = await fs.readFile(path.join(cwd, 'release-artifacts/SHA256SUMS-darwin-arm64.txt'), 'utf8');
   assert.match(hashes, /^[a-f0-9]{64}  Bedrock-darwin-arm64-1.0.0.dmg/m);
-  assert.equal(hashes.trim().split('\n').length, 2);
+  assert.equal(hashes.trim().split('\n').length, 3);
+  const metadata = JSON.parse(await fs.readFile(path.join(cwd, 'release-artifacts/latest-arm64-mac.yml'), 'utf8'));
+  assert.equal(metadata.version, '1.0.0');
+  assert.equal(metadata.files[0].url, 'Bedrock-darwin-arm64-1.0.0.zip');
+  assert.equal(metadata.files[0].size, 3);
+  assert.equal(Buffer.from(metadata.files[0].sha512, 'base64').length, 64);
 }));
 test('notarization key accepts wrapped Base64 and rejects malformed secrets', () => fixture(async cwd => {
   const key = '-----BEGIN PRIVATE KEY-----\nfixture-only\n-----END PRIVATE KEY-----\n';
@@ -79,3 +84,15 @@ test('notarization key accepts wrapped Base64 and rejects malformed secrets', ()
     assert.equal(await fs.readFile(path.join(cwd, 'AuthKey.p8'), 'utf8'), key);
   }
 }));
+
+test('nightly plans retry drafts, skip published commits, and allow fresh manual builds', async () => {
+  const { releasePlan } = await import('../scripts/release-plan.mjs');
+  const input = { releases: [], sha: 'abc', sourceVersion: '1.5.2', date: '20260929', run: '42', forced: false };
+  const first = releasePlan(input);
+  assert.equal(first.tag, '1.5.3-nightly.20260929.42');
+  const draft = { tag_name: first.tag, target_commitish: 'abc', draft: true };
+  assert.equal(releasePlan({ ...input, run: '43', releases: [draft] }).tag, first.tag);
+  assert.equal(releasePlan({ ...input, releases: [{ ...draft, draft: false }] }).skip, true);
+  assert.equal(releasePlan({ ...input, run: '43', forced: true, releases: [draft] }).tag, '1.5.3-nightly.20260929.43');
+  assert.throws(() => releasePlan({ ...input, tag: '1.5.2', releases: [{ tag_name: '1.5.2', draft: false }] }));
+});

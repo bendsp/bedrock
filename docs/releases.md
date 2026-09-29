@@ -30,58 +30,76 @@ An interrupted install may leave `~/Applications/.bedrock-dev-install.lock`. Con
 that no installer is running before removing that empty directory. If rollback fails,
 the command prints the retained previous bundle's path.
 
-## Release a version
+## Stable and nightly releases
 
-Use an existing SemVer tag such as `1.5.0` or `v1.5.0-beta.1`. Pushing the tag starts
-Release. A manual workflow run must also select a tag. The tag sets `package.json`'s
-version only in the build checkout; the workflow does not push a version commit.
-The source manifest can therefore lag the latest release and is not the release authority.
+Stable builds use a SemVer tag such as `1.5.2`. CI sets `package.json` to the tag's
+version in the build checkout, then checks the source manifest, packaged ASAR, and
+macOS bundle versions. It never pushes a version commit to protected main.
+All checks and platform builds must pass before CI uploads a stable draft.
+Review the draft, then publish it as the latest release.
 
-Release validates the tag and refuses to modify a published release. It runs the same
-lint, typecheck, unit, release-script, and Linux Electron checks as CI. Builds then
-produce macOS arm64 and x64 DMG/ZIP files and Windows x64 Squirrel artifacts. Every
-platform must succeed before upload to a GitHub draft. Prerelease tags create prerelease
-drafts. Review the draft and publish it manually.
+Nightlies build on main pushes. A 30-minute schedule retries unfinished work and
+builds a new commit if a push was missed. Unchanged published commits are skipped.
+A manual run on main forces a new nightly. Failed jobs reuse their draft and tag.
+Nightly versions use the next patch followed by `-nightly.YYYYMMDD.RUN_NUMBER`.
+They pass the same gates as stable, then publish automatically as prereleases with
+`make_latest=false`. Stable installations never follow these prereleases.
 
-Ordinary local packaging signs only when an explicit identity is configured.
-The macOS build uses the GitHub **Build** environment's Developer ID certificate and
-App Store Connect key. Missing credentials fail the release. Forge signs and notarizes
-the app, then notarizes the DMG. The workflow validates signatures, Gatekeeper acceptance,
-and stapled tickets. Artifact names distinguish architectures; SHA-256 files accompany
-the downloads. Windows includes the installer, package, and RELEASES metadata.
+Each published tag is immutable. CI refuses to replace a published release's
+assets. Downloads include macOS arm64 and x64 DMG/ZIP files, a Windows x64 NSIS
+installer, checksums, and architecture-specific updater metadata. The updater
+pins its download to one tag so a newer nightly cannot change an active download.
 
-## Review findings, 8 September 2026
+The macOS Build environment supplies the Developer ID certificate and App Store
+Connect key. Missing credentials fail the build. Forge signs and notarizes the
+app and DMG; CI validates the signatures and stapled tickets. Windows installers
+are currently unsigned. Publishing requires no Windows signing credentials.
 
-The previous successful release was `1.4.0`, with arm64 ZIP, DMG, and Windows installer.
-Its Apple credential names remain configured in the Build environment. Their presence
-does not prove the certificate or key is still valid. The new signed release matrix
-needs a real tagged run before its notarization and Intel builds can be called verified.
-No release was published during this review.
+## In-app updates, starting with 1.5.2
 
-Fixed gaps include missing test gates, branch names used as versions on manual runs,
-missing Intel artifacts, uploads that assumed a release already existed, incomplete
-Windows artifacts, and the possibility of replacing published downloads. CI now also
-runs on main. A Linux trace-cleanup failure after the last window closed was corrected. Local packaging under Node 26 exited during ZIP extraction; pinning Node 22.23.2 restored complete builds. Trusted-frame URL comparison now normalizes URL encoding so installed paths containing spaces work.
+Settings → Updates shows the running version, selected channel, download progress,
+release notes, and restart action. Bedrock checks every 30 minutes and downloads
+new versions in the background. Installation requires an explicit restart.
+Unsaved documents block that restart, and editing stays locked while installation
+starts. Failed downloads leave the current app usable.
 
-Automatic updates are not implemented in the current source. There is no updater
-initialization, feed selection, or install/restart flow. Preserving the production
-installation keeps it available for future update testing, but does not establish an
-existing update path. Add that as a separate feature and verify an actual upgrade
-between two signed releases. macOS updates require a signed app and a compatible feed.
-See [Electron autoUpdater](https://www.electronjs.org/docs/latest/api/auto-updater/)
-and [Forge ZIP update support](https://www.electronforge.io/config/makers/zip).
+Changing the channel and choosing Apply saves the preference, checks the channel,
+and downloads its current release. Returning from Nightly to Stable can install an
+older version. Bedrock shows the version before restart. Cancelling or switching
+channels invalidates the previous download. A native installation failure requires
+restarting Bedrock before another update attempt.
 
-Windows signing is also not configured. The Windows installer remains unsigned.
-This review does not introduce a signing provider or credentials for it.
+Both channels share the same application identity and settings directory. Nightly
+changes must preserve compatibility with the latest stable settings and document
+formats. Any future irreversible migration needs a separate migration design before
+it can ship on Nightly. The updater never rewrites workspace documents.
+
+Versions before 1.5.2 need one manual installation to gain the updater. On macOS,
+quit Bedrock and replace the app with the downloaded release. On Windows, uninstall
+the old Squirrel installation through Installed Apps before installing the new NSIS
+release. Keep your workspace and `%APPDATA%/Bedrock` settings folder. The two
+installer systems cannot update each other, and leaving both installed can leave
+old shortcuts pointing at the old version. Future NSIS versions update in place.
+
+Local Bedrock Dev builds and unpackaged development sessions have updates disabled.
+The production updater accepts only the repository's release feeds. The native CI
+smoke test uses a loopback feed only with explicit test mode, CI mode, and isolated
+user data.
 
 ## Verification
 
-Local validation passed lint, typecheck, 82 unit checks, three release-script tests,
-and 40 Electron workflows. `actionlint` passed for both workflows. Native computer use
-confirmed the installed Dev app loads its Home screen without IPC errors. Reinstalling
-while Dev was running exercised graceful quit and replacement. The production app's
-`app.asar` SHA-256 remained unchanged. Local Dev builds use ad-hoc signing; this is not
-proof of Apple notarization or a production auto-update.
+The baseline is `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`,
+`pnpm test:release`, and `pnpm test:e2e`. Updater coverage includes channel filtering,
+cancelled and stale downloads, cross-channel downgrades, dirty-document protection,
+preference failures, offline checks, and failed downloads.
+
+Release CI also installs two builds from the same source with different versions
+on disposable macOS arm64 and Windows x64 runners. It performs a native update to
+Nightly and a downgrade to Stable, launches each replaced app, and checks version,
+channel preference, and preserved document/settings bytes. macOS uses actual
+Developer ID signatures and notarization. Intel builds receive signature and
+artifact checks; the native round trip runs on arm64. Evidence is uploaded as
+`update-smoke-*` artifacts. A failed round trip prevents release publication.
 
 ## App icon
 
@@ -92,6 +110,6 @@ Icon Composer's macOS rendition and generate the committed PNG, ICNS, and ICO.
 The app About screen uses the PNG; app bundles, DMGs, and Windows installers use
 the platform formats. Keep the website icon synchronized with this PNG.
 
-## 1.5.1 version checks
+## Version checks
 
-The repository package version is 1.5.1. Release CI still derives the build version from the tag, then verifies `package.json`, the packaged ASAR manifest, and both macOS bundle version fields before uploading artifacts. A mismatch fails the build.
+Release CI still derives the build version from the tag, then verifies `package.json`, the packaged ASAR manifest, and both macOS bundle version fields before uploading artifacts. A mismatch fails the build.

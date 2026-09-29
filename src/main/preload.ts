@@ -1,3 +1,4 @@
+import type { UpdateChannel, UpdateStatus } from "../shared/updates";
 import { contextBridge, ipcRenderer } from "electron";
 import {
   ImageImportRequest,
@@ -16,6 +17,17 @@ import {
 } from "../shared/types";
 
 contextBridge.exposeInMainWorld("electronAPI", {
+  getUpdateStatus: () => ipcRenderer.invoke("updates:status"),
+  setUpdateChannel: (channel: UpdateChannel) => ipcRenderer.invoke("updates:channel", channel),
+  checkForUpdates: () => ipcRenderer.invoke("updates:check"),
+  downloadUpdate: () => ipcRenderer.invoke("updates:download"),
+  cancelUpdate: () => ipcRenderer.invoke("updates:cancel"),
+  installUpdate: () => ipcRenderer.invoke("updates:install"),
+  onUpdateStatus: (callback: (status: UpdateStatus) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: UpdateStatus) => callback(status);
+    ipcRenderer.on("updates:status", listener);
+    return () => ipcRenderer.removeListener("updates:status", listener);
+  },
   chooseImage: (): Promise<ImportedImage | null> => ipcRenderer.invoke("file:choose-image"),
   revealImage: (relativePath: string): Promise<void> => ipcRenderer.invoke("file:reveal-image", relativePath),
   searchWorkspace: (query: string): Promise<WorkspaceSearchResult> =>

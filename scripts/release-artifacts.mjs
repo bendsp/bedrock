@@ -20,6 +20,13 @@ async function collect(directory) {
   }
 }
 await collect('out/make');
-const required = platform === 'darwin' ? ['.dmg', '.zip'] : ['.exe', '.nupkg', 'RELEASES'];
+const required = platform === 'darwin' ? ['.dmg', '.zip'] : ['-setup.exe'];
 for (const suffix of required) if (![...found].some(name => name.endsWith(suffix))) throw new Error(`Missing ${suffix} artifact.`);
+const updateAsset = [...found].find(name => name.endsWith(platform === 'darwin' ? '.zip' : '-setup.exe'));
+const bytes = await fs.readFile(path.join('release-artifacts', updateAsset));
+const sha512 = createHash('sha512').update(bytes).digest('base64');
+const metadata = JSON.stringify({ version, files: [{ url: updateAsset, sha512, size: bytes.length }], path: updateAsset, sha512, releaseDate: new Date().toISOString() }, null, 2) + '\n';
+const metadataName = `latest-${arch}${platform === 'darwin' ? '-mac' : ''}.yml`;
+await fs.writeFile(path.join('release-artifacts', metadataName), metadata);
+hashes.push(`${createHash('sha256').update(metadata).digest('hex')}  ${metadataName}`);
 await fs.writeFile(`release-artifacts/SHA256SUMS-${platform}-${arch}.txt`, hashes.sort().join('\n') + '\n');

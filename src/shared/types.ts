@@ -1,3 +1,4 @@
+import type { UpdateChannel, UpdateStatus } from "./updates";
 export interface CursorPosition {
   line: number;
   char: number;
@@ -95,6 +96,13 @@ export interface ImageImportRequest {
 }
 
 export interface IElectronAPI {
+  getUpdateStatus: () => Promise<UpdateStatus>;
+  setUpdateChannel: (channel: UpdateChannel) => Promise<void>;
+  checkForUpdates: () => Promise<void>;
+  downloadUpdate: () => Promise<void>;
+  cancelUpdate: () => Promise<void>;
+  installUpdate: () => Promise<void>;
+  onUpdateStatus: (callback: (status: UpdateStatus) => void) => () => void;
   chooseImage: () => Promise<ImportedImage | null>;
   revealImage: (relativePath: string) => Promise<void>;
   searchWorkspace: (query: string) => Promise<WorkspaceSearchResult>;

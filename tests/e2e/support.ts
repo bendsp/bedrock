@@ -26,6 +26,7 @@ const findCompiledMainEntry = async (): Promise<string> => {
 
 export const launchBedrock = async (
   options: {
+    updates?: { version: string; failure?: "check" | "download"; delay?: number };
     initialExternalOpenPaths?: string[];
     setup?: boolean;
     userDataDir?: string;
@@ -46,6 +47,7 @@ export const launchBedrock = async (
     env: {
       ...process.env,
       BEDROCK_E2E: "1",
+      BEDROCK_E2E_UPDATES: options.updates ? JSON.stringify(options.updates) : "",
       BEDROCK_E2E_INITIAL_EXTERNAL_OPEN_PATHS: JSON.stringify(
         options.initialExternalOpenPaths ?? [],
       ),

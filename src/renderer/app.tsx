@@ -96,6 +96,9 @@ const App = () => {
   const [isQuickOpen, setIsQuickOpen] = useState(false);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsCategory, setSettingsCategory] = useState<"editor" | "updates">("editor");
+  const [updateReady, setUpdateReady] = useState(false);
+  useEffect(() => window.electronAPI.onUpdateStatus(status => setUpdateReady(status.phase === "ready")), []);
   const [selectionStats, setSelectionStats] = useState<SelectionStats>({
     hasSelection: false,
     words: 0,
@@ -454,6 +457,7 @@ const App = () => {
   }, [doc, focusEditor, screen, perform, refreshWorkspace]);
 
   const handleOpenSettings = useCallback(() => {
+    setSettingsCategory("editor");
     setIsSettingsOpen(true);
   }, []);
 
@@ -790,8 +794,15 @@ const App = () => {
           onClose={() => setIsPaletteOpen(false)}
         />
       )}
+      {updateReady && !isSettingsOpen ? <button className="fixed right-5 top-12 z-50 rounded-md border border-border bg-background px-3 py-2 text-sm shadow-sm" onClick={() => { setSettingsCategory("updates"); setIsSettingsOpen(true); }}>Update ready</button> : null}
       {isSettingsOpen ? (
         <SettingsModal
+          initialCategory={settingsCategory}
+          documentDirty={isDirty || busy}
+          onInstallUpdate={async () => {
+            if (isDirty) throw new Error("Save your changes before restarting to update.");
+            await perform(async () => { await window.electronAPI.installUpdate(); });
+          }}
           workspace={workspace}
           workspaceBusy={busy}
           workspaceError={workspaceError}

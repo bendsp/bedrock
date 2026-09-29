@@ -1,0 +1,14 @@
+{
+  "appId": "com.electron.bedrock",
+  "productName": "Bedrock",
+  "directories": { "output": "out/make/nsis" },
+  "win": { "target": ["nsis"], "icon": "src/assets/icon.ico", "signAndEditExecutable": false },
+  "nsis": {
+    "oneClick": true,
+    "perMachine": false,
+    "deleteAppDataOnUninstall": false,
+    "allowElevation": false,
+    "artifactName": "Bedrock-${version}-${arch}-setup.exe"
+  },
+  "publish": null
+}

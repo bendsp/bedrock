@@ -4,21 +4,29 @@ on:
   push:
     tags:
       - "*"
+    branches:
+      - main
+  schedule:
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.ref_type == 'tag' && github.ref_name || 'nightly' }}
   cancel-in-progress: false
-
-env:
-  RELEASE_TAG: ${{ github.ref_name }}
 
 jobs:
   prepare:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      channel: ${{ steps.release.outputs.channel }}
+      sha: ${{ steps.release.outputs.sha }}
+      skip: ${{ steps.release.outputs.skip }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -27,25 +35,21 @@ jobs:
           node-version: 22.23.2
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Validate release tag
-        run: node scripts/release-version.mjs
-      - name: Refuse to modify a published release
+      - name: Prepare stable or nightly release
+        id: release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh release view "$RELEASE_TAG" --json isDraft > release.json; then
-            node -e 'if (!require("./release.json").isDraft) throw new Error("This release is already published")'
-          else
-            # Distinguish a missing release from authentication or network failures.
-            gh api "repos/$GITHUB_REPOSITORY/releases" > /dev/null
-          fi
+        run: node scripts/prepare-release.mjs
 
   checks:
     needs: prepare
+    if: needs.prepare.outputs.skip != 'true'
     uses: ./.github/workflows/ci.yml
 
   build:
-    needs: checks
+    needs: [prepare, checks]
+    env:
+      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
     strategy:
       fail-fast: false
       matrix:
@@ -61,9 +65,12 @@ jobs:
             arch: x64
     runs-on: ${{ matrix.os }}
     environment: Build
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -107,7 +114,9 @@ jobs:
           done < <(find out/make -name '*.dmg' -print0)
       - name: Build Windows installer
         if: matrix.platform == 'win32'
-        run: pnpm exec electron-forge make --platform=win32 --arch=x64
+        run: |
+          pnpm exec electron-forge package --platform=win32 --arch=x64
+          pnpm exec electron-builder --prepackaged out/Bedrock-win32-x64 --win nsis --x64 --config electron-builder.windows.json --publish never
         env:
           BEDROCK_RELEASE: "1"
       - name: Collect artifacts with unique names
@@ -123,13 +132,35 @@ jobs:
           name: release-${{ matrix.platform }}-${{ matrix.arch }}
           path: release-artifacts/*
           if-no-files-found: error
+      - name: Verify installed upgrade and downgrade
+        if: matrix.arch == 'arm64' || matrix.platform == 'win32'
+        run: node scripts/update-smoke.mjs
+        env:
+          BUILD_ARCH: ${{ matrix.arch }}
+          BEDROCK_RELEASE: "1"
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_IDENTITY: ${{ secrets.APPLE_IDENTITY }}
+          APPLE_API_KEY: ${{ runner.temp }}/AuthKey.p8
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+      - name: Upload installed update evidence
+        if: always() && (matrix.arch == 'arm64' || matrix.platform == 'win32')
+        uses: actions/upload-artifact@v4
+        with:
+          name: update-smoke-${{ matrix.platform }}-${{ matrix.arch }}
+          path: update-smoke-results/*
+          if-no-files-found: ignore
       - name: Remove notarization key
         if: always() && matrix.platform == 'darwin'
         shell: bash
         run: rm -f "$RUNNER_TEMP/AuthKey.p8"
 
   draft:
-    needs: build
+    needs: [prepare, build]
+    env:
+      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+      RELEASE_CHANNEL: ${{ needs.prepare.outputs.channel }}
+      RELEASE_SHA: ${{ needs.prepare.outputs.sha }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -149,6 +180,9 @@ jobs:
           else
             PRERELEASE=()
             if [[ "$RELEASE_TAG" == *-* ]]; then PRERELEASE=(--prerelease); fi
-            gh release create "$RELEASE_TAG" --verify-tag --draft --generate-notes "${PRERELEASE[@]}"
+            gh release create "$RELEASE_TAG" --verify-tag --target "$RELEASE_SHA" --draft --generate-notes "${PRERELEASE[@]}"
           fi
           gh release upload "$RELEASE_TAG" artifacts/* --clobber
+          if [[ "$RELEASE_CHANNEL" == nightly ]]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false --title "Bedrock Nightly $RELEASE_TAG"
+          fi

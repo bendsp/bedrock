@@ -101,3 +101,6 @@ electron-forge
 
 *.log
 local_notes.md
+
+release-artifacts/
+update-smoke-results/

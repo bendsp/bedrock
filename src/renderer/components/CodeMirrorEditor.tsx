@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { EditorView } from "@codemirror/view";
 import { documentText, editorText } from "../editor/codemirror/documentText";
 import { RenderMode, CursorPosition, SelectionStats } from "../../shared/types";
+import type { FileKind } from "../../shared/fileKind";
 import { ThemeName } from "../theme";
 import type { CommandRegistry, CommandRunner } from "../commands/commandSystem";
 import type { UserSettings } from "../settings";
@@ -19,6 +20,7 @@ import { EditorContextMenu } from "./EditorContextMenu";
 type CodeMirrorEditorProps = {
   value: string;
   renderMode: RenderMode;
+  fileKind: FileKind;
   theme: ThemeName;
   textSize: number;
   settings: UserSettings;
@@ -36,6 +38,7 @@ type CodeMirrorEditorProps = {
 export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
   value,
   renderMode,
+  fileKind,
   theme,
   textSize,
   settings,
@@ -60,6 +63,7 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
 
     const bundle = createCmExtensions({
       renderMode,
+      fileKind,
       theme,
       textSize,
       keyBindings,
@@ -115,7 +119,7 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
     }
     view.dispatch({
       effects: bundle.compartments.renderMode.reconfigure(
-        renderModeExtension(renderMode),
+        renderModeExtension(renderMode, fileKind),
       ),
     });
   }, [renderMode]);
@@ -141,16 +145,17 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
     }
     view.dispatch({
       effects: bundle.compartments.keymap.reconfigure(
-        keymapExtension(keyBindings, buildBaseKeymap()),
+        keymapExtension(keyBindings, fileKind === "markdown" ? buildBaseKeymap() : []),
       ),
     });
-  }, [keyBindings]);
+  }, [keyBindings, fileKind]);
 
   return (
     <EditorContextMenu
       getView={() => viewRef.current}
       commands={commands}
       commandRegistry={commandRegistry}
+      fileKind={fileKind}
       settings={settings}
     >
       <div
@@ -160,7 +165,7 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
           const files = Array.from(event.clipboardData.files).filter((file) =>
             file.type.startsWith("image/"),
           );
-          if (!files.length) return;
+          if (!files.length || fileKind !== "markdown") return;
           event.preventDefault();
           event.stopPropagation();
           const element =
@@ -174,6 +179,7 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
             void commands.runWithView("insert.attachImages", view, { files });
         }}
         onDragOver={(event) => {
+          if (fileKind !== "markdown") return;
           if (
             Array.from(event.dataTransfer.items).some(
               (item) => item.kind === "file" && item.type.startsWith("image/"),
@@ -185,7 +191,7 @@ export const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
           const files = Array.from(event.dataTransfer.files).filter((file) =>
             file.type.startsWith("image/"),
           );
-          if (!files.length) return;
+          if (!files.length || fileKind !== "markdown") return;
           event.preventDefault();
           event.stopPropagation();
           if (event.target instanceof HTMLElement)

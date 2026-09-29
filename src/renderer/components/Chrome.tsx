@@ -29,6 +29,7 @@ import type { SelectionStats } from "../../shared/types";
 
 export type ChromeProps = {
   isHome: boolean;
+  isMarkdown: boolean;
   busy: boolean;
   onHome: () => void;
   title: string;
@@ -52,6 +53,7 @@ export type ChromeProps = {
 
 export function Chrome({
   isHome,
+  isMarkdown,
   busy,
   onHome,
   title,
@@ -191,7 +193,7 @@ export function Chrome({
                 </TooltipContent>
               </Tooltip>
 
-              <DropdownMenu>
+              {isMarkdown && <DropdownMenu>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <DropdownMenuTrigger asChild>
@@ -220,7 +222,7 @@ export function Chrome({
                     <span>Export to PDF</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
-              </DropdownMenu>
+              </DropdownMenu>}
               </> : null}
 
               <div className="flex-1" />
@@ -251,7 +253,7 @@ export function Chrome({
               </div>
               {!isHome ? <footer className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border px-4 text-xs tabular-nums text-muted-foreground">
                 <span className="min-w-0 truncate">
-                  {selectionStats?.hasSelection
+                  {!isMarkdown ? "Plain text · " : ""}{selectionStats?.hasSelection
                     ? `selection: ${selectionStats.words} words / ${selectionStats.chars} chars`
                     : "no selection"}
                 </span>

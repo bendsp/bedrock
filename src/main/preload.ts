@@ -16,6 +16,8 @@ import {
 } from "../shared/types";
 
 contextBridge.exposeInMainWorld("electronAPI", {
+  chooseImage: (): Promise<ImportedImage | null> => ipcRenderer.invoke("file:choose-image"),
+  revealImage: (relativePath: string): Promise<void> => ipcRenderer.invoke("file:reveal-image", relativePath),
   searchWorkspace: (query: string): Promise<WorkspaceSearchResult> =>
     ipcRenderer.invoke("workspace:search", query),
   openWorkspaceNote: (relativePath: string): Promise<OpenFileResult> =>

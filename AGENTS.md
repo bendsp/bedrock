@@ -153,3 +153,6 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
 - 2026-03-29: Added macOS `.md` document registration plus queued Finder/open-file handling so Bedrock can appear in Finder `Open With…`, reuse the existing single window, and honor dirty-document discard prompts for externally opened Markdown files.
 - 2026-04-19: Tightened external-open startup handling in the renderer and reset main-process renderer readiness after renderer termination so queued Finder opens recover more safely.
 - 2026-05-09: Completed a repo quality pass adding Markdown line commands (lists, tasks, quotes, code blocks), editor font-family settings, document stats, and main-process file/export IPC hardening.
+- 2026-09-29: Added UTF-8 text editing for files of any extension, with binary and mixed-line-ending rejection, plain-text editor mode, and safe save checks.
+
+- 2026-09-29: Images stay atomic rendered objects in both Markdown modes, including table cells, with replace, reveal, and delete controls. Release CI verifies source and packaged versions against the tag.

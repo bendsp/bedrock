@@ -6,6 +6,7 @@ import {
   atomicWriteFile,
   atomicWriteNote,
   readNote,
+  readTextFile,
   revision,
   resolveNoteResource,
   readImage,
@@ -51,6 +52,19 @@ async function run() {
     await assert.rejects(readNote(encoded), /UTF-16/);
     await fs.writeFile(encoded, "\ufeff# Title");
     assert.equal(await readNote(encoded), "\ufeff# Title");
+    const textBin = path.join(dir, "settings.bin");
+    await fs.writeFile(textBin, "\ufeffalpha\r\nbeta\r\n");
+    assert.equal(await readTextFile(textBin), "\ufeffalpha\r\nbeta\r\n");
+    await atomicWriteNote(textBin, "\ufeffalpha\r\nchanged\r\n", revision("\ufeffalpha\r\nbeta\r\n"));
+    assert.equal(await readTextFile(textBin), "\ufeffalpha\r\nchanged\r\n");
+    await fs.writeFile(textBin, Buffer.from([0x42, 0x49, 0x4e, 0, 0xff]));
+    await assert.rejects(readTextFile(textBin), /UTF-8|binary/);
+    await fs.writeFile(textBin, "alpha\r\nbeta\n");
+    await assert.rejects(readTextFile(textBin), /mixed line endings/);
+    const newText = path.join(dir, "new.txt");
+    await atomicWriteNote(newText, "new", null);
+    await assert.rejects(atomicWriteNote(newText, "overwrite", null), /appeared while saving/);
+    assert.equal(await readTextFile(newText), "new");
     const link = path.join(dir, "link.md");
     await fs.symlink(note, link);
     await atomicWriteNote(link, "through link", revision("external edit"));

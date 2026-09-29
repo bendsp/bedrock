@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
-import { readBoundedText } from "./noteFiles";
+import { readTextFile, UnsupportedTextFileError } from "./noteFiles";
 import type { ImportedImage, WorkspaceSearchResult } from "../shared/types";
 
 export function isWithin(root: string, target: string): boolean {
@@ -22,9 +22,9 @@ export async function workspaceNote(
     !relative ||
     relative.length > 4096 ||
     path.isAbsolute(relative) ||
-    !relative.toLowerCase().endsWith(".md")
+    relative.includes("\0")
   )
-    throw new Error("Choose a Markdown note in your Bedrock folder.");
+    throw new Error("Choose a file in your Bedrock folder.");
   const canonicalRoot = await fs.realpath(root);
   const candidate = path.resolve(canonicalRoot, relative);
   if (!isWithin(canonicalRoot, candidate))
@@ -82,7 +82,7 @@ export async function searchWorkspace(
         directories.push(full);
         continue;
       }
-      if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".md"))
+      if (!entry.isFile())
         continue;
       const relativePath = path
         .relative(canonicalRoot, full)
@@ -95,18 +95,16 @@ export async function searchWorkspace(
       if (!nameMatch) {
         try {
           const size = (await fs.stat(full)).size;
+          // Attachments cannot contain text matches and must not exhaust the text budget.
+          if (/\.(?:png|jpe?g|gif|webp|ico|pdf|zip|gz|mp[34]|mov|woff2?|ttf)$/i.test(entry.name)) continue;
           if (size > 1024 * 1024 || bytes + size > 32 * 1024 * 1024) {
             truncated = true;
             continue;
           }
-          bytes += size;
           // Recheck containment immediately before reading: symlinks are never followed outside the root.
           const resolved = await workspaceNote(canonicalRoot, relativePath);
-          const content = await readBoundedText(
-            resolved,
-            1024 * 1024,
-            "Note too large for content search.",
-          );
+          const content = await readTextFile(resolved);
+          bytes += size;
           const lower = content.toLocaleLowerCase();
           if (
             !tokens.every(
@@ -123,8 +121,8 @@ export async function searchWorkspace(
           excerpt = content
             .slice(Math.max(0, index - 40), index + 120)
             .replace(/\s+/g, " ");
-        } catch {
-          truncated = true;
+        } catch (error) {
+          if (!(error instanceof UnsupportedTextFileError)) truncated = true;
           continue;
         }
       }

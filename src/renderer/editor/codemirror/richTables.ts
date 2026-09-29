@@ -1,4 +1,4 @@
-import { blockPreviews } from "./markdownWidgets";
+import { blockPreviews, imagePreviews, selectRenderedImage } from "./markdownWidgets";
 import {
   markdownDocument,
   refreshMarkdownContext,
@@ -153,6 +153,14 @@ class TableEditor {
             `${row === 0 ? "Header" : `Row ${row - 1}`} column ${column + 1}`,
           );
           host.addEventListener("mousedown", (event) => {
+            const clickedImage = event.target instanceof HTMLImageElement ? event.target : null;
+            const imageIndex = clickedImage ? Array.from(host.querySelectorAll("img")).indexOf(clickedImage) : -1;
+            if (imageIndex >= 0 && this.active?.host !== host) {
+              event.preventDefault();
+              this.activate(row, column, false);
+              if (this.active) selectRenderedImage(this.active.editor, imageIndex);
+              return;
+            }
             if (followRenderedLink(event, this.outer)) return;
             if (this.active?.host === host) return;
             event.preventDefault();
@@ -335,6 +343,7 @@ class TableEditor {
               markdown({ extensions: [GFM, noteMarkdown] }),
               markdownDocument.of(() => this.outer.state),
               blockPreviews,
+              imagePreviews,
               markdownDecorations,
               linkClickHandler,
               drawSelection(),

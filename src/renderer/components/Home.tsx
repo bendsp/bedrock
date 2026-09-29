@@ -29,7 +29,7 @@ export const Home = ({
     <h1 className="text-3xl font-semibold tracking-tight">Home</h1>
     {workspace?.rootPath && (
       <Button variant="outline" disabled={busy} onClick={onQuickOpen}>
-        Find a note…
+        Find a file…
       </Button>
     )}
     {!workspace?.rootPath ? (

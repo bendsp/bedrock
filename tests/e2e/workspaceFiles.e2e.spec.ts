@@ -105,9 +105,8 @@ test("images paste inside table cells through the shared command", async () => {
       .click();
     await expect(page.locator('[data-table-cell="true"]')).toBeFocused();
     await pasteImage(page, '[data-table-cell="true"]');
-    await expect
-      .poll(() => page.locator('[data-table-cell="true"]').innerText())
-      .toContain("Attachments/Screenshot-");
+    await expect(page.locator('[data-table-cell="true"]').getByRole("img", { name: "Screenshot", exact: true })).toBeVisible();
+    await expect(page.locator('[data-table-cell="true"]')).not.toContainText("![");
     await page.keyboard.press("Escape");
     await expect(page.locator(".cm-rich-table img")).toBeVisible();
     await expect(page.locator(".cm-rich-table")).toHaveCount(1);
@@ -132,7 +131,7 @@ test("quick-open searches subfolders and content, honors dirty cancellation and 
     await page.locator(".cm-content").fill("Unsaved writing");
     await configureTestHarness(page, { discardResponse: false });
     await page.keyboard.press(`${mod}+p`);
-    const search = page.getByRole("combobox", { name: "Find a note" });
+    const search = page.getByRole("combobox", { name: "Find a file" });
     await search.fill("marmalade");
     await expect(page.getByRole("option")).toContainText("Projects/Ideas.md");
     await search.press("Enter");
@@ -149,7 +148,7 @@ test("quick-open searches subfolders and content, honors dirty cancellation and 
     );
     await page.getByRole("button", { name: "Home", exact: true }).click();
     await page
-      .getByRole("button", { name: "Find a note…", exact: true })
+      .getByRole("button", { name: "Find a file…", exact: true })
       .click();
     await search.fill("ideas");
     await expect(page.getByRole("option")).toHaveCount(2);

@@ -367,8 +367,16 @@ body {
 .cm-md-preview table { border-collapse: collapse; min-width: 55%; max-width: 100%; }
 .cm-md-preview th, .cm-md-preview td { border: 1px solid var(--panel-border); padding: .5em .75em; min-width: 5em; }
 .cm-md-preview th { background: var(--code-bg); font-weight: 600; }
-.cm-md-preview img { max-width: 100%; max-height: 32rem; object-fit: contain; border-radius: 4px; }
+.cm-md-preview img { max-width: 100%; max-height: min(32rem, 45vh); object-fit: contain; border-radius: 4px; }
 .cm-md-image-error { min-height: 2em; }
+.cm-md-preview-image { display: inline-block; position: relative; max-width: 100%; cursor: pointer; vertical-align: middle; border-radius: 4px; }
+.cm-image-content { display: block; width: fit-content; max-width: 100%; border-radius: 4px; }
+.cm-md-preview-image img { display: block; }
+.cm-md-preview-image.cm-image-selected .cm-image-content { outline: 2px solid var(--ui-primary); outline-offset: 3px; }
+.cm-image-controls { display: flex; flex-wrap: wrap; gap: 4px; position: relative; z-index: 30; width: max-content; max-width: min(420px, 75vw); margin-top: 6px; padding: 5px; border: 1px solid var(--panel-border); border-radius: 8px; background: var(--panel-bg); color: var(--panel-text); box-shadow: 0 4px 16px #0002; font: 12px/1.4 system-ui, sans-serif; user-select: none; }
+.cm-image-controls button { padding: 6px 8px; border: 0; border-radius: 4px; background: transparent; color: inherit; cursor: pointer; white-space: nowrap; }
+.cm-image-controls button:hover, .cm-image-controls button:focus-visible { background: var(--code-bg); outline: 1px solid var(--ui-primary); }
+.cm-image-controls button:disabled { opacity: .5; cursor: default; }
 .command-palette { overflow: hidden; background: var(--panel-bg); color: var(--panel-text); border-color: var(--panel-border); font-size: 14px; }
 .command-search { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--panel-border); color: var(--muted-text); }
 .command-search input { flex: 1; min-width: 0; padding: 0; background: transparent; border: 0; outline: none; box-shadow: none; color: var(--panel-text); font-size: 15px; }
@@ -529,3 +537,8 @@ body {
 .quick-note-copy small, .quick-note-copy p { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted-text); font-size: 12px; }
 .quick-note-copy p { margin-top: 4px; }
 .quick-open [role="alert"] { padding: 16px; }
+
+.cm-image-object-selected > .cm-scroller > .cm-selectionLayer,
+.cm-image-object-selected > .cm-scroller > .cm-cursorLayer { visibility: hidden; }
+
+.cm-image-controls[hidden] { display: none; }

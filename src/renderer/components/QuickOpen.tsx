@@ -73,20 +73,20 @@ export function QuickOpen({
         >
           <Dialog.Title className="sr-only">Quick open</Dialog.Title>
           <Dialog.Description className="sr-only">
-            Find a note by its name, folder, or contents.
+            Find a file by its name, folder, or contents.
           </Dialog.Description>
           <div className="command-search">
             <Search size={18} aria-hidden="true" />
             <input
               autoFocus
               role="combobox"
-              aria-label="Find a note"
+              aria-label="Find a file"
               aria-expanded="true"
               aria-controls="quick-open-results"
               aria-activedescendant={
                 files[active] ? `quick-note-${active}` : undefined
               }
-              placeholder="Find a note…"
+              placeholder="Find a file…"
               maxLength={200}
               value={query}
               onChange={(event) => {
@@ -117,7 +117,7 @@ export function QuickOpen({
           <div
             id="quick-open-results"
             role="listbox"
-            aria-label="Notes"
+            aria-label="Files"
             aria-busy={state.kind === "loading"}
           >
             {files.map((file, index) => (
@@ -145,15 +145,15 @@ export function QuickOpen({
             {state.kind === "ready" && !files.length && (
               <p role="status">
                 {query
-                  ? "No matching notes."
-                  : "Your Bedrock folder has no notes yet."}
+                  ? "No matching files."
+                  : "Your Bedrock folder has no files yet."}
               </p>
             )}
           </div>
           <div className="command-footer">
             {state.kind === "ready" && state.result.truncated
               ? "Showing a limited set of matches. Refine your search."
-              : "Search names, folders, and note contents"}
+              : "Search names, folders, and text contents"}
           </div>
         </Dialog.Content>
       </Dialog.Portal>

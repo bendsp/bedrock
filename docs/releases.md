@@ -19,7 +19,7 @@ and macOS accepts the launch request. It never targets `/Applications/Bedrock.ap
 | Installed location | `/Applications/Bedrock.app` | `~/Applications/Bedrock Dev.app` |
 | Settings directory | Existing Electron user-data directory | `~/Library/Application Support/Bedrock Dev` |
 | Signing | Developer ID and Apple notarization | Local ad-hoc signature |
-| Markdown registration | Finder Open With | No file association registration |
+| Markdown and TXT registration | Finder Open With | No file association registration |
 
 Dev starts with separate settings and workspace selection. You can select the same
 Bedrock folder to use your real notes. Those files are then shared, even though the
@@ -91,3 +91,7 @@ Run `python3 scripts/generate-icons.py` on macOS with Xcode and Pillow to export
 Icon Composer's macOS rendition and generate the committed PNG, ICNS, and ICO.
 The app About screen uses the PNG; app bundles, DMGs, and Windows installers use
 the platform formats. Keep the website icon synchronized with this PNG.
+
+## 1.5.1 version checks
+
+The repository package version is 1.5.1. Release CI still derives the build version from the tag, then verifies `package.json`, the packaged ASAR manifest, and both macOS bundle version fields before uploading artifacts. A mismatch fails the build.

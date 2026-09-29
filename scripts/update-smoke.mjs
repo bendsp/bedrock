@@ -100,12 +100,18 @@ try {
     // disposable installation before starting the next controlled instance.
     if (platform === 'darwin') {
       const processes = execFileSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8' });
+      const stopped = [];
       for (const line of processes.split('\n')) {
         const match = line.trim().match(/^(\d+)\s+(.*)$/);
         if (match && (match[2] === executable || match[2].startsWith(executable + ' '))) {
-          try { process.kill(Number(match[1]), 'SIGTERM'); } catch { /* Already exited. */ }
+          const pid = Number(match[1]);
+          try { process.kill(pid, 'SIGTERM'); stopped.push(pid); } catch (error) { if (error.code !== 'ESRCH') throw error; }
         }
       }
+      const alive = pid => { try { process.kill(pid, 0); return true; } catch (error) { if (error.code !== 'ESRCH') throw error; return false; } };
+      const deadline = Date.now() + 10000;
+      while (stopped.some(alive) && Date.now() < deadline) await delay(100);
+      if (stopped.some(alive)) throw new Error('The temporary test app did not exit before the next update phase.');
     } else {
       const script = `Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq '${executable.replaceAll("'", "''")}' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`;
       run('powershell.exe', ['-NoProfile', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')]);
@@ -147,7 +153,8 @@ try {
   if (platform === 'darwin') {
     const cache = path.join(process.env.HOME, 'Library/Caches/com.electron.bedrock.ShipIt');
     for (const name of ['ShipIt_stderr.log', 'ShipIt_stdout.log']) await fs.copyFile(path.join(cache, name), path.join('update-smoke-results', name)).catch(() => undefined);
-    await fs.writeFile('update-smoke-results/processes.txt', execFileSync('ps', ['-axo', 'pid=,command=']));
+    const processes = execFileSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8' }).split('\n').filter(line => line.includes(root) || line.includes('ShipIt')).join('\n');
+    await fs.writeFile('update-smoke-results/processes.txt', processes);
   }
   for (const name of ['app.log', 'user-data/update-smoke.jsonl']) {
     await fs.copyFile(path.join(root, name), path.join('update-smoke-results', path.basename(name))).catch(() => undefined);

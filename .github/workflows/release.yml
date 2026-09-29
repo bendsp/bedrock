@@ -131,6 +131,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.platform }}-${{ matrix.arch }}
+          retention-days: 7
           path: release-artifacts/*
           if-no-files-found: error
       - name: Verify installed upgrade and downgrade
@@ -149,6 +150,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: update-smoke-${{ matrix.platform }}-${{ matrix.arch }}
+          retention-days: 7
           path: update-smoke-results/*
           if-no-files-found: ignore
       - name: Remove notarization key

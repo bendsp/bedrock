@@ -1,20 +1,7 @@
-# Releasing (GitHub Actions)
+# Release signing setup
 
-This repo publishes release artifacts on tag push via `.github/workflows/release.yml`.
-
-## What gets built
-
-- Windows: Squirrel installer (`Bedrock.exe`)
-- macOS: `dmg` + `zip` (signed + notarized)
-
-Releases are created as **drafts** and assets are uploaded to the GitHub Release for the tag.
-
-## Release flow
-
-- Version bumps are derived from the pushed tag
-- GitHub Actions applies the tag version only in the release workspace; it does not push version-bump commits back to `main`
-- Release jobs install with `pnpm install --frozen-lockfile`
-- Build commands use `pnpm build` / `pnpm make:mac`
+See [builds and releases](releases.md) for stable/nightly CI, installer formats,
+version checks, and the in-app update flow.
 
 ## macOS signing + notarization (CI)
 
@@ -28,13 +15,13 @@ For CI, notarization is configured to use **App Store Connect API keys** (`.p8`)
 
 ### Required GitHub Secrets
 
-Add these in GitHub → Settings → Secrets and variables → Actions → **Secrets**:
+Add these to the repository's **Build** environment in GitHub Actions:
 
 - **`MACOS_CERTIFICATE_P12_BASE64`**: base64 of your exported signing certificate `.p12`
   - Must contain a **Developer ID Application** identity (not “Mac App Distribution”)
 - **`MACOS_CERTIFICATE_PASSWORD`**: password used when exporting the `.p12`
 - **`APPLE_TEAM_ID`**: your Apple Developer Team ID (e.g. `ABCD123456`)
-- **`APPLE_IDENTITY`** (optional but recommended): the exact signing identity string
+- **`APPLE_IDENTITY`**: the exact signing identity string
   - Example: `Developer ID Application: Your Name (ABCD123456)`
 
 App Store Connect API key (notarization):

@@ -8,3 +8,5 @@ import "./markdownCore.test";
 import "./noteFiles.test";
 import "./telemetryPrivacy.test";
 import "./workspaceFiles.test";
+
+import "./updates.test";

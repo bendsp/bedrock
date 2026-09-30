@@ -156,3 +156,5 @@ This document gives code-aware agents a concise mental model of Bedrock’s arch
 - 2026-09-29: Added UTF-8 text editing for files of any extension, with binary and mixed-line-ending rejection, plain-text editor mode, and safe save checks.
 
 - 2026-09-29: Images stay atomic rendered objects in both Markdown modes, including table cells, with replace, reveal, and delete controls. Release CI verifies source and packaged versions against the tag.
+
+- 2026-09-29: Added Settings → Updates, stable/nightly feeds, explicit restart and cross-channel downgrade support. Nightly CI runs on main changes with draft reuse on retry; native macOS/Windows update round trips gate releases. Windows release packaging uses NSIS starting with 1.5.2. See `docs/releases.md`.

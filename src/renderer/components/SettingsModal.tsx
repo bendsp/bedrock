@@ -1,3 +1,4 @@
+import UpdatesSettings from "./UpdatesSettings";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { WorkspaceInfo } from "../../shared/types";
 import { EditorFontFamily, KeyBindingAction, UserSettings } from "../settings";
@@ -70,6 +71,9 @@ const editorFontOptions: Array<{
 ];
 
 type SettingsModalProps = {
+  initialCategory?: "editor" | "updates";
+  documentDirty: boolean;
+  onInstallUpdate: () => Promise<void>;
   workspace: WorkspaceInfo | null;
   workspaceBusy: boolean;
   workspaceError: string | null;
@@ -82,9 +86,10 @@ type SettingsModalProps = {
 };
 
 type SettingsCategory =
-  "files" | "editor" | "appearance" | "keybindings" | "developer" | "about";
+  "updates" | "files" | "editor" | "appearance" | "keybindings" | "developer" | "about";
 
 const SettingsModal = ({
+  initialCategory = "editor", documentDirty, onInstallUpdate,
   workspace,
   workspaceBusy,
   workspaceError,
@@ -101,7 +106,7 @@ const SettingsModal = ({
   }, [settings]);
 
   const [activeCategory, setActiveCategory] =
-    useState<SettingsCategory>("editor");
+    useState<SettingsCategory>(initialCategory);
   const [listeningFor, setListeningFor] = useState<KeyBindingAction | null>(
     null,
   );
@@ -287,6 +292,7 @@ const SettingsModal = ({
       { id: "editor", label: "Editor", icon: Type },
       { id: "appearance", label: "Appearance", icon: Palette },
       { id: "keybindings", label: "Keybindings", icon: Keyboard },
+      { id: "updates", label: "Updates", icon: RotateCcw },
       { id: "developer", label: "Developer", icon: Wrench },
       { id: "about", label: "About", icon: Info },
     ];
@@ -364,6 +370,7 @@ const SettingsModal = ({
                   ) : null}
                 </div>
 
+                {activeCategory === "updates" ? <UpdatesSettings dirty={documentDirty} onInstall={onInstallUpdate} /> : null}
                 {activeCategory === "files" ? (
                   <ItemGroup className="rounded-md border border-border bg-background">
                     <Item>

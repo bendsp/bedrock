@@ -1,3 +1,6 @@
+import { updateSmokeFeed, recordUpdateSmoke, runUpdateSmoke } from "./updateSmoke";
+import { createUpdates } from "./electronUpdates";
+import { UpdateController } from "./updateController";
 import { promises as fs } from "node:fs";
 import {
   isWithin,
@@ -9,6 +12,7 @@ import {
 import githubMarkdownCss from "github-markdown-css/github-markdown.css";
 import {
   app,
+  autoUpdater as nativeUpdater,
   clipboard,
   BrowserWindow,
   dialog,
@@ -87,6 +91,36 @@ const handle: typeof ipcMain.handle = (channel, listener) =>
       throw new Error("Test API is disabled.");
     return listener(event, ...args);
   });
+
+let updates: Promise<UpdateController>;
+let updateInstalling = false;
+let updateMayQuit = false;
+let installTimeout: ReturnType<typeof setTimeout> | null = null;
+let rejectInstall: ((error: Error) => void) | null = null;
+nativeUpdater.on("before-quit-for-update", () => {
+  updateMayQuit = true;
+  if (installTimeout) clearTimeout(installTimeout);
+});
+handle("updates:status", async () => (await updates).getStatus());
+handle("updates:channel", async (_event, channel: unknown) => (await updates).selectChannel(channel));
+handle("updates:check", async () => (await updates).check());
+handle("updates:download", async () => (await updates).download());
+handle("updates:cancel", async () => (await updates).cancel());
+handle("updates:install", async () => {
+  const controller = await updates;
+  if (rejectInstall) throw new Error("An update is already being installed.");
+  return new Promise<void>((_resolve, reject) => {
+    rejectInstall = reject;
+    try {
+      updateMayQuit = process.platform === "win32";
+      controller.install([...windowDirtyState.values()].some(Boolean));
+      if (controller.getStatus().phase === "installing") {
+        installTimeout = setTimeout(() => controller.failed(new Error("Installation did not finish.")), 180000);
+        installTimeout.unref();
+      }
+    } catch (error) { rejectInstall = null; reject(error); }
+  });
+});
 
 const testState: BedrockTestState = {
   nextImagePath: null,
@@ -914,6 +948,7 @@ const createWindow = (): void => {
   let forceClose = false;
 
   window.on("close", async (event) => {
+    if (updateInstalling && !updateMayQuit) { event.preventDefault(); return; }
     if (forceClose) {
       return;
     }
@@ -948,6 +983,37 @@ const createWindow = (): void => {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on("ready", () => {
+  const updateScenario = isE2EMode && process.env.BEDROCK_E2E_UPDATES ? JSON.parse(process.env.BEDROCK_E2E_UPDATES) : undefined;
+  const smokeFeed = updateSmokeFeed();
+  const disabled = updateScenario || smokeFeed ? null : (isE2EMode || BEDROCK_LOCAL_BUILD || !app.isPackaged)
+    ? "In-app updates are available in installed release builds."
+    : !["darwin", "win32"].includes(process.platform) ? "In-app updates are available on macOS and Windows." : null;
+  updates = createUpdates(status => {
+    recordUpdateSmoke(status);
+    updateInstalling = status.phase === "installing";
+    if (["error", "disabled"].includes(status.phase) && rejectInstall) {
+      rejectInstall(new Error(status.message ?? "Unable to install update."));
+      rejectInstall = null;
+      updateMayQuit = false;
+      if (installTimeout) clearTimeout(installTimeout);
+    }
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("updates:status", status);
+  }, disabled, updateScenario);
+  const backgroundCheck = async () => {
+    const controller = await updates;
+    if (!["idle", "current", "error"].includes(controller.getStatus().phase)) return;
+    await controller.check();
+    const status = controller.getStatus();
+    if (status.phase === "available" && !status.target?.downgrade) await controller.download();
+  };
+  if (!disabled && !isE2EMode) {
+    setTimeout(() => void backgroundCheck().catch((): undefined => undefined), 30000).unref();
+    setInterval(() => void backgroundCheck().catch((): undefined => undefined), 30 * 60 * 1000).unref();
+  }
+  if (smokeFeed) {
+    void updates.then(runUpdateSmoke).catch(error => { console.error(error); app.exit(1); });
+    return;
+  }
   installApplicationMenu();
   createWindow();
 

@@ -96,6 +96,14 @@ const App = () => {
   const [isQuickOpen, setIsQuickOpen] = useState(false);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsCategory, setSettingsCategory] = useState<"editor" | "updates">("editor");
+  const [updateReady, setUpdateReady] = useState(false);
+  useEffect(() => {
+    let active = true;
+    const unsubscribe = window.electronAPI.onUpdateStatus(status => setUpdateReady(status.phase === "ready"));
+    void window.electronAPI.getUpdateStatus().then(status => { if (active) setUpdateReady(status.phase === "ready"); }).catch((): undefined => undefined);
+    return () => { active = false; unsubscribe(); };
+  }, []);
   const [selectionStats, setSelectionStats] = useState<SelectionStats>({
     hasSelection: false,
     words: 0,
@@ -454,6 +462,7 @@ const App = () => {
   }, [doc, focusEditor, screen, perform, refreshWorkspace]);
 
   const handleOpenSettings = useCallback(() => {
+    setSettingsCategory("editor");
     setIsSettingsOpen(true);
   }, []);
 
@@ -790,8 +799,22 @@ const App = () => {
           onClose={() => setIsPaletteOpen(false)}
         />
       )}
+      {updateReady && !isSettingsOpen ? <button className="fixed right-5 top-12 z-50 rounded-md border border-border bg-background px-3 py-2 text-sm shadow-sm" onClick={() => { setSettingsCategory("updates"); setIsSettingsOpen(true); }}>Update ready</button> : null}
       {isSettingsOpen ? (
         <SettingsModal
+          initialCategory={settingsCategory}
+          documentDirty={isDirty || busy}
+          onInstallUpdate={async () => {
+            if (isDirty) throw new Error("Save your changes before restarting to update.");
+            await perform(async () => {
+              try { await window.electronAPI.installUpdate(); }
+              catch {
+                const status = await window.electronAPI.getUpdateStatus();
+                // The Updates panel already shows native installation failures.
+                if (status.phase !== "disabled") throw new Error(status.message ?? "Unable to restart for the update. Save your changes and try again.");
+              }
+            });
+          }}
           workspace={workspace}
           workspaceBusy={busy}
           workspaceError={workspaceError}
